@@ -9,6 +9,8 @@ android = "{http://schemas.android.com/apk/res/android}"
 permissions = {node.get(android + "name") for node in tree.findall("uses-permission")}
 allowed = {
     "android.permission.POST_NOTIFICATIONS",
+    "android.permission.USE_BIOMETRIC",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
     "com.mateuswilliam.financas.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
 }
 if permissions - allowed:

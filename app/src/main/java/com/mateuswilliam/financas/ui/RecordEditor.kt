@@ -40,18 +40,26 @@ fun RecordEditor(
     accounts: List<AccountOption>,
     lastOrigin: String,
     onAddAccount: suspend (String) -> String,
+    preset: Record? = null,
+    duplicateIndex: DuplicateCandidates? = null,
+    hideAmounts: Boolean = false,
+    reviewProgress: String? = null,
+    newPendingCount: Int = 0,
+    notificationChanged: Boolean = false,
+    onAcceptUpdate: () -> Unit = {},
 ) {
-    val originalAt = rememberSaveable { existing?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis() }
+    val initial = existing ?: preset
+    val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis() }
     val originalDate = Instant.ofEpochMilli(originalAt).atZone(ZoneId.systemDefault())
-    val id = rememberSaveable { existing?.id ?: UUID.randomUUID().toString() }
-    val amount = rememberTextFieldState(initialText = (existing?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
+    val id = rememberSaveable { initial?.id ?: UUID.randomUUID().toString() }
+    val amount = rememberTextFieldState(initialText = (initial?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
     var invalidMoneyInput by rememberSaveable { mutableStateOf(false) }
-    var bank by rememberSaveable { mutableStateOf(existing?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
-    var description by rememberSaveable { mutableStateOf(existing?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
-    var movement by rememberSaveable { mutableStateOf(existing?.movement ?: draft?.movement ?: Movement.EXPENSE) }
-    var method by rememberSaveable { mutableStateOf(existing?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
-    var category by rememberSaveable { mutableStateOf(existing?.category ?: draft?.category ?: Category.OTHER) }
-    var destination by rememberSaveable { mutableStateOf(existing?.destination.orEmpty()) }
+    var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
+    var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
+    var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: Movement.EXPENSE) }
+    var method by rememberSaveable { mutableStateOf(initial?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
+    var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.category ?: Category.OTHER) }
+    var destination by rememberSaveable { mutableStateOf(initial?.destination.orEmpty()) }
     var date by rememberSaveable { mutableStateOf(originalDate.toLocalDate().toString()) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var deleteDialog by remember { mutableStateOf(false) }
@@ -67,6 +75,7 @@ fun RecordEditor(
     val record = Record(id, cents ?: 0, movement, method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), destination)
     val error = RecordValidation.error(record)
+    val duplicates = remember(duplicateIndex, record, draft?.id) { if (draft != null) duplicateIndex?.find(record).orEmpty() else emptyList() }
 
     ModalBottomSheet(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -77,10 +86,11 @@ fun RecordEditor(
         val scroll = if (compactHeight) Modifier.verticalScroll(compactScroll) else Modifier
         Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding().then(scroll)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(if (draft != null) "Conferir movimentação" else if (existing != null) "Editar lançamento" else "Novo lançamento",
+                Text(if (draft != null) "Conferir movimentação" else if (preset != null) "Conferir previsão" else if (existing != null) "Editar lançamento" else "Novo lançamento",
                     style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(if (draft != null) "A notificação só vira lançamento após sua confirmação." else "Seu controle, do seu jeito.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                reviewProgress?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
             }
             val fields = if (compactHeight) Modifier else Modifier.weight(1f, fill = false).verticalScroll(fieldsScroll)
             Column(fields.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -91,6 +101,26 @@ fun RecordEditor(
                             Text(draft.sourceTitle, style = MaterialTheme.typography.titleSmall)
                             Text(draft.sourceBody, style = MaterialTheme.typography.bodySmall)
                             Text(draft.explanation, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+                if (newPendingCount > 0) Text("$newPendingCount nova(s) pendência(s) disponível(is). Os campos desta revisão foram mantidos.", style = MaterialTheme.typography.bodySmall)
+                if (notificationChanged) {
+                    Text("A notificação foi atualizada. O texto de origem acima está atualizado; os campos editados foram preservados. Confira a atualização antes de confirmar.", color = MaterialTheme.colorScheme.error)
+                    OutlinedButton(onClick = onAcceptUpdate, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Usar esta versão e manter a edição") }
+                }
+                if (duplicates.isNotEmpty()) {
+                    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.large) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Possível duplicidade", fontWeight = FontWeight.SemiBold)
+                            Text("Há lançamentos manuais semelhantes. A sugestão não confirma duplicidade e não une ou remove registros.", style = MaterialTheme.typography.bodySmall)
+                            duplicates.forEach { candidate ->
+                                Text(candidate.record.description, style = MaterialTheme.typography.titleSmall)
+                                Text("${candidate.record.bank} · ${shortDate(candidate.record.occurredAt)}", style = MaterialTheme.typography.bodySmall)
+                                Amount(candidate.record.amountCents, hideAmounts, size = 16)
+                                Text(candidate.reasons.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (onIgnore != null) OutlinedButton(onClick = onIgnore, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Ignorar sugestão já registrada") }
                         }
                     }
                 }
@@ -115,7 +145,7 @@ fun RecordEditor(
                 OutlinedButton(onClick = { if (onIgnore != null) onIgnore() else onDismiss() }, enabled = !busy, modifier = Modifier.weight(1f)) {
                     Text(if (onIgnore != null) "Não é transação" else "Cancelar")
                 }
-                Button(onClick = { attempted = true; if (cents != null && error == null) onSave(record) }, enabled = !busy, modifier = Modifier.weight(1f)) {
+                Button(onClick = { attempted = true; if (cents != null && error == null && !notificationChanged) onSave(record) }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
                     Text(if (busy) "Salvando…" else "Confirmar")
                 }
             }

@@ -33,7 +33,7 @@ class FinanceUiTest {
         rule.onNodeWithText("Descrição").performTextInput("Mercado de exemplo")
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Novo lançamento").fetchSemanticsNodes().isEmpty() }
-        rule.onNodeWithText("Extrato").performClick()
+        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Mercado de exemplo").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Mercado de exemplo").assertIsDisplayed()
         assertEquals(4290L, runBlocking { app.repository.exportRecords().single().amountCents })
@@ -77,7 +77,7 @@ class FinanceUiTest {
     @Test fun existingAmountIsNotScaledAgainWhenEditing() = runBlocking {
         app.repository.save(Record("editar-exemplo", 4290, Movement.EXPENSE, PaymentMethod.PIX,
             Category.FOOD, "Conta de exemplo", "Editar valor de exemplo", System.currentTimeMillis()), null)
-        rule.onNodeWithText("Extrato").performClick()
+        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Editar valor de exemplo").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Editar valor de exemplo").performClick()
         confirmEntry()
@@ -85,7 +85,7 @@ class FinanceUiTest {
     }
 
     @Test fun appearancePersistsAfterActivityRecreationAndUpdatesSystemBars() {
-        rule.onNodeWithText("Ajustes").performClick()
+        rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
         rule.onNodeWithText("Escuro").performClick()
         rule.runOnIdle {
             assertEquals(Appearance.DARK, app.settings.state.value.appearance)
@@ -93,7 +93,7 @@ class FinanceUiTest {
         }
         rule.activityRule.scenario.recreate()
         rule.waitForIdle()
-        rule.onNodeWithText("Ajustes").performClick()
+        rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
         rule.onNodeWithText("Escuro").assertIsSelected()
         screenshot("ajustes-escuro")
         rule.onNodeWithText("Claro").performClick()
@@ -108,7 +108,7 @@ class FinanceUiTest {
     }
 
     @Test fun decliningDisclosureKeepsCaptureDisabled() {
-        rule.onNodeWithText("Ajustes").performClick()
+        rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
         rule.onNodeWithContentDescription("Capturar notificações").performClick()
         rule.onNodeWithText("Antes de ativar a captura").assertIsDisplayed()
         rule.onNodeWithText("Agora não").performClick()
@@ -286,7 +286,7 @@ class FinanceUiTest {
             command("cmd notification allow_listener " + component)
             resume()
             rule.waitUntil(10000) { app.listenerConnected.value }
-            rule.onNodeWithText("Ajustes").performClick()
+            rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithText("Permitir alertas de revisão").assertExists()
             command("cmd notification disallow_listener " + component)

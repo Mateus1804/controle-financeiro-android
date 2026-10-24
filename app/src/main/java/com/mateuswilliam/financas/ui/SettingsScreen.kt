@@ -27,6 +27,8 @@ fun SettingsScreen(
     onToggle: (Boolean) -> Unit, onApps: () -> Unit, onAccess: () -> Unit,
     onReconnect: () -> Unit, onAlerts: () -> Unit, onExport: () -> Unit,
     onClear: () -> Unit, onSimulate: () -> Unit, onAppearance: (Appearance) -> Unit, busy: Boolean,
+    onBackup: () -> Unit, onRestore: () -> Unit, onPlanning: () -> Unit,
+    onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit,
 ) {
     var privacy by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -77,10 +79,40 @@ fun SettingsScreen(
         item {
             SettingsCard {
                 Text("Dados do aplicativo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("Os registros ficam neste aparelho. O CSV exporta os lançamentos confirmados; ele ainda não substitui um backup restaurável.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Os registros ficam neste aparelho. O CSV é um relatório; o backup criptografado permite recuperar os dados do aplicativo.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Exportar lançamentos em CSV") }
                 TextButton(onClick = { privacy = true }) { Text("Privacidade e uso dos dados") }
                 TextButton(onClick = onClear, enabled = !busy) { Text("Apagar todos os dados", color = MaterialTheme.colorScheme.error) }
+            }
+        }
+        item {
+            SettingsCard {
+                Text("Backup e recuperação", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Arquivo criptografado com senha, conferência em base temporária e confirmação antes de substituir os dados. A senha não pode ser recuperada.")
+                OutlinedButton(onClick = onBackup, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Criar backup criptografado") }
+                OutlinedButton(onClick = onRestore, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Restaurar backup") }
+            }
+        }
+        item {
+            SettingsCard {
+                Text("Planejamento", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Limites mensais por categoria e previsões recorrentes. Uma previsão só entra nos totais após confirmação.")
+                OutlinedButton(onClick = onPlanning, modifier = Modifier.fillMaxWidth()) { Text("Orçamentos e recorrências") }
+            }
+        }
+        item {
+            SettingsCard {
+                Text("Proteção do aplicativo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Autenticar ao abrir", Modifier.weight(1f))
+                    Switch(settings.lockEnabled, onLockChange, modifier = Modifier.semantics { contentDescription = "Autenticar ao abrir" })
+                }
+                Text("Biometria ou credencial do aparelho ao iniciar e após 30 segundos em segundo plano. Alterar este controle exige autenticação. O banco local não recebe criptografia adicional.", style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Ocultar no seletor e bloquear capturas", Modifier.weight(1f))
+                    Switch(settings.secureScreen, onSecureScreen, modifier = Modifier.semantics { contentDescription = "Ocultar no seletor e bloquear capturas" })
+                }
+                Text("Protege a imagem no seletor de aplicativos e impede capturas e compartilhamento da tela quando respeitado pelo Android. A proteção é ativada junto com o bloqueio e pode ser ajustada separadamente.", style = MaterialTheme.typography.bodySmall)
             }
         }
         if (BuildConfig.DEBUG) item {
@@ -93,7 +125,7 @@ fun SettingsScreen(
         item { Text("Controle Financeiro · ${BuildConfig.VERSION_NAME}\nPrimeira versão em desenvolvimento", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     if (privacy) AlertDialog(onDismissRequest = { privacy = false }, title = { DialogSystemBars(); Text("Privacidade") },
-        text = { Text("As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.\n\nO texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais são mantidos para evitar o reprocessamento do mesmo evento.\n\nA exportação CSV contém os lançamentos confirmados e é salva no destino escolhido. Os dados locais são removidos ao desinstalar ou usar a opção de apagar. A restauração de backup ainda está em desenvolvimento.") },
+        text = { Text("As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.\n\nO texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais são mantidos para evitar o reprocessamento do mesmo evento.\n\nO CSV contém os lançamentos confirmados. O backup criptografado também inclui pendências e planejamento; o arquivo e a senha ficam sob responsabilidade do usuário. O bloqueio da interface não criptografa o banco local.\n\nOs dados locais são removidos ao desinstalar ou usar a opção de apagar. A recuperação depende de um backup válido e da senha original.") },
         confirmButton = { TextButton(onClick = { privacy = false }) { Text("Entendi") } })
 }
 

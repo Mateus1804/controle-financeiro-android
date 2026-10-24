@@ -16,3 +16,5 @@ keystore.properties
 captures/
 qa/
 .DS_Store
+*.cfbackup
+casos-locais/

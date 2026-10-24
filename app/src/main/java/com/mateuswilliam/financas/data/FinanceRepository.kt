@@ -7,6 +7,12 @@ import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.core.RecordValidation
 import com.mateuswilliam.financas.core.AccountCatalog
 import com.mateuswilliam.financas.core.AccountNames
+import com.mateuswilliam.financas.core.Budgets
+import com.mateuswilliam.financas.core.MonthlyBudget
+import com.mateuswilliam.financas.core.RecurringPlan
+import com.mateuswilliam.financas.core.Recurrences
+import com.mateuswilliam.financas.core.Movement
+import java.time.LocalDate
 import kotlinx.coroutines.flow.combine
 import java.util.UUID
 import kotlinx.coroutines.flow.map
@@ -23,7 +29,10 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     private val writes = Mutex()
     val pending = dao.pending()
     val records = dao.records().map { rows -> rows.map { it.toRecord() } }
+    val manualRecords = dao.records().map { rows -> rows.filter { it.sourceDraftId == null }.map { it.toRecord() } }
     val accounts = combine(dao.accounts(), records) { saved, history -> AccountCatalog.options(saved.map { it.toOption() }, history) }
+    val budgets = dao.budgets().map { rows -> rows.map { it.toBudget() } }
+    val recurring = dao.recurring().map { rows -> rows.map { it.toPlan() } }
 
     private suspend fun rememberAccount(name: String) {
         val label = AccountNames.clean(name)
@@ -89,10 +98,81 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     suspend fun dismiss(id: String) = writes.withLock { dao.reviewDraft(id, "DISMISSED") }
-    suspend fun deleteRecord(id: String) = writes.withLock { dao.deleteRecord(id) }
+    suspend fun deleteRecord(id: String) = writes.withLock { database.withTransaction { dao.unlinkOccurrence(id); dao.deleteRecord(id) } }
     suspend fun exportRecords(): List<Record> = dao.allRecords().map { it.toRecord() }
+
+    suspend fun saveBudget(budget: MonthlyBudget) = writes.withLock {
+        Budgets.error(budget)?.let { throw IllegalArgumentException(it) }
+        dao.upsertBudget(BudgetEntity(budget.month, budget.category, budget.limitCents))
+    }
+    suspend fun deleteBudget(month: String, category: com.mateuswilliam.financas.core.Category) = writes.withLock { dao.deleteBudget(month, category) }
+
+    suspend fun saveRecurring(plan: RecurringPlan) = writes.withLock {
+        Recurrences.error(plan)?.let { throw IllegalArgumentException(it) }
+        database.withTransaction {
+            require(dao.occurrence(plan.id, plan.nextDate) == null) { "Esse vencimento já foi tratado. Escolha outra data para a previsão." }
+            val old = dao.recurringById(plan.id)
+            val reminder = if (old?.nextDate == plan.nextDate) old.lastRemindedDate else ""
+            dao.upsertRecurring(RecurringEntity.from(plan.copy(lastRemindedDate = reminder)))
+            rememberAccount(plan.bank)
+        }
+    }
+
+    suspend fun confirmRecurring(id: String, due: String, record: Record): Boolean = writes.withLock {
+        RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
+        require(record.movement in setOf(Movement.EXPENSE, Movement.INCOME)) { "O registro de uma previsão precisa ser receita ou despesa." }
+        database.withTransaction {
+            val plan = dao.recurringById(id) ?: return@withTransaction false
+            if (!plan.active || plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
+            dao.insertRecord(RecordEntity.from(record, null))
+            dao.insertOccurrence(OccurrenceEntity(id, due, "RECORDED", record.id))
+            check(dao.advanceRecurring(id, due, Recurrences.followingDate(due, plan.dayOfMonth)) == 1)
+            rememberAccount(record.bank)
+            true
+        }
+    }
+
+    suspend fun skipRecurring(id: String, due: String): Boolean = writes.withLock {
+        database.withTransaction {
+            val plan = dao.recurringById(id) ?: return@withTransaction false
+            if (plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
+            dao.insertOccurrence(OccurrenceEntity(id, due, "SKIPPED", null))
+            check(dao.advanceRecurring(id, due, Recurrences.followingDate(due, plan.dayOfMonth)) == 1)
+            true
+        }
+    }
+
+    suspend fun notifyDue(today: LocalDate, send: (RecurringPlan) -> Boolean) = writes.withLock {
+        if (!settings.snapshot().remindersEnabled) return@withLock
+        dao.allRecurring().filter { it.active && !LocalDate.parse(it.nextDate).isAfter(today) && it.lastRemindedDate != it.nextDate }
+            .forEach { if (settings.snapshot().remindersEnabled && send(it.toPlan())) dao.markReminded(it.id, it.nextDate) }
+    }
+
+    suspend fun snapshot(): FinanceSnapshot = writes.withLock {
+        val display = settings.snapshot().let { BackupDisplay(it.appearance, it.hideAmounts, it.lastOrigin) }
+        database.withTransaction { readSnapshot(dao, System.currentTimeMillis(), display) }
+    }
+
+    suspend fun restore(snapshot: FinanceSnapshot) = writes.withLock {
+        BackupSnapshot.validate(snapshot)
+        val wasEnabled = settings.snapshot().enabled
+        withContext(Dispatchers.IO) { settings.pauseCapture() }
+        try {
+            database.withTransaction { clearTables(); insertSnapshot(dao, snapshot) }
+        } catch (exception: Exception) {
+            if (wasEnabled) withContext(Dispatchers.IO) { settings.setEnabled(true) }
+            throw exception
+        }
+        withContext(Dispatchers.IO) { settings.restoreDisplay(snapshot.display) }
+    }
+
+    private suspend fun clearTables() {
+        dao.clearOccurrences(); dao.clearRecurring(); dao.clearBudgets()
+        dao.clearRecords(); dao.clearDrafts(); dao.clearAccounts()
+    }
+
     suspend fun clear() = writes.withLock {
         withContext(Dispatchers.IO) { settings.reset() }
-        database.withTransaction { dao.clearRecords(); dao.clearDrafts(); dao.clearAccounts() }
+        database.withTransaction { clearTables() }
     }
 }
