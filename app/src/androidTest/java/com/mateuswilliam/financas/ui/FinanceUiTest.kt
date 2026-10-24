@@ -26,7 +26,7 @@ class FinanceUiTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private val app get() = rule.activity.application as FinanceApplication
 
-    @Before fun reset() { runBlocking { app.repository.clear() }; rule.waitForIdle() }
+    @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
 
     @Test fun manualEntryWorksWithoutNotificationAccess() {
         rule.onNodeWithContentDescription("Novo lançamento").performClick()
@@ -67,6 +67,7 @@ class FinanceUiTest {
         val field = rule.onNodeWithTag("amount-input")
         field.performTextInput("1234")
         field.performTextClearance()
+        rule.onNodeWithText("Descrição").performTextInput("Teste de valor apagado")
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
         field.performTextInput("1")
@@ -146,7 +147,71 @@ class FinanceUiTest {
         screenshot("revisao-escuro")
     }
 
+
+    @Test fun firstUseCanContinueManuallyWithoutConsent() {
+        app.settings.reset()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Usar manualmente").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Usar manualmente").performClick()
+        rule.runOnIdle { assertTrue(app.settings.state.value.introSeen); assertFalse(app.settings.state.value.consented) }
+        rule.onNodeWithContentDescription("Novo lançamento").assertIsDisplayed()
+    }
+
+    @Test fun introductionDoesNotReplaceDisclosureConsent() {
+        app.settings.reset()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Ativar preenchimento por notificações").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Ativar preenchimento por notificações").performClick()
+        rule.onNodeWithText("Antes de ativar a captura").assertIsDisplayed()
+        rule.onNodeWithText("Agora não").performClick()
+        rule.runOnIdle { assertFalse(app.settings.state.value.consented) }
+    }
+
+    @Test fun closedCaptureNoticeStaysClosedAfterRecreation() {
+        rule.onNodeWithContentDescription("Fechar aviso de captura").performClick()
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { app.settings.state.value.captureCondition == "CONSENT" }
+        rule.onAllNodesWithContentDescription("Fechar aviso de captura").assertCountEquals(0)
+        rule.runOnIdle { assertFalse(app.settings.state.value.consented) }
+    }
+
+    @Test fun accountCanBeAddedWithoutLosingTheAmount() {
+        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        rule.onNodeWithTag("amount-input").performTextInput("1234")
+        rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo().performClick()
+        rule.onNodeWithText("Nome da conta").performTextInput("Inter pessoal")
+        rule.onNodeWithText("Adicionar", useUnmergedTree = true).performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Adicionar conta ou banco").fetchSemanticsNodes().isEmpty() }
+        confirmEntry()
+        val record = runBlocking { app.repository.exportRecords().single() }
+        assertEquals(1234L, record.amountCents); assertEquals("Inter pessoal", record.bank)
+    }
+
+    @Test fun amountAndDescriptionSurviveFormRecreation() {
+        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        rule.onNodeWithTag("amount-input").performTextInput("1234")
+        rule.onNodeWithText("Descrição").performTextInput("Formulário de exemplo")
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Descrição").assertTextContains("Formulário de exemplo")
+        confirmEntry()
+        assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
+    }
+
+    @Test fun chartOpensOnlyTheSelectedExpenseGroup() = runBlocking {
+        val now = System.currentTimeMillis()
+        app.repository.save(Record("grafico-gasto", 10000, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
+            "Conta teste", "Despesa do gráfico", now), null)
+        app.repository.save(Record("grafico-receita", 20000, Movement.INCOME, PaymentMethod.PIX, Category.FOOD,
+            "Conta teste", "Receita excluída do gráfico", now), null)
+        rule.waitUntil(5000) { rule.onAllNodesWithText(Money.format(10000)).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("expense-group-FOOD"))
+        screenshot("grafico-categorias")
+        rule.onNodeWithTag("expense-group-FOOD").performClick()
+        rule.onNodeWithText("Despesa do gráfico").assertIsDisplayed()
+        rule.onAllNodesWithText("Receita excluída do gráfico").assertCountEquals(0)
+    }
+
     private fun confirmEntry() {
+        rule.onNodeWithText("Descrição").performTextReplacement("Lançamento fictício de teste")
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
     }

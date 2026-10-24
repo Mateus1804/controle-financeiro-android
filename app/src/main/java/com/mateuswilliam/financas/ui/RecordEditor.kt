@@ -35,12 +35,15 @@ fun RecordEditor(
     onSave: (Record) -> Unit,
     onIgnore: (() -> Unit)?,
     onDelete: (() -> Unit)?,
+    accounts: List<AccountOption>,
+    lastOrigin: String,
+    onAddAccount: suspend (String) -> String,
 ) {
-    val originalAt = existing?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis()
+    val originalAt = rememberSaveable { existing?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis() }
     val originalDate = Instant.ofEpochMilli(originalAt).atZone(ZoneId.systemDefault())
     val id = rememberSaveable { existing?.id ?: UUID.randomUUID().toString() }
     val amount = rememberTextFieldState(initialText = (existing?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
-    var bank by rememberSaveable { mutableStateOf(existing?.bank ?: draft?.bank ?: "Carteira") }
+    var bank by rememberSaveable { mutableStateOf(existing?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
     var description by rememberSaveable { mutableStateOf(existing?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
     var movement by rememberSaveable { mutableStateOf(existing?.movement ?: draft?.movement ?: Movement.EXPENSE) }
     var method by rememberSaveable { mutableStateOf(existing?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
@@ -85,8 +88,8 @@ fun RecordEditor(
                 ChoiceField("Movimentação", movement, Movement.entries.toList(), { it.label }) { movement = it }
                 ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
-                OutlinedTextField(bank, { bank = it.take(80) }, label = { Text("Conta ou banco de origem") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                if (movement == Movement.TRANSFER) OutlinedTextField(destination, { destination = it.take(80) }, label = { Text("Conta de destino") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount)
+                if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount)
                 OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
                 OutlinedButton(onClick = {

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.mateuswilliam.financas.core.Ledger
 import com.mateuswilliam.financas.core.NotificationInput
 import com.mateuswilliam.financas.core.Record
+import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.data.CaptureSettings
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.data.DraftChangedException
@@ -26,6 +27,7 @@ data class FinanceState(
     val pending: List<DraftEntity> = emptyList(),
     val settings: CaptureSettings = CaptureSettings(),
     val loaded: Boolean = false,
+    val accounts: List<AccountOption> = emptyList(),
 )
 
 data class SelectableApp(val packageName: String, val label: String)
@@ -41,8 +43,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val message = MutableStateFlow<String?>(null)
     val apps = MutableStateFlow<List<SelectableApp>>(emptyList())
     val loadingApps = MutableStateFlow(false)
-    val state = combine(repository.records, repository.pending, preferences.state) { records, drafts, settings ->
-        FinanceState(records, drafts, settings, loaded = true)
+    val state = combine(repository.records, repository.pending, preferences.state, repository.accounts) { records, drafts, settings, accounts ->
+        FinanceState(records, drafts, settings, loaded = true, accounts = accounts)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
 
     fun save(record: Record, draftId: String?, editing: Boolean, expectedRevision: Int?, onSaved: () -> Unit) = action {
@@ -108,4 +110,5 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     suspend fun exportCsv(): String = Ledger.csv(repository.exportRecords(), ZoneId.systemDefault())
+    suspend fun addAccount(name: String): String = repository.addAccount(name)
 }

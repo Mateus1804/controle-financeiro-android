@@ -59,6 +59,7 @@ jobs:
             core/build/reports/tests/
             core/build/test-results/
             app/build/reports/lint-results-debug.*
+            app/schemas/
           retention-days: 14
 
   device:

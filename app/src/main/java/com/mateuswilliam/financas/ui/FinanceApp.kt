@@ -24,6 +24,9 @@ import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.R
 import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.core.Record
+import com.mateuswilliam.financas.core.CaptureIssue
+import com.mateuswilliam.financas.core.ExpenseFilter
+import com.mateuswilliam.financas.core.ExpenseDimension
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.notifications.BankNotificationListener
 import java.time.YearMonth
@@ -44,14 +47,21 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var monthString by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthString)
     var categoryFilter by rememberSaveable { mutableStateOf<Category?>(null) }
-    var editing by remember { mutableStateOf(false) }
-    var draft by remember { mutableStateOf<DraftEntity?>(null) }
-    var record by remember { mutableStateOf<Record?>(null) }
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var selectedDraftId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedRecordId by rememberSaveable { mutableStateOf<String?>(null) }
+    var expectedRevision by rememberSaveable { mutableStateOf<Int?>(null) }
+    val draft = state.pending.find { it.id == selectedDraftId }
+    val record = state.records.find { it.id == selectedRecordId }
+    var expenseDimension by rememberSaveable { mutableStateOf<ExpenseDimension?>(null) }
+    var expenseKey by rememberSaveable { mutableStateOf("") }
+    var expenseLabel by rememberSaveable { mutableStateOf("") }
+    val expenseFilter = expenseDimension?.let { ExpenseFilter(it, expenseKey, expenseLabel) }
     var disclosure by remember { mutableStateOf(false) }
     var appPicker by remember { mutableStateOf(false) }
     var clearDialog by remember { mutableStateOf(false) }
     var permissionVersion by remember { mutableIntStateOf(0) }
-    val seen = remember { mutableSetOf<String>() }
+    val seen = rememberSaveable { arrayListOf<String>() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -75,7 +85,21 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         }
     }
 
-    fun openDraft(value: DraftEntity) { seen.add(value.id); draft = value; record = null; editing = true }
+    fun openDraft(value: DraftEntity) { seen.add(value.id); selectedDraftId = value.id; selectedRecordId = null; expectedRevision = value.revision; editing = true }
+    val captureIssue = CaptureIssue.evaluate(state.settings.consented, state.settings.enabled, state.settings.packages.isNotEmpty(), hasAccess, connected)
+    LaunchedEffect(state.loaded, captureIssue) { if (state.loaded) model.preferences.observeCaptureCondition(captureIssue.name) }
+    LaunchedEffect(state.loaded, selectedDraftId, selectedRecordId, draft, record) {
+        if (state.loaded && editing && ((selectedDraftId != null && draft == null) || (selectedRecordId != null && record == null))) editing = false
+    }
+    fun resolveCapture() {
+        when (captureIssue) {
+            CaptureIssue.CONSENT -> disclosure = true
+            CaptureIssue.DISABLED -> model.preferences.setEnabled(true)
+            CaptureIssue.APPS -> { appPicker = true; model.loadApps() }
+            CaptureIssue.ACCESS -> requestAccess()
+            else -> tab = 3
+        }
+    }
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); if (model.message.value == it) model.message.value = null }
     }
@@ -108,7 +132,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             }
         },
         floatingActionButton = {
-            if (tab != 3) FloatingActionButton(onClick = { draft = null; record = null; editing = true },
+            if (tab != 3) FloatingActionButton(onClick = { selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true },
                 containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
                 AppIcon(R.drawable.ic_add, description = "Novo lançamento")
             }
@@ -119,10 +143,15 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                 when (tab) {
                     0 -> DashboardScreen(state, month, { monthString = it.toString() },
                         { model.preferences.hideAmounts(!state.settings.hideAmounts) },
-                        { tab = 1 }, { categoryFilter = it; tab = 2 })
+                        { tab = 1 }, { categoryFilter = it; expenseDimension = null; tab = 2 },
+                        onExpenseGroup = { categoryFilter = null; expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; tab = 2 },
+                        notice = if (state.loaded && captureIssue != CaptureIssue.READY && state.settings.dismissedCondition != captureIssue.name) {
+                            { CaptureNotice(captureIssue, ::resolveCapture) { model.preferences.dismissCaptureNotice(captureIssue.name) } }
+                        } else null)
                     1 -> PendingScreen(state.pending, state.settings.hideAmounts, ::openDraft, { model.dismiss(it) }, busy)
                     2 -> RecordsScreen(state.records, month, { monthString = it.toString() }, state.settings.hideAmounts,
-                        categoryFilter, { categoryFilter = it }, { record = it; draft = null; editing = true })
+                        categoryFilter, { categoryFilter = it }, { selectedRecordId = it.id; selectedDraftId = null; expectedRevision = null; editing = true },
+                        expenseFilter = expenseFilter, onClearExpenseFilter = { expenseDimension = null })
                     3 -> SettingsScreen(state.settings, connected, hasAccess, canAlert, captureError,
                         onToggle = { enabled -> if (enabled && !state.settings.consented) disclosure = true else model.preferences.setEnabled(enabled) },
                         onApps = { if (!state.settings.consented) disclosure = true else { appPicker = true; model.loadApps() } },
@@ -137,12 +166,16 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         }
     }
 
-    if (editing) key(draft?.id, record?.id) {
+    if (editing && (selectedDraftId == null || draft != null) && (selectedRecordId == null || record != null)) key(selectedDraftId, selectedRecordId) {
         RecordEditor(draft, record, busy, onDismiss = { editing = false },
-            onSave = { model.save(it, draft?.id, editing = record != null, expectedRevision = draft?.revision) { editing = false } },
+            onSave = { model.save(it, selectedDraftId, editing = selectedRecordId != null, expectedRevision = expectedRevision) { editing = false } },
             onIgnore = draft?.let { current -> { model.dismiss(current.id); editing = false } },
-            onDelete = record?.let { current -> { model.delete(current.id) } })
+            onDelete = record?.let { current -> { model.delete(current.id) } },
+            accounts = state.accounts, lastOrigin = state.settings.lastOrigin, onAddAccount = model::addAccount)
     }
+    if (state.loaded && !state.settings.introSeen) CaptureIntroduction(
+        onActivate = { model.preferences.finishIntro(); disclosure = true },
+        onManual = { model.preferences.finishIntro() })
     if (disclosure) DisclosureDialog(onDismiss = { disclosure = false }, onAccept = {
         model.preferences.acceptDisclosure(); disclosure = false; appPicker = true; model.loadApps()
     })

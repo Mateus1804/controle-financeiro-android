@@ -54,4 +54,21 @@ class AppearancePreferencesTest {
         app.repository.clear()
         assertEquals(Appearance.SYSTEM, CapturePreferences(app).state.value.appearance)
     }
+
+    @Test fun dismissingTheSameNoticeSurvivesAReopenedPreferencesInstance() {
+        app.settings.observeCaptureCondition("ACCESS")
+        app.settings.dismissCaptureNotice("ACCESS")
+        app.settings.observeCaptureCondition("ACCESS")
+        val reopened = CapturePreferences(app)
+        assertEquals("ACCESS", reopened.state.value.dismissedCondition)
+        assertFalse(reopened.state.value.consented)
+    }
+
+    @Test fun activeCaptureThenRevocationCanShowANewNotice() {
+        app.settings.observeCaptureCondition("ACCESS")
+        app.settings.dismissCaptureNotice("ACCESS")
+        app.settings.observeCaptureCondition("READY")
+        app.settings.observeCaptureCondition("ACCESS")
+        assertEquals("", CapturePreferences(app).state.value.dismissedCondition)
+    }
 }

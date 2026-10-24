@@ -30,6 +30,18 @@ Mantenho somente o texto necessário enquanto a notificação está pendente. Ap
 
 Desenho os gráficos de barras com componentes Compose nesta etapa. Adotarei uma biblioteca de gráficos quando houver uma visualização que justifique a dependência. Uso dois módulos para testar as regras sem depender do ciclo de vida Android.
 
+## Entrada monetária em centavos
+
+Interpreto a sequência numérica do formulário como centavos: `1234` corresponde a `R$ 12,34`. Diferencio essa digitação da colagem de um valor formatado em reais, como `1.234,56`. Preservo o limite monetário e os valores que já existem ou foram sugeridos por notificações.
+
+Mantenho a conversão em `MoneyInput`, no módulo `core`. Uso `TextFieldState`, `InputTransformation` e `OutputTransformation` na interface para inserir separadores sem armazená-los no campo e deixar o Compose acompanhar o cursor e a seleção. Continuo usando o interpretador `Money.parse` nas notificações e os mesmos centavos inteiros na persistência e na exportação.
+
+## Aparência independente do sistema
+
+Guardo a escolha entre Sistema, Claro e Escuro nas preferências locais, com Sistema como padrão. Leio essa preferência antes de carregar os lançamentos para evitar depender da consulta ao banco para escolher as cores. Atualizo a interface, os ícones das barras do sistema e o tema do calendário. Uma preferência ausente ou desconhecida acompanha o sistema.
+
+Preservo consentimento e aplicativos selecionados ao mudar a aparência. A exclusão de todos os dados também restaura a opção Sistema. Essa alteração não modifica o esquema Room nem acrescenta dependências.
+
 ## Recursos que adiei
 
 - Registro automático sem revisão: primeiro preciso comprovar os formatos e a deduplicação.

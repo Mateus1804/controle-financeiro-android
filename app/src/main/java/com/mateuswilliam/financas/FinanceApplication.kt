@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class FinanceApplication : Application() {
     val settings by lazy { CapturePreferences(this) }
-    val database by lazy { Room.databaseBuilder(this, FinanceDatabase::class.java, "financas.db").build() }
+    val database by lazy { Room.databaseBuilder(this, FinanceDatabase::class.java, "financas.db").addMigrations(FinanceDatabase.MIGRATION_1_2).build() }
     val repository by lazy { FinanceRepository(database, settings) }
     val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val listenerConnected = MutableStateFlow(false)

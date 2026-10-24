@@ -12,7 +12,11 @@ import kotlinx.coroutines.launch
 class BankNotificationListener : NotificationListenerService() {
     private val app get() = application as FinanceApplication
 
-    override fun onListenerConnected() { app.listenerConnected.value = true }
+    override fun onListenerConnected() {
+        app.listenerConnected.value = true
+        val settings = app.settings.state.value
+        if (settings.consented && settings.enabled && settings.packages.isNotEmpty()) app.settings.observeCaptureCondition("READY")
+    }
     override fun onListenerDisconnected() { app.listenerConnected.value = false }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {

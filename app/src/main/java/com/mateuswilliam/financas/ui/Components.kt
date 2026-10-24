@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.mateuswilliam.financas.core.Money
 import com.mateuswilliam.financas.core.Movement
 import com.mateuswilliam.financas.core.Record
+import com.mateuswilliam.financas.R
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -54,10 +56,19 @@ fun Amount(cents: Long, hidden: Boolean, modifier: Modifier = Modifier, size: In
 
 @Composable
 fun RecordRow(record: Record, hidden: Boolean, onEdit: (() -> Unit)? = null) {
-    val color = if (record.movement == Movement.EXPENSE) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    val color = when (record.movement) {
+        Movement.EXPENSE -> MaterialTheme.colorScheme.error
+        Movement.TRANSFER -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    val clickable = if (onEdit != null) Modifier.clickable(onClick = onEdit) else Modifier
+    Row(Modifier.fillMaxWidth().then(clickable).heightIn(min = 48.dp).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(color.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-            Text(when (record.movement) { Movement.EXPENSE -> "↗"; Movement.TRANSFER -> "⇄"; else -> "↙" }, color = color, fontSize = 23.sp)
+            Icon(painterResource(when (record.movement) {
+                Movement.EXPENSE -> R.drawable.ic_expense
+                Movement.TRANSFER -> R.drawable.ic_transfer
+                else -> R.drawable.ic_income
+            }), contentDescription = null, tint = color)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(record.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)

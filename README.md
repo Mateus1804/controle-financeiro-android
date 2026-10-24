@@ -6,12 +6,15 @@ Desenvolvo este aplicativo para acompanhar minhas receitas e despesas com menos 
 
 - Registro manual de receitas, despesas, transferências e estornos.
 - Entrada monetária com centavos automáticos: ao digitar `1234`, vejo `R$ 12,34`. Também posso colar valores formatados em reais.
+- Cadastro e pesquisa de contas reutilizáveis, com opções recentes e aproveitamento dos nomes presentes no histórico.
 - Edição e exclusão de lançamentos confirmados.
 - Caixa de revisão para notificações, com valor, origem, movimentação, meio de pagamento e categoria editáveis.
 - Captura opcional dos aplicativos que eu selecionar, depois do consentimento e da autorização do Android.
 - Resumo mensal, comparação de receitas e despesas e barras de gastos por categoria.
+- Gráfico de rosca das despesas brutas por categoria, conta ou meio de pagamento, com detalhamento e estornos indicados separadamente.
 - Busca e filtros no histórico, navegação por mês e exportação CSV.
 - Escolha persistente entre os temas Sistema, Claro e Escuro em Ajustes, além da opção de ocultar totais.
+- Apresentação inicial opcional da captura e avisos de configuração que posso fechar, mantendo o cadastro manual disponível.
 
 ## Como trato as notificações
 
