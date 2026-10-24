@@ -34,6 +34,12 @@ Uso Kotlin, Jetpack Compose, Material 3, Room/SQLite, Coroutines e StateFlow. Se
 
 Armazeno dinheiro em centavos inteiros. Transferências ficam fora do resultado mensal, e estornos reduzem as despesas líquidas. A confirmação de uma pendência e a criação do lançamento ocorrem na mesma transação do banco de dados.
 
+## Qualidade
+
+Validei a base com **31 testes de regras Kotlin** e **13 testes instrumentados no Android 15**. Cobri valores monetários, interpretação, totais, CSV, consentimento, persistência, confirmação simultânea e revisão de mensagens alteradas. Os testes de interface incluem cadastro manual e recusa da captura.
+
+Também compilei o APK de depuração, executei Android Lint sem erros e conferi as permissões do manifesto mesclado. Mantenho os resultados e as limitações em [Qualidade e validação](docs/qualidade.md).
+
 ## Estágio do projeto
 
 Estou desenvolvendo a versão **0.1.0**, com a base de registro e revisão. Valido os padrões com exemplos sintéticos: ainda preciso conferir as notificações reais de cada aplicativo bancário e o comportamento dos aparelhos.
