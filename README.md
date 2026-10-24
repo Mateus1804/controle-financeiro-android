@@ -15,6 +15,11 @@ O Controle Financeiro Android permite acompanhar receitas e despesas com menos d
 - Busca e filtros no histórico, navegação por mês e exportação CSV.
 - Escolha persistente entre os temas Sistema, Claro e Escuro em Ajustes, além da opção de ocultar totais.
 - Apresentação inicial da captura opcional e avisos de configuração que podem ser fechados, mantendo o cadastro manual disponível.
+- Backup criptografado com senha e formato versionado, com prévia e conferência em banco temporário antes da restauração.
+- Avisos de possível duplicidade entre lançamentos manuais e novas pendências, sem união ou exclusão automática.
+- Revisão em sequência com progresso e oferta de acesso ao próximo item, preservando a edição quando chegam novas notificações.
+- Orçamentos mensais por categoria e previsões recorrentes, com confirmação manual de cada vencimento.
+- Lembretes opcionais de vencimentos e proteção opcional por biometria ou credencial do aparelho.
 
 ## Captura e revisão de notificações
 
@@ -24,11 +29,23 @@ A implementação inicial reconhece padrões genéricos em português e valores 
 
 Com o aplicativo aberto, a revisão ocorre em um formulário. Fora dele, um alerta abre a pendência ao ser tocado, desde que o envio de alertas esteja autorizado. O lançamento manual permanece disponível quando uma notificação não chega ou não contém informações suficientes.
 
+As possíveis duplicidades consideram valor, tipo, proximidade de data, origem e descrição. Contas diferentes do mesmo banco podem representar movimentações legítimas; a indicação é apenas um apoio à conferência. Uma atualização da notificação mantém os campos editados e exige conferência explícita da nova versão.
+
+Os casos reproduzíveis e a situação de Inter, Nubank, PicPay, Mercado Pago e PagBank estão registrados em [Validação bancária](docs/validacao-bancaria.md). Os exemplos sintéticos não constituem homologação de notificações reais.
+
+## Planejamento e recuperação
+
+Os limites mensais acompanham despesas líquidas confirmadas por categoria. Previsões recorrentes permanecem separadas dos lançamentos: cada vencimento pode ser conferido, registrado ou pulado. Os lembretes dependem da autorização de alertas e das condições de execução do Android, sem garantia de horário exato.
+
+O backup inclui lançamentos, pendências, contas, orçamentos, recorrências e preferências de apresentação. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
+
 ## Privacidade
 
 O processamento e o armazenamento dos dados ocorrem no aparelho. As origens selecionadas são filtradas antes da leitura do conteúdo; mensagens identificadas como autenticação são descartadas. O texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais evitam o reprocessamento do mesmo evento.
 
-O aplicativo não solicita credenciais bancárias. A exportação CSV ocorre somente para um destino escolhido pelo usuário. Os backups automáticos do sistema estão desativados nesta versão, e a exclusão dos dados locais está disponível em Ajustes.
+O aplicativo não solicita credenciais bancárias. A exportação CSV e o backup criptografado ocorrem somente para um destino escolhido pelo usuário. A senha do backup não é salva no aplicativo. Os backups automáticos do sistema estão desativados nesta versão, e a exclusão dos dados locais está disponível em Ajustes.
+
+A proteção opcional exige autenticação do aparelho ao iniciar e após 30 segundos em segundo plano. A opção de proteger a imagem no seletor também bloqueia capturas de tela quando respeitada pelo Android. Esse bloqueio da interface não acrescenta criptografia ao banco Room.
 
 O tratamento dos dados está descrito em [Privacidade](docs/privacidade.md).
 
@@ -40,9 +57,9 @@ Os valores monetários são armazenados em centavos inteiros. Transferências fi
 
 ## Qualidade
 
-A revisão da interface foi validada com **51 testes de regras Kotlin** e **41 testes instrumentados no Android 15**, todos aprovados. A cobertura inclui valores monetários, contas, migração, relatórios, consentimento, persistência, confirmação simultânea e fluxos de interface. Também foram verificados recriação do formulário, fonte ampliada, orientação horizontal e concessão e revogação do acesso às notificações.
+A validação abrange regras Kotlin, persistência e fluxos de interface no Android 15. A cobertura inclui valores monetários, contas, migrações, relatórios, consentimento, confirmação simultânea, criptografia, restauração, planejamento e revisão em sequência. Os casos bancários distinguem procedência sintética de coleta real anonimizada.
 
-Os APKs foram compilados, o Android Lint foi executado sem erros e as permissões do manifesto mesclado foram conferidas. Os avisos, as evidências e os limites da avaliação estão registrados em [Qualidade e validação](docs/qualidade.md).
+Os resultados dos comandos, as execuções aprovadas, os avisos e as verificações ainda pendentes estão registrados em [Qualidade e validação](docs/qualidade.md). A validação com bancos reais, a autenticação no aparelho e a recuperação em condições reais de uso exigem avaliação própria.
 
 ## Interface
 
@@ -60,6 +77,6 @@ As capturas utilizam dados fictícios para demonstrar os temas, os relatórios e
 
 A versão **0.1.0** está em desenvolvimento, com a base de registro e revisão disponível. Os padrões são validados com exemplos sintéticos; a conferência de notificações reais de cada aplicativo bancário e do comportamento dos aparelhos permanece pendente.
 
-A captura não equivale a uma integração oficial com os bancos ou ao acesso ao extrato completo. Contas com saldo inicial, conciliação, faturas, parcelamentos, orçamentos, recorrências e backup restaurável fazem parte do [planejamento](docs/planejamento.md).
+A captura não equivale a uma integração oficial com os bancos ou ao acesso ao extrato completo. Contas com saldo inicial, conciliação, faturas, parcelamentos, metas e sincronização em nuvem continuam fora desta etapa, conforme o [planejamento](docs/planejamento.md). Os valores apresentados representam lançamentos registrados, sem promessa de saldo bancário conciliado.
 
 Os resultados efetivamente executados estão registrados em [Qualidade e validação](docs/qualidade.md), junto às [decisões técnicas](docs/decisoes.md) e às [referências de estudo](docs/referencias.md). As instruções do ambiente e os comandos ficam no [guia de desenvolvimento](docs/desenvolvimento.md).

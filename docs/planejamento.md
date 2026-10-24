@@ -18,14 +18,20 @@ Critérios de verificação:
 
 Os testes não devem produzir notificações que simulem a identidade de bancos nem registrar credenciais. Nos testes automatizados, os exemplos sintéticos são identificados como fictícios.
 
+A estrutura reproduzível, os 25 casos sintéticos e a situação de cada origem ficam em [Validação bancária](validacao-bancaria.md). A coleta real continua pendente; os casos sintéticos não são apresentados como validação dos bancos.
+
 ## Etapa 3 — Uso pessoal contínuo
 
-Esta etapa prevê contas com saldo inicial, conciliação, backup criptografado e restauração validada. Faturas, vencimentos e parcelas exigem uma regra única para evitar que a compra e o pagamento da fatura sejam contados como duas despesas.
+O aplicativo já inclui backup criptografado, restauração conferida em base temporária, candidatos a duplicidade e revisão em sequência. A recuperação com dados reais e a proteção opcional no aparelho ainda exigem conferência manual própria, além dos testes automatizados.
+
+Contas com saldo inicial e conciliação permanecem para uma etapa própria. Faturas e parcelas exigem uma regra única para evitar que a compra e o pagamento da fatura sejam contados como duas despesas.
 
 ## Etapa 4 — Planejamento financeiro
 
-Esta etapa prevê orçamentos por categoria, recorrências, metas e lembretes configuráveis. Valores realizados e previsões devem permanecer separados, com nomes claros em cada tela.
+Limites mensais por categoria, previsões recorrentes e lembretes opcionais estão implementados. Cada vencimento exige confirmação para gerar um lançamento. Metas, intervalos diferentes do mensal e regras mais amplas de projeção permanecem para avaliação posterior.
 
 ## Etapa 5 — Distribuição
 
 A distribuição depende da preparação de assinatura e versionamento, dos testes de atualização sem perda de dados, da revisão de acessibilidade e desempenho e do preenchimento das informações exigidas pela loja. Bancos e aparelhos só poderão ser apresentados como validados após o registro de evidências.
+
+Sincronização em nuvem, classificação remota, OCR, investimentos, múltiplas moedas e integração oficial com Open Finance continuam fora desta etapa.

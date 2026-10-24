@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import java.util.UUID
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -121,7 +122,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     suspend fun confirmRecurring(id: String, due: String, record: Record): Boolean = writes.withLock {
         RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
         require(record.movement in setOf(Movement.EXPENSE, Movement.INCOME)) { "O registro de uma previsão precisa ser receita ou despesa." }
-        database.withTransaction {
+        val saved = database.withTransaction {
             val plan = dao.recurringById(id) ?: return@withTransaction false
             if (!plan.active || plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
             dao.insertRecord(RecordEntity.from(record, null))
@@ -130,6 +131,8 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             rememberAccount(record.bank)
             true
         }
+        if (saved) withContext(Dispatchers.IO) { settings.rememberOrigin(record.bank) }
+        saved
     }
 
     suspend fun skipRecurring(id: String, due: String): Boolean = writes.withLock {
@@ -160,7 +163,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         try {
             database.withTransaction { clearTables(); insertSnapshot(dao, snapshot) }
         } catch (exception: Exception) {
-            if (wasEnabled) withContext(Dispatchers.IO) { settings.setEnabled(true) }
+            if (wasEnabled) withContext(NonCancellable + Dispatchers.IO) { settings.setEnabled(true) }
             throw exception
         }
         withContext(Dispatchers.IO) { settings.restoreDisplay(snapshot.display) }

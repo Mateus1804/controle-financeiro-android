@@ -1,6 +1,5 @@
 package com.mateuswilliam.financas.ui
 
-import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -174,7 +173,7 @@ private fun RecurringEditor(existing: RecurringPlan?, accounts: List<AccountOpti
             AccountPickerField("Conta da previsão", bank, accounts, { bank = it }, onAddAccount)
             OutlinedButton(onClick = {
                 val selected = LocalDate.parse(date)
-                DatePickerDialog(context, theme, { _, y, m, d -> date = LocalDate.of(y, m + 1, d).toString() }, selected.year, selected.monthValue - 1, selected.dayOfMonth).show()
+                showFinanceDatePicker(context, theme, selected) { date = it.toString() }
             }, modifier = Modifier.fillMaxWidth()) { Text("Próximo vencimento: ${formatDate(date)}") }
             Text("Repetição mensal no dia $day. Meses mais curtos usam o último dia, mantendo o dia original para o próximo mês.", style = MaterialTheme.typography.bodySmall)
             if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error)

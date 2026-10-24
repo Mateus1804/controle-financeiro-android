@@ -116,7 +116,7 @@ class OptionalFeaturesUiTest {
         app.repository.capture(NotificationInput(value.sourcePackage, value.sourceKey, value.bank, "EXEMPLO FICTÍCIO atualizado",
             "Compra aprovada no cartão de R$ 48,90. Mercado Exemplo.", value.occurredAt), simulation = true)
         rule.waitUntil(5000) { rule.onAllNodesWithText("Usar esta versão e manter a edição").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).assertIsNotEnabled()
+        rule.onNodeWithText("Confirmar").assertIsNotEnabled()
         rule.onNodeWithText("Descrição").assertTextContains("Descrição editada")
         rule.onNodeWithText("Descrição").performImeAction(); waitForKeyboard()
         rule.onNodeWithText("Usar esta versão e manter a edição").performScrollTo().performClick()
@@ -136,8 +136,8 @@ class OptionalFeaturesUiTest {
             rule.runOnIdle { assertTrue(rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
             rule.activityRule.scenario.recreate()
             rule.onNodeWithText("Acesso protegido").assertExists()
-            rule.runOnIdle { rule.activity.startActivity(Intent(rule.activity, MainActivity::class.java)
-                .putExtra(ReviewNotifications.EXTRA_DRAFT_ID, "pendencia-privada").addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
+            rule.activityRule.scenario.onActivity { activity -> activity.onNewIntent(Intent(activity, MainActivity::class.java)
+                .putExtra(ReviewNotifications.EXTRA_DRAFT_ID, "pendencia-privada")) }
             rule.waitForIdle()
             rule.onNodeWithText("Acesso protegido").assertExists()
             rule.onAllNodesWithText("Conferir movimentação").assertCountEquals(0)
@@ -160,6 +160,24 @@ class OptionalFeaturesUiTest {
         rule.onAllNodesWithText("curta", substring = true).assertCountEquals(0)
         rule.onNodeWithText("Cancelar", useUnmergedTree = true).performClick()
         assertTrue(app.repository.exportRecords().isEmpty())
+    }
+
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 29)
+    @Test fun secureScreenAlsoProtectsTheNativeDateDialog() {
+        try {
+            rule.runOnIdle { app.settings.setSecureScreen(true) }
+            rule.waitForIdle()
+            rule.onNodeWithContentDescription("Novo lançamento").performClick()
+            rule.onNodeWithText("Data:", substring = true).performScrollTo().performClick()
+            rule.waitUntil(5000) { android.view.inspector.WindowInspector.getGlobalWindowViews().size >= 3 }
+            rule.runOnIdle {
+                val windows = android.view.inspector.WindowInspector.getGlobalWindowViews()
+                assertTrue(windows.all { (it.layoutParams as WindowManager.LayoutParams).flags and WindowManager.LayoutParams.FLAG_SECURE != 0 })
+            }
+        } finally {
+            InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+            rule.runOnIdle { app.settings.setSecureScreen(false) }
+        }
     }
 
     @Test fun hiddenPlanningAndLargeTextStayUsableInBothThemes() = runBlocking<Unit> {

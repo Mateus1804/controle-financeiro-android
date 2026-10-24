@@ -41,12 +41,15 @@ class PlanningRepositoryTest {
         val plan = plan()
         repository.saveRecurring(plan)
         assertTrue(repository.exportRecords().isEmpty())
+        assertFalse(Ledger.csv(repository.exportRecords(), ZoneId.of("UTC")).contains(plan.title))
         val results = coroutineScope { listOf(
             async(Dispatchers.Default) { repository.confirmRecurring(plan.id, plan.nextDate, plan.proposedRecord("a", ZoneId.of("UTC"))) },
             async(Dispatchers.Default) { repository.confirmRecurring(plan.id, plan.nextDate, plan.proposedRecord("b", ZoneId.of("UTC"))) },
         ).map { it.await() } }
         assertEquals(1, results.count { it })
         assertEquals(1, repository.exportRecords().size)
+        assertEquals(plan.bank, preferences.snapshot().lastOrigin)
+        assertTrue(Ledger.csv(repository.exportRecords(), ZoneId.of("UTC")).contains(plan.title))
         assertEquals("2026-11-30", repository.recurring.first().single().nextDate)
         assertEquals("RECORDED", database.financeDao().allOccurrences().single().status)
     }

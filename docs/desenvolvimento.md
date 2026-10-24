@@ -70,3 +70,26 @@ O esquema Room fica em `app/schemas`, e a migração 1→2, em `FinanceDatabase.
 O comando `python3 scripts/verify-contrast.py` confere os dez pares principais de texto e fundo. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
 
 A instalação de uma atualização sobre uma base que deve ser preservada exige o mesmo identificador do aplicativo e a mesma chave de assinatura. Os APKs de depuração produzidos em ambientes diferentes podem usar chaves diferentes. Para o uso pessoal, a chave local do Android Studio deve ser preservada. A desinstalação de uma instalação com dados reais não deve ser utilizada para contornar uma incompatibilidade de assinatura.
+
+## Backup e planejamento
+
+O esquema atual é Room 3, com migrações aditivas 1→2 e 2→3. Os testes de migração abrem bases isoladas reconstruídas dos esquemas anteriores exportados e conferem os dados existentes antes de utilizar as novas tabelas. `BackupStoreTest` cobre o envelope criptográfico no Android, a base temporária, o cancelamento, entradas inválidas e o rollback de uma restauração com falha simulada.
+
+A recuperação usa **Ajustes → Restaurar backup**, senha original e confirmação da prévia. Um teste manual utiliza emulador dedicado e arquivo com dados fictícios; a instalação de uso pessoal permanece preservada. Os arquivos `.cfbackup` e a pasta `casos-locais/` ficam fora do Git. O formato e os limites estão descritos em [Backup e recuperação](backup.md).
+
+O planejamento fica disponível no resumo e em Ajustes. Limites pertencem a um mês e uma categoria. Recorrências são previsões e não aparecem no CSV ou nos totais antes da confirmação de um vencimento. Os lembretes são periódicos, sem alarme exato; a execução em segundo plano ainda depende das condições do Android.
+
+## Casos bancários
+
+```bash
+python3 scripts/verify-bank-fixtures.py
+./gradlew :core:test --tests '*BankNotificationFixturesTest'
+```
+
+Os recursos de teste contêm exemplos sintéticos identificados. Notificações reais exigem anonimização revisada e metadados de versão, aparelho e coleta. O procedimento fica em [Validação bancária](validacao-bancaria.md); a execução dos casos de texto não comprova entrega pelo serviço em um aparelho.
+
+## Avaliação da proteção
+
+Os testes automatizados conferem política de sessão, persistência, bloqueio da interface, links de notificação e flags das janelas. O teste de inspeção das janelas nativas exige API 29 ou superior; a execução de referência utiliza Android 15. A confirmação biométrica ou por PIN, a revogação da credencial e o comportamento do seletor precisam de testes manuais em aparelho configurado.
+
+A proteção pode ser avaliada em **Ajustes → Autenticar ao abrir**. O recurso depende de PIN, padrão ou senha no Android. A opção de ocultar a imagem também impede capturas e compartilhamento de tela; capturas públicas de evidência utilizam emulador e dados fictícios, com essa opção desativada. A documentação não deve apresentar uma tela capturada nessas condições como comprovação de proteção contra capturas.

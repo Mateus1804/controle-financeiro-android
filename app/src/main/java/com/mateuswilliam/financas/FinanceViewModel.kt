@@ -17,6 +17,7 @@ import com.mateuswilliam.financas.data.CaptureSettings
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.data.DraftChangedException
 import com.mateuswilliam.financas.notifications.ReviewNotifications
+import com.mateuswilliam.financas.notifications.RecurringReminders
 import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -80,12 +81,21 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveBudget(budget: MonthlyBudget, onSaved: () -> Unit) = action { repository.saveBudget(budget); onSaved(); "Limite mensal salvo." }
     fun deleteBudget(month: String, category: Category) = action { repository.deleteBudget(month, category); "Limite mensal removido." }
-    fun saveRecurring(plan: RecurringPlan, onSaved: () -> Unit) = action { repository.saveRecurring(plan); onSaved(); "Previsão mensal salva. Nenhum lançamento foi criado." }
+    fun saveRecurring(plan: RecurringPlan, onSaved: () -> Unit) = action {
+        val old = state.value.recurring.find { it.id == plan.id }
+        repository.saveRecurring(plan)
+        if (old != null && (!plan.active || old.nextDate != plan.nextDate)) RecurringReminders.cancel(app, old.id, old.nextDate)
+        onSaved()
+        "Previsão mensal salva. Nenhum lançamento foi criado."
+    }
     fun skipRecurring(plan: RecurringPlan) = action {
-        if (repository.skipRecurring(plan.id, plan.nextDate)) "Vencimento pulado. Nenhum lançamento foi criado." else "Esse vencimento já foi tratado."
+        if (repository.skipRecurring(plan.id, plan.nextDate)) {
+            RecurringReminders.cancel(app, plan.id, plan.nextDate)
+            "Vencimento pulado. Nenhum lançamento foi criado."
+        } else "Esse vencimento já foi tratado."
     }
     fun confirmRecurring(id: String, due: String, record: Record, onSaved: () -> Unit) = action {
-        if (repository.confirmRecurring(id, due, record)) { onSaved(); "Lançamento confirmado e próxima previsão atualizada." }
+        if (repository.confirmRecurring(id, due, record)) { RecurringReminders.cancel(app, id, due); onSaved(); "Lançamento confirmado e próxima previsão atualizada." }
         else "A previsão mudou ou já foi tratada. Confira o planejamento."
     }
 

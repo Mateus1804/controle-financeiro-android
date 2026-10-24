@@ -57,6 +57,9 @@ object RecurringReminders {
         return try { manager.notify("plan:${plan.id}:${plan.nextDate}", NOTIFICATION_ID, notification); true }
             catch (_: SecurityException) { false }
     }
+    fun cancel(context: Context, id: String, due: String) {
+        context.getSystemService(NotificationManager::class.java).cancel("plan:$id:$due", NOTIFICATION_ID)
+    }
 }
 
 class RecurringReminderService : JobService() {

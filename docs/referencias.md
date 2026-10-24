@@ -29,3 +29,15 @@ O projeto inclui o Gradle Wrapper oficial 8.13 com sua licença Apache 2.0 e ver
 - [Padrões de acessibilidade do Compose](https://developer.android.com/develop/ui/compose/accessibility/api-defaults): semântica e áreas de toque.
 
 As referências orientam as decisões técnicas, e os resultados executados estão registrados em `qualidade.md`. Esses projetos não são apresentados como dependências nem como código auditado nesta revisão.
+
+## Backup, planejamento e proteção — 24/10/2026
+
+- [Criptografia no Android](https://developer.android.com/privacy-and-security/cryptography): algoritmos da plataforma e compatibilidade de provedores.
+- [OWASP: armazenamento criptográfico](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html): criptografia autenticada, geração aleatória e tratamento de chaves.
+- [OWASP: derivação de senhas](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html): referência de custo para PBKDF2-HMAC-SHA256. O formato deste projeto utiliza 600 mil iterações e não guarda a senha.
+- [Biometria e credencial do aparelho](https://developer.android.com/identity/sign-in/biometric-auth): autenticação local e diferenças entre versões.
+- [KeyguardManager](https://developer.android.com/reference/android/app/KeyguardManager): alternativa de credencial para versões anteriores e consulta da proteção do aparelho.
+- [Proteção de atividades e FLAG_SECURE](https://developer.android.com/security/fraud-prevention/activities): limites da proteção de imagem e capturas.
+- [JobInfo.Builder](https://developer.android.com/reference/android/app/job/JobInfo.Builder): trabalho periódico, persistência e condições de execução pelo sistema.
+
+A implementação permanece própria e não acrescenta bibliotecas de produção. A utilização dessas referências não constitui auditoria independente nem aprovação para publicação.

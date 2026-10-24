@@ -92,6 +92,24 @@ class BackupStoreTest {
         assertFalse(context.getDatabasePath(preview.databaseName).exists())
         assertEquals("preservado", repository.exportRecords().single().id)
     }
+    @Test fun oversizedInputIsBoundedAndClosedWithoutTouchingTheLiveDatabase() = runBlocking<Unit> {
+        repository.save(record("preservado"), null)
+        var delivered = 0
+        var closed = false
+        val input = object : java.io.InputStream() {
+            override fun read(): Int = error("A leitura utiliza blocos limitados")
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                bytes.fill(0, offset, offset + length); delivered += length; return length
+            }
+            override fun close() { closed = true }
+        }
+        val secret = password()
+        val failure = runCatching { store.stage(input, secret) }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(delivered <= BackupCrypto.MAX_FILE_BYTES + 8192)
+        assertTrue(closed); assertTrue(secret.all { it == '\u0000' })
+        assertEquals("preservado", repository.exportRecords().single().id)
+    }
     @Test fun failedLiveTransactionRollsBackDeletedRowsAndRestoresCaptureState() = runBlocking<Unit> {
         repository.save(record("novo-backup"), null)
         val snapshot = repository.snapshot()

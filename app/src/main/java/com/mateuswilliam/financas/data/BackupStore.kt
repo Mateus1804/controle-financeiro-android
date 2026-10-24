@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.room.withTransaction
 import com.mateuswilliam.financas.core.BackupCrypto
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.util.UUID
@@ -64,7 +65,7 @@ class BackupStore(private val context: Context, private val repository: FinanceR
             val snapshot = readSnapshot(database.financeDao(), staged.createdAt, staged.display)
             BackupSnapshot.validate(snapshot)
             repository.restore(snapshot)
-        } finally { database.close(); discard(staged) }
+        } finally { database.close(); withContext(NonCancellable) { discard(staged) } }
     }
 
     suspend fun discard(staged: StagedRestore) = withContext(Dispatchers.IO) { context.deleteDatabase(staged.databaseName); Unit }

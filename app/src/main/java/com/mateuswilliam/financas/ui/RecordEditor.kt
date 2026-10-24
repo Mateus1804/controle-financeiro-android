@@ -1,6 +1,5 @@
 package com.mateuswilliam.financas.ui
 
-import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -134,8 +133,7 @@ fun RecordEditor(
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
                 OutlinedButton(onClick = {
                     val selected = LocalDate.parse(date)
-                    DatePickerDialog(context, dateDialogTheme, { _, year, month, day -> date = LocalDate.of(year, month + 1, day).toString() },
-                        selected.year, selected.monthValue - 1, selected.dayOfMonth).show()
+                    showFinanceDatePicker(context, dateDialogTheme, selected) { date = it.toString() }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 if (onDelete != null) TextButton(onClick = { deleteDialog = true }, enabled = !busy) { Text("Excluir lançamento", color = MaterialTheme.colorScheme.error) }

@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.SystemClock
+import android.os.PowerManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -93,7 +94,12 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onStop() {
-        if (::session.isInitialized && !isChangingConfigurations) session.backgroundAt = SystemClock.elapsedRealtime()
+        if (::session.isInitialized && !isChangingConfigurations) {
+            session.backgroundAt = SystemClock.elapsedRealtime()
+            val settings = (application as FinanceApplication).settings.snapshot()
+            if (settings.lockEnabled && (getSystemService(KeyguardManager::class.java).isDeviceLocked || !getSystemService(PowerManager::class.java).isInteractive))
+                session.authenticated = false
+        }
         super.onStop()
     }
     override fun onNewIntent(intent: Intent) {

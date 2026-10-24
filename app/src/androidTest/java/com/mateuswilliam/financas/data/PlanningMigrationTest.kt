@@ -25,7 +25,7 @@ class PlanningMigrationTest {
                 val entity = entities.getJSONObject(i)
                 val table = entity.getString("tableName")
                 execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
-                val indices = entity.getJSONArray("indices")
+                val indices = entity.optJSONArray("indices") ?: org.json.JSONArray()
                 for (n in 0 until indices.length()) execSQL(indices.getJSONObject(n).getString("createSql").replace("\${TABLE_NAME}", table))
             }
             val setup = schema.getJSONArray("setupQueries")

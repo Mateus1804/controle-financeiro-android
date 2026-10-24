@@ -57,7 +57,7 @@ fun BackupPreviewDialog(preview: StagedRestore, busy: Boolean, onCancel: () -> U
         title = { DialogSystemBars(); Text("Conferir restauração") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Backup de ${shortDate(preview.createdAt)} conferido em uma base temporária.")
-            Text("${preview.records} lançamentos · ${preview.pending} pendências · ${preview.accounts} contas\n${preview.budgets} orçamentos · ${preview.recurring} recorrências")
+            Text("${preview.records} lançamentos · ${preview.pending} pendências · ${preview.accounts} contas cadastradas\n${preview.budgets} orçamentos · ${preview.recurring} recorrências")
             Text("A restauração substitui os dados financeiros locais. Crie um backup atual antes de continuar. Captura e lembretes ficam pausados; consentimento e permissões do Android não são transferidos.")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Checkbox(confirmed, { confirmed = it }, enabled = !busy)
