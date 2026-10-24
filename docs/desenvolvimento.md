@@ -49,7 +49,7 @@ No Linux ou macOS:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Utilizo um aparelho ou emulador conectado para os testes instrumentados do segundo comando. A primeira execução baixa as dependências. Mantenho Gradle 8.13, AGP 8.13.2 e Kotlin 2.2.21 com versões fixas para reproduzir a compilação.
+Executo os testes instrumentados do segundo comando somente em um emulador dedicado, sem dados reais. A suíte reinicia a base de desenvolvimento, e o runner bloqueia aparelhos físicos para preservar uma instalação de uso pessoal. Reservo o celular para os testes manuais do aplicativo. A primeira execução baixa as dependências. Mantenho Gradle 8.13, AGP 8.13.2 e Kotlin 2.2.21 com versões fixas para reproduzir a compilação.
 
 ## Integração contínua
 
