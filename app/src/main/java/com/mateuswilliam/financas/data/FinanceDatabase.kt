@@ -82,6 +82,7 @@ interface FinanceDao {
     fun accounts(): Flow<List<AccountEntity>>
     @Query("SELECT * FROM accounts ORDER BY lastUsedAt DESC, nameKey ASC")
     suspend fun allAccounts(): List<AccountEntity>
+    @Query("SELECT * FROM accounts WHERE nameKey = :key LIMIT 1") suspend fun accountByKey(key: String): AccountEntity?
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertAccount(account: AccountEntity)
     @Query("UPDATE accounts SET lastUsedAt = MAX(lastUsedAt, :time) WHERE nameKey = :key")
     suspend fun touchAccount(key: String, time: Long)

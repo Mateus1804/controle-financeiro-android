@@ -23,7 +23,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.R
 import com.mateuswilliam.financas.core.Category
-import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.core.CaptureIssue
 import com.mateuswilliam.financas.core.ExpenseFilter
 import com.mateuswilliam.financas.core.ExpenseDimension
@@ -125,17 +124,19 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                 val labels = listOf("Resumo", "Revisar", "Extrato", "Ajustes")
                 val icons = listOf(R.drawable.ic_overview, R.drawable.ic_pending, R.drawable.ic_records, R.drawable.ic_settings)
                 labels.forEachIndexed { index, label ->
+                    if (index == 2) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        FloatingActionButton(onClick = { selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true },
+                            containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
+                            AppIcon(R.drawable.ic_add, description = "Novo lançamento")
+                        }
+                    }
                     NavigationBarItem(selected = tab == index, onClick = { tab = index },
+                        colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.onSurface),
                         icon = { if (index == 1 && state.pending.isNotEmpty()) BadgedBox(badge = { Badge { Text(state.pending.size.toString()) } }) {
                             AppIcon(icons[index])
                         } else AppIcon(icons[index]) }, label = { Text(label) })
                 }
-            }
-        },
-        floatingActionButton = {
-            if (tab != 3) FloatingActionButton(onClick = { selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true },
-                containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
-                AppIcon(R.drawable.ic_add, description = "Novo lançamento")
             }
         },
     ) { padding ->
@@ -177,9 +178,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             onSave = { model.save(it, selectedDraftId, editing = selectedRecordId != null, expectedRevision = expectedRevision) { editing = false } },
             onIgnore = draft?.let { current -> { model.dismiss(current.id); editing = false } },
             onDelete = record?.let { current -> { model.delete(current.id) } },
-            accounts = state.accounts, lastOrigin = state.settings.lastOrigin, onAddAccount = model::addAccount)
+            accounts = state.accounts, lastOrigin = state.settings.lastOrigin.ifBlank { state.records.firstOrNull()?.bank.orEmpty() }, onAddAccount = model::addAccount)
     }
-    if (state.loaded && !state.settings.introSeen) CaptureIntroduction(
+    if (state.loaded && !busy && !state.settings.introSeen) CaptureIntroduction(
         onActivate = { model.preferences.finishIntro(); disclosure = true },
         onManual = { model.preferences.finishIntro() })
     if (disclosure) DisclosureDialog(onDismiss = { disclosure = false }, onAccept = {

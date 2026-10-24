@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.DraftEntity
+import com.mateuswilliam.financas.R
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -125,7 +126,7 @@ fun <T> ChoiceField(label: String, value: T, options: List<T>, text: (T) -> Stri
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small, contentPadding = PaddingValues(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(text(value)); Text("⌄") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(text(value), Modifier.weight(1f)); AppIcon(R.drawable.ic_chevron_down) }
             }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
                 options.forEach { option -> DropdownMenuItem(text = { Text(text(option)) }, onClick = { onChange(option); expanded = false }) }

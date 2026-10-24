@@ -38,7 +38,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80) { "Informe um nome de conta com até 80 caracteres." }
         database.withTransaction { rememberAccount(label) }
-        dao.allAccounts().first { it.nameKey == AccountNames.key(label) }.label
+        dao.accountByKey(AccountNames.key(label))!!.label
     }
 
     suspend fun capture(input: NotificationInput, simulation: Boolean = false): CaptureResult? = writes.withLock {

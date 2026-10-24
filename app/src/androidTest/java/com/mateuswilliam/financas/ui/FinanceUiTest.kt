@@ -1,7 +1,6 @@
 package com.mateuswilliam.financas.ui
 
 import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.test.*
@@ -254,15 +253,30 @@ class FinanceUiTest {
         }
     }
 
+
+    @Test fun hiddenAmountsAlsoHideChartLabelsAndSemantics() = runBlocking<Unit> {
+        app.repository.save(Record("privacidade-grafico", 123456, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
+            "Conta exemplo", "Exemplo privado", System.currentTimeMillis()), null)
+        rule.waitUntil(5000) { rule.onAllNodesWithText(Money.format(123456)).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Ocultar").performClick()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("expense-group-FOOD"))
+        rule.onAllNodesWithText(Money.format(123456)).assertCountEquals(0)
+        rule.onAllNodesWithContentDescription(Money.format(123456), substring = true).assertCountEquals(0)
+        rule.onAllNodesWithText("100,00%").assertCountEquals(0)
+    }
+
     private fun confirmEntry() {
         rule.onNodeWithText("Descrição").performTextReplacement("Lançamento fictício de teste")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
     }
 
     private fun screenshot(name: String) {
         val directory = File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
-        val bitmap = rule.onAllNodes(isRoot()).onLast().captureToImage().asAndroidBitmap()
+        rule.waitForIdle()
+        val bitmap = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            ?: error("Não foi possível capturar a tela do emulador.")
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

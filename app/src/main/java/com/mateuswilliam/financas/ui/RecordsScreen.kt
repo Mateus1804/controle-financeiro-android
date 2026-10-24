@@ -47,11 +47,13 @@ fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) 
     var search by rememberSaveable { mutableStateOf("") }
     var movement by rememberSaveable { mutableStateOf<Movement?>(null) }
     LaunchedEffect(expenseFilter) { if (expenseFilter != null) movement = Movement.EXPENSE }
-    val filtered = Ledger.month(records, month, ZoneId.systemDefault()).records.filter {
+    val zone = ZoneId.systemDefault()
+    val period = remember(records, month, zone) { Ledger.month(records, month, zone).records }
+    val filtered = remember(period, category, movement, search, expenseFilter) { period.filter {
         (expenseFilter == null || expenseFilter.matches(it)) &&
             (category == null || it.category == category) && (movement == null || it.movement == movement) &&
             (search.isBlank() || "${it.description} ${it.bank} ${it.destination}".contains(search.trim(), ignoreCase = true))
-    }
+    } }
     LazyColumn(contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { SectionTitle("Meu extrato", "Histórico dos lançamentos registrados neste aparelho") }
         item { MonthPicker(month, onMonth) }

@@ -15,7 +15,8 @@ val ExpenseRed = Color(0xFFB43F4D)
 
 private val Light = lightColorScheme(
     primary = BrandBlue, onPrimary = Color.White, primaryContainer = Color(0xFFE5E9FF),
-    onPrimaryContainer = Ink, secondary = Color(0xFF5965A8),
+    onPrimaryContainer = Ink, secondary = Color(0xFF5965A8), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE5E9FF), onSecondaryContainer = Ink,
     tertiary = Color(0xFF187963), onTertiary = Color.White,
     background = Color(0xFFF5F6FC), onBackground = Ink,
     surface = Color.White, onSurface = Ink,
@@ -24,7 +25,8 @@ private val Light = lightColorScheme(
 )
 private val Dark = darkColorScheme(
     primary = SoftBlue, onPrimary = Ink, primaryContainer = BrandBlue, onPrimaryContainer = Color.White,
-    tertiary = Color(0xFF70D9B9), secondary = Color(0xFFB6BFFF),
+    tertiary = Color(0xFF70D9B9), onTertiary = Ink, secondary = Color(0xFFB6BFFF), onSecondary = Ink,
+    secondaryContainer = Color(0xFF293452), onSecondaryContainer = Color(0xFFE5E9FF),
     background = Color(0xFF10131F), onBackground = Color(0xFFE8EBF7),
     surface = Color(0xFF1A1F30), onSurface = Color(0xFFE8EBF7),
     surfaceVariant = Color(0xFF2A3044), onSurfaceVariant = Color(0xFFC1C7DF),
