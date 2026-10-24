@@ -91,6 +91,7 @@ class FinanceUiTest {
             assertEquals(Appearance.DARK, app.settings.state.value.appearance)
             assertFalse(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
         }
+        assertStatusBarBackground(dark = true)
         rule.activityRule.scenario.recreate()
         rule.waitForIdle()
         rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
@@ -102,6 +103,7 @@ class FinanceUiTest {
             assertEquals(Appearance.LIGHT, app.settings.state.value.appearance)
             assertTrue(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
         }
+        assertStatusBarBackground(dark = false)
         screenshot("ajustes-claro")
         rule.onNodeWithText("Sistema").performClick()
         rule.onNodeWithText("Sistema").assertIsSelected()
@@ -336,6 +338,17 @@ class FinanceUiTest {
                 rule.onAllNodes(isRoot())[it].printToString()
             }
             throw AssertionError("A confirmação não terminou. Estado da interface:\n" + roots, failure)
+        }
+    }
+
+    private fun assertStatusBarBackground(dark: Boolean) {
+        rule.waitUntil(5000) {
+            val bitmap = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                ?: return@waitUntil false
+            val pixel = bitmap.getPixel(bitmap.width / 2, 2)
+            bitmap.recycle()
+            val brightness = (android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) + android.graphics.Color.blue(pixel)) / 3
+            if (dark) brightness < 128 else brightness > 128
         }
     }
 

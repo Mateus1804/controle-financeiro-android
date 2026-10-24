@@ -4,7 +4,7 @@ import android.content.Intent
 import android.app.KeyguardManager
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
-import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.Build
 import android.os.CancellationSignal
@@ -17,6 +17,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -60,13 +62,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings by financeModel.preferences.state.collectAsStateWithLifecycle()
             val dark = settings.appearance.usesDarkTheme(isSystemInDarkTheme())
-            SideEffect {
-                updateScreenProtection(settings.secureScreen)
-                val bars = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
-                    else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-                enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
-            }
             FinanceTheme(darkTheme = dark) {
+                val background = MaterialTheme.colorScheme.background.toArgb()
+                SideEffect {
+                    updateScreenProtection(settings.secureScreen)
+                    window.setBackgroundDrawable(ColorDrawable(background))
+                    val bars = if (dark) SystemBarStyle.dark(background) else SystemBarStyle.light(background, background)
+                    enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+                }
                 val savedUi = rememberSaveableStateHolder()
                 if (settings.lockEnabled && !session.authenticated) LockScreen(session.authenticating, session.message) {
                     authenticate(AuthenticationAction.UNLOCK)

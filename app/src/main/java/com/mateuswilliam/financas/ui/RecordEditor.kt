@@ -124,7 +124,7 @@ fun RecordEditor(
                     }
                 }
                 MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
-                ChoiceField("Movimentação", movement, Movement.entries.toList(), { it.label }) { movement = it }
+                ChoiceField("Movimentação", movement, if (preset != null) listOf(Movement.EXPENSE, Movement.INCOME) else Movement.entries.toList(), { it.label }) { movement = it }
                 ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
                 AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount)

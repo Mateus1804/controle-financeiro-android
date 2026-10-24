@@ -227,6 +227,7 @@ class OptionalFeaturesUiTest {
         android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
     }
     private fun screenshot(name: String) {
+        rule.waitUntil(8000) { rule.onAllNodesWithText("Limite mensal salvo.").fetchSemanticsNodes().isEmpty() }
         rule.waitForIdle()
         val directory = File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: error("Captura do emulador indisponível")

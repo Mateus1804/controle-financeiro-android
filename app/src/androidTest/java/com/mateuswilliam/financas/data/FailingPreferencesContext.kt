@@ -10,6 +10,7 @@ internal class FailingPreferencesContext(context: Context, private val isolated:
         override fun edit(): SharedPreferences.Editor {
             val editor = isolated.edit()
             return object : SharedPreferences.Editor by editor {
+                override fun clear(): SharedPreferences.Editor { editor.clear(); return this }
                 override fun commit(): Boolean = if (successfulCommits-- > 0) editor.commit() else false
             }
         }
