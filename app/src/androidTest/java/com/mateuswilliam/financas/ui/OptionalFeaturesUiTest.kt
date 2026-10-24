@@ -42,7 +42,8 @@ class OptionalFeaturesUiTest {
     @Test fun monthlyBudgetCanBeCreatedAndRecoveredAfterRecreation() = runBlocking<Unit> {
         openPlanning()
         rule.onNodeWithText("Adicionar limite mensal").performClick()
-        rule.onNodeWithTag("amount-input").performTextInput("10000").performImeAction()
+        rule.onNodeWithTag("amount-input").performTextInput("10000")
+        rule.onNodeWithTag("amount-input").performImeAction()
         waitForKeyboard()
         rule.onNodeWithText("Salvar limite").performClick()
         rule.waitUntil(5000) { runBlocking { app.repository.budgets.first().isNotEmpty() } }
@@ -148,7 +149,8 @@ class OptionalFeaturesUiTest {
         rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Criar backup criptografado"))
         rule.onNodeWithText("Criar backup criptografado").performClick()
         rule.onNodeWithText("Senha do backup").performTextInput("curta")
-        rule.onNodeWithText("Repetir senha").performTextInput("curta").performImeAction()
+        rule.onNodeWithText("Repetir senha").performTextInput("curta")
+        rule.onNodeWithText("Repetir senha").performImeAction()
         waitForKeyboard()
         rule.onNodeWithText("Preparar backup").performClick()
         rule.onNodeWithText("Use uma senha com pelo menos 12 caracteres.").assertExists()
@@ -185,7 +187,8 @@ class OptionalFeaturesUiTest {
     }
 
     private fun confirmDescription(description: String) {
-        rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement(description).performImeAction()
+        rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement(description)
+        rule.onNodeWithText("Descrição").performImeAction()
         waitForKeyboard()
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).assertIsDisplayed().performClick()
     }
