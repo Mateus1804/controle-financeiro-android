@@ -267,7 +267,7 @@ class FinanceUiTest {
 
     private fun confirmEntry() {
         rule.onNodeWithText("Descrição").performTextReplacement("Lançamento fictício de teste")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        rule.onNodeWithText("Descrição").performImeAction()
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
     }

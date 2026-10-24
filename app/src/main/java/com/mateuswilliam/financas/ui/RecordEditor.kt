@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.DraftEntity
@@ -93,7 +94,7 @@ fun RecordEditor(
                 AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount)
                 if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount)
                 OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
                 OutlinedButton(onClick = {
                     val selected = LocalDate.parse(date)
                     DatePickerDialog(context, dateDialogTheme, { _, year, month, day -> date = LocalDate.of(year, month + 1, day).toString() },
