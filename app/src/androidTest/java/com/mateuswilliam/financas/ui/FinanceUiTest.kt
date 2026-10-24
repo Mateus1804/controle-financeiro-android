@@ -319,8 +319,24 @@ class FinanceUiTest {
     private fun confirmEntry() {
         rule.onNodeWithText("Descrição").performTextReplacement("Lançamento fictício de teste")
         rule.onNodeWithText("Descrição").performImeAction()
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
+        rule.waitUntil(5000) {
+            val windows = if (android.os.Build.VERSION.SDK_INT >= 29)
+                android.view.inspector.WindowInspector.getGlobalWindowViews() else listOf(rule.activity.window.decorView)
+            windows.none { androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
+        }
+        rule.waitForIdle()
+        val confirm = rule.onNodeWithText("Confirmar", useUnmergedTree = true)
+        if (rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) confirm.performScrollTo()
+        confirm.assertIsDisplayed().performClick()
+        try {
+            rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
+            rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
+        } catch (failure: AssertionError) {
+            val roots = rule.onAllNodes(isRoot()).fetchSemanticsNodes().indices.joinToString("\n") {
+                rule.onAllNodes(isRoot()).onIndex(it).printToString()
+            }
+            throw AssertionError("A confirmação não terminou. Estado da interface:\n" + roots, failure)
+        }
     }
 
     private fun screenshot(name: String) {
