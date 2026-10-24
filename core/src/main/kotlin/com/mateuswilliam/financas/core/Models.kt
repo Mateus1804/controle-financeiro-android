@@ -53,7 +53,7 @@ object RecordValidation {
         record.occurredAt <= 0 -> "Informe uma data válida."
         record.movement == Movement.TRANSFER && record.destination.isBlank() -> "Informe a conta de destino."
         record.destination.length > 80 -> "Use até 80 caracteres para a conta de destino."
-        record.movement == Movement.TRANSFER && record.bank.trim().equals(record.destination.trim(), true) ->
+        record.movement == Movement.TRANSFER && AccountNames.key(record.bank) == AccountNames.key(record.destination) ->
             "A origem e o destino precisam ser diferentes."
         else -> null
     }
