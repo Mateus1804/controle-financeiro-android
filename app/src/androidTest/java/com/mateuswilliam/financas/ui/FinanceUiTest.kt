@@ -47,6 +47,7 @@ class FinanceUiTest {
         assertEquals(123456L, runBlocking { app.repository.exportRecords().single().amountCents })
     }
 
+    @OptIn(ExperimentalTestApi::class)
     @Test fun cursorSelectionReplacementAndBackspaceKeepCents() {
         rule.onNodeWithContentDescription("Novo lançamento").performClick()
         val field = rule.onNodeWithTag("amount-input")
