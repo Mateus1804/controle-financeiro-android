@@ -58,7 +58,7 @@ Ainda preciso validar o APK assinado, a política pública, a declaração de se
 
 ## Contas reutilizáveis e compatibilidade
 
-Acrescento a tabela `accounts` no esquema Room 2 e mantenho uma migração aditiva a partir da versão 1. Combino o cadastro com os nomes encontrados no histórico, normalizando espaços e caixa apenas para pesquisa e comparação. Preservo os nomes gravados nos lançamentos antigos. Nomes como Inter pessoal e Inter trabalho continuam distintos.
+Acrescento a tabela `accounts` no esquema Room 2 e mantenho uma migração aditiva a partir da versão 1. Combino o cadastro com os nomes encontrados no histórico, normalizando espaços e caixa apenas para pesquisa e comparação. Preservo os nomes gravados nos lançamentos antigos. Nomes como Inter pessoal e Inter trabalho continuam distintos. Uso essa mesma comparação nas transferências para impedir origem e destino iguais por diferenças de espaços ou maiúsculas.
 
 Atualizo a ordem de uso junto com a gravação dos lançamentos, dentro da mesma transação. Guardo separadamente a última origem utilizada manualmente. A conta escolhida na revisão não modifica o pacote ou a identificação original da notificação. Contas com saldo inicial e conciliação continuam em planejamento.
 
@@ -72,7 +72,7 @@ Apresento despesas brutas antes dos estornos. Mantenho estornos separados e pres
 
 Apresento o recurso de captura na primeira utilização e mantenho uma alternativa de uso manual. A apresentação não concede consentimento: a divulgação específica continua anterior à seleção de aplicativos e às configurações do Android.
 
-Distingo falta de consentimento, captura pausada, seleção vazia, acesso ausente e serviço desconectado. Salvo o fechamento da orientação por condição e volto a orientar quando observo uma mudança relevante. O envio de alertas continua independente da captura; ajustes de permissão não bloqueiam a caixa de revisão.
+Distingo falta de consentimento, captura pausada, seleção vazia, acesso ausente e serviço desconectado. Salvo o fechamento da orientação por condição e volto a orientar quando observo uma mudança relevante. Consulto a autorização do componente do serviço no Android e atualizo o estado ao retomar a atividade ou mudar a conexão. O envio de alertas continua independente da captura; ajustes de permissão não bloqueiam a caixa de revisão. A escolha de uso manual também pausa uma captura que já estava habilitada.
 
 ## Referências da interface
 
