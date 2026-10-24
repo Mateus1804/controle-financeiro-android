@@ -331,9 +331,9 @@ class FinanceUiTest {
         try {
             rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
             rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
-        } catch (failure: AssertionError) {
+        } catch (failure: Throwable) {
             val roots = rule.onAllNodes(isRoot()).fetchSemanticsNodes().indices.joinToString("\n") {
-                rule.onAllNodes(isRoot()).onIndex(it).printToString()
+                rule.onAllNodes(isRoot())[it].printToString()
             }
             throw AssertionError("A confirmação não terminou. Estado da interface:\n" + roots, failure)
         }
