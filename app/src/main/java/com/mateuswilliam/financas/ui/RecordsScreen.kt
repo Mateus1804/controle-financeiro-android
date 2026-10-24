@@ -55,7 +55,7 @@ fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) 
             (search.isBlank() || "${it.description} ${it.bank} ${it.destination}".contains(search.trim(), ignoreCase = true))
     } }
     LazyColumn(contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { SectionTitle("Meu extrato", "Histórico dos lançamentos registrados neste aparelho") }
+        item { SectionTitle("Extrato", "Histórico dos lançamentos registrados neste aparelho") }
         item { MonthPicker(month, onMonth) }
         if (expenseFilter != null) item {
             InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${expenseFilter.label} · Limpar filtro") })
