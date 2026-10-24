@@ -42,21 +42,29 @@ fun PendingScreen(pending: List<DraftEntity>, hidden: Boolean, onReview: (DraftE
 
 @Composable
 fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) -> Unit, hidden: Boolean,
-                  category: Category?, onCategory: (Category?) -> Unit, onEdit: (Record) -> Unit) {
+                  category: Category?, onCategory: (Category?) -> Unit, onEdit: (Record) -> Unit,
+                  expenseFilter: ExpenseFilter? = null, onClearExpenseFilter: () -> Unit = {}) {
     var search by rememberSaveable { mutableStateOf("") }
     var movement by rememberSaveable { mutableStateOf<Movement?>(null) }
-    val filtered = Ledger.month(records, month, ZoneId.systemDefault()).records.filter {
-        (category == null || it.category == category) && (movement == null || it.movement == movement) &&
+    LaunchedEffect(expenseFilter) { if (expenseFilter != null) movement = Movement.EXPENSE }
+    val zone = ZoneId.systemDefault()
+    val period = remember(records, month, zone) { Ledger.month(records, month, zone).records }
+    val filtered = remember(period, category, movement, search, expenseFilter) { period.filter {
+        (expenseFilter == null || expenseFilter.matches(it)) &&
+            (category == null || it.category == category) && (movement == null || it.movement == movement) &&
             (search.isBlank() || "${it.description} ${it.bank} ${it.destination}".contains(search.trim(), ignoreCase = true))
-    }
+    } }
     LazyColumn(contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { SectionTitle("Meu extrato", "Histórico dos lançamentos registrados neste aparelho") }
         item { MonthPicker(month, onMonth) }
+        if (expenseFilter != null) item {
+            InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${expenseFilter.label} · Limpar filtro") })
+        }
         item { OutlinedTextField(search, { search = it.take(100) }, label = { Text("Buscar descrição ou banco") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.weight(1f)) { ChoiceField("Tipo", movement, listOf(null) + Movement.entries.filter { it != Movement.UNKNOWN }, { it?.label ?: "Todos" }) { movement = it } }
-                Box(Modifier.weight(1f)) { ChoiceField("Categoria", category, listOf(null) + Category.entries, { it?.label ?: "Todas" }, onCategory) }
+                Box(Modifier.weight(1f)) { ChoiceField("Tipo", movement, listOf(null) + Movement.entries.filter { it != Movement.UNKNOWN }, { it?.label ?: "Todos" }) { onClearExpenseFilter(); movement = it } }
+                Box(Modifier.weight(1f)) { ChoiceField("Categoria", category, listOf(null) + Category.entries, { it?.label ?: "Todas" }) { onClearExpenseFilter(); onCategory(it) } }
             }
         }
         item { Text("${filtered.size} lançamento(s)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }

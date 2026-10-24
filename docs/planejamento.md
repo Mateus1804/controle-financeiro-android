@@ -2,7 +2,7 @@
 
 ## Etapa 1 — Base de registro e revisão
 
-Construí o cadastro manual, o histórico com filtros, a revisão de notificações, a seleção de aplicativos, o consentimento, os totais mensais e a exportação CSV. Mantenho a validação executada em `qualidade.md`.
+Construí o cadastro manual, o histórico com filtros, a revisão de notificações, a seleção de aplicativos, o consentimento, os totais mensais e a exportação CSV. Acrescentei centavos automáticos, contas reutilizáveis, relatórios de despesas, apresentação inicial e seleção de tema. Mantenho a validação executada em `qualidade.md`.
 
 ## Etapa 2 — Validação no meu aparelho
 

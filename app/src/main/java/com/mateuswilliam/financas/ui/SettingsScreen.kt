@@ -19,17 +19,34 @@ import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.BuildConfig
 import com.mateuswilliam.financas.SelectableApp
 import com.mateuswilliam.financas.data.CaptureSettings
+import com.mateuswilliam.financas.data.Appearance
 
 @Composable
 fun SettingsScreen(
     settings: CaptureSettings, connected: Boolean, hasAccess: Boolean, canAlert: Boolean, captureError: Boolean,
     onToggle: (Boolean) -> Unit, onApps: () -> Unit, onAccess: () -> Unit,
     onReconnect: () -> Unit, onAlerts: () -> Unit, onExport: () -> Unit,
-    onClear: () -> Unit, onSimulate: () -> Unit, busy: Boolean,
+    onClear: () -> Unit, onSimulate: () -> Unit, onAppearance: (Appearance) -> Unit, busy: Boolean,
 ) {
     var privacy by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { SectionTitle("Meus ajustes", "Privacidade e controle em primeiro lugar.") }
+        item {
+            SettingsCard {
+                Text("Aparência", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Escolha um tema ou acompanhe a configuração do aparelho.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    Appearance.entries.forEachIndexed { index, appearance ->
+                        SegmentedButton(
+                            selected = settings.appearance == appearance,
+                            onClick = { onAppearance(appearance) },
+                            shape = SegmentedButtonDefaults.itemShape(index, Appearance.entries.size),
+                        ) { Text(appearance.label) }
+                    }
+                }
+            }
+        }
         item {
             SettingsCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -75,7 +92,7 @@ fun SettingsScreen(
         }
         item { Text("Controle Financeiro · ${BuildConfig.VERSION_NAME}\nPrimeira versão em desenvolvimento", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
-    if (privacy) AlertDialog(onDismissRequest = { privacy = false }, title = { Text("Privacidade") },
+    if (privacy) AlertDialog(onDismissRequest = { privacy = false }, title = { DialogSystemBars(); Text("Privacidade") },
         text = { Text("Processo as notificações autorizadas neste aparelho para sugerir lançamentos. Não transmito os textos bancários, não solicito credenciais de banco e não integro anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra a seleção antes de ler o conteúdo. Descarto mensagens identificadas como códigos, senhas ou autenticação.\n\nApago o texto original após confirmar ou ignorar a pendência. Mantenho identificadores locais para evitar reprocessar o mesmo evento.\n\nA exportação CSV contém os dados que você confirmou e é salva no destino escolhido. Os dados locais são removidos ao desinstalar ou usar a opção de apagar. A restauração de backup ainda está em desenvolvimento.") },
         confirmButton = { TextButton(onClick = { privacy = false }) { Text("Entendi") } })
 }
@@ -89,7 +106,7 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 fun DisclosureDialog(onDismiss: () -> Unit, onAccept: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Antes de ativar a captura") },
+    AlertDialog(onDismissRequest = onDismiss, title = { DialogSystemBars(); Text("Antes de ativar a captura") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Para sugerir receitas e despesas, o Controle Financeiro acessa o título e o texto das notificações dos aplicativos selecionados, inclusive quando esta tela está fechada.")
@@ -107,7 +124,7 @@ fun AppPickerDialog(apps: List<SelectableApp>, loading: Boolean, selected: Set<S
     var selection by remember { mutableStateOf(selected.toSet()) }
     var search by remember { mutableStateOf("") }
     val visible = apps.filter { it.label.contains(search, true) || it.packageName.contains(search, true) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Bancos e carteiras") },
+    AlertDialog(onDismissRequest = onDismiss, title = { DialogSystemBars(); Text("Bancos e carteiras") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Selecione as origens que deseja acompanhar. A lista mostra aplicativos com ícone de abertura disponíveis neste perfil do Android.", style = MaterialTheme.typography.bodySmall)

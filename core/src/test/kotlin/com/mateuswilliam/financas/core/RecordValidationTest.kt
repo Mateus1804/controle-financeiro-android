@@ -14,6 +14,8 @@ class RecordValidationTest {
         assertNotNull(RecordValidation.error(valid.copy(movement = Movement.TRANSFER)))
         assertNotNull(RecordValidation.error(valid.copy(movement = Movement.TRANSFER, destination = " banco ")))
         assertNull(RecordValidation.error(valid.copy(movement = Movement.TRANSFER, destination = "Carteira")))
+        assertNotNull(RecordValidation.error(valid.copy(movement = Movement.TRANSFER, bank = "Inter pessoal", destination = " INTER  pessoal ")))
+        assertNull(RecordValidation.error(valid.copy(movement = Movement.TRANSFER, bank = "Inter pessoal", destination = "Inter trabalho")))
     }
     @Test fun `campos obrigatorios e limites sao validados`() {
         assertNotNull(RecordValidation.error(valid.copy(bank = " ")))

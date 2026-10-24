@@ -131,4 +131,35 @@ class FinanceRepositoryTest {
         assertTrue(repository.records.first().isEmpty())
         assertEquals(5000L, repository.pending.first().single().amountCents)
     }
+
+    @Test fun accountNamesArePersistentAndOnlyEquivalentNamesAreDeduplicated() = runBlocking {
+        assertEquals("Inter pessoal", repository.addAccount(" Inter  pessoal "))
+        assertEquals("Inter pessoal", repository.addAccount("INTER pessoal"))
+        repository.addAccount("Inter trabalho")
+        assertEquals(2, database.financeDao().allAccounts().size)
+        val reopened = FinanceRepository(database, preferences)
+        assertEquals(setOf("Inter pessoal", "Inter trabalho"), reopened.accounts.first().map { it.label }.toSet())
+    }
+
+    @Test fun legacyNamesAreAvailableWithoutRewritingHistory() = runBlocking {
+        val legacy = RecordEntity.from(record().copy(bank = "Banco   antigo"), null)
+        database.financeDao().insertRecord(legacy)
+        assertEquals("Banco antigo", repository.accounts.first().single().label)
+        assertEquals("Banco   antigo", database.financeDao().allRecords().single().bank)
+    }
+
+    @Test fun originDestinationAndNotificationIdentityRemainIndependent() = runBlocking {
+        repository.save(record("transferencia").copy(movement = Movement.TRANSFER, bank = "Origem", destination = "Destino"), null)
+        assertEquals("Origem", CapturePreferences(androidx.test.core.app.ApplicationProvider.getApplicationContext()).state.value.lastOrigin)
+        assertEquals(2, database.financeDao().allAccounts().size)
+        authorize()
+        val draft = repository.capture(input)!!
+        repository.save(record("notificacao").copy(bank = "Conta escolhida"), draft.id)
+        assertEquals("Origem", CapturePreferences(androidx.test.core.app.ApplicationProvider.getApplicationContext()).state.value.lastOrigin)
+        assertEquals(input.packageName, database.financeDao().draftById(draft.id)!!.sourcePackage)
+        assertEquals(input.bank, database.financeDao().draftById(draft.id)!!.bank)
+        assertEquals("Conta escolhida", repository.exportRecords().first { it.id == "notificacao" }.bank)
+        repository.clear()
+        assertTrue(database.financeDao().allAccounts().isEmpty())
+    }
 }

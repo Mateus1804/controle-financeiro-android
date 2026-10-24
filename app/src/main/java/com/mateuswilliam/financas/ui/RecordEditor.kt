@@ -4,20 +4,23 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.DraftEntity
+import com.mateuswilliam.financas.R
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -34,12 +37,16 @@ fun RecordEditor(
     onSave: (Record) -> Unit,
     onIgnore: (() -> Unit)?,
     onDelete: (() -> Unit)?,
+    accounts: List<AccountOption>,
+    lastOrigin: String,
+    onAddAccount: suspend (String) -> String,
 ) {
-    val originalAt = existing?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis()
+    val originalAt = rememberSaveable { existing?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis() }
     val originalDate = Instant.ofEpochMilli(originalAt).atZone(ZoneId.systemDefault())
     val id = rememberSaveable { existing?.id ?: UUID.randomUUID().toString() }
-    var amount by rememberSaveable { mutableStateOf((existing?.amountCents ?: draft?.amountCents)?.let(Money::editable).orEmpty()) }
-    var bank by rememberSaveable { mutableStateOf(existing?.bank ?: draft?.bank ?: "Carteira") }
+    val amount = rememberTextFieldState(initialText = (existing?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
+    var invalidMoneyInput by rememberSaveable { mutableStateOf(false) }
+    var bank by rememberSaveable { mutableStateOf(existing?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
     var description by rememberSaveable { mutableStateOf(existing?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
     var movement by rememberSaveable { mutableStateOf(existing?.movement ?: draft?.movement ?: Movement.EXPENSE) }
     var method by rememberSaveable { mutableStateOf(existing?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
@@ -49,8 +56,14 @@ fun RecordEditor(
     var attempted by rememberSaveable { mutableStateOf(false) }
     var deleteDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val maximumHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * 0.84f
-    val cents = Money.parse(amount)
+    val dateDialogTheme = if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
+        android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val compactHeight = windowHeight < 480.dp
+    val maximumHeight = windowHeight * if (compactHeight) 0.96f else 0.84f
+    val compactScroll = rememberScrollState()
+    val fieldsScroll = rememberScrollState()
+    val cents = if (invalidMoneyInput) null else MoneyInput.cents(amount.text.toString())
     val record = Record(id, cents ?: 0, movement, method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), destination)
     val error = RecordValidation.error(record)
@@ -60,14 +73,17 @@ fun RecordEditor(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding()) {
+        DialogSystemBars()
+        val scroll = if (compactHeight) Modifier.verticalScroll(compactScroll) else Modifier
+        Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding().then(scroll)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (draft != null) "Conferir movimentação" else if (existing != null) "Editar lançamento" else "Novo lançamento",
                     style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(if (draft != null) "A notificação só vira lançamento após sua confirmação." else "Seu controle, do seu jeito.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val fields = if (compactHeight) Modifier else Modifier.weight(1f, fill = false).verticalScroll(fieldsScroll)
+            Column(fields.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (draft != null) {
                     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -78,21 +94,17 @@ fun RecordEditor(
                         }
                     }
                 }
-                OutlinedTextField(amount, { amount = it.take(24) }, label = { Text("Valor (R$)") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    isError = (attempted || amount.isNotBlank()) && (cents == null || cents <= 0),
-                    supportingText = { if ((attempted || amount.isNotBlank()) && (cents == null || cents <= 0)) Text("Informe um valor válido, como 42,90.") })
+                MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
                 ChoiceField("Movimentação", movement, Movement.entries.toList(), { it.label }) { movement = it }
                 ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
-                OutlinedTextField(bank, { bank = it.take(80) }, label = { Text("Conta ou banco de origem") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                if (movement == Movement.TRANSFER) OutlinedTextField(destination, { destination = it.take(80) }, label = { Text("Conta de destino") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount)
+                if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount)
                 OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
                 OutlinedButton(onClick = {
                     val selected = LocalDate.parse(date)
-                    DatePickerDialog(context, { _, year, month, day -> date = LocalDate.of(year, month + 1, day).toString() },
+                    DatePickerDialog(context, dateDialogTheme, { _, year, month, day -> date = LocalDate.of(year, month + 1, day).toString() },
                         selected.year, selected.monthValue - 1, selected.dayOfMonth).show()
                 }, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
@@ -109,7 +121,7 @@ fun RecordEditor(
             }
         }
     }
-    if (deleteDialog) AlertDialog(onDismissRequest = { deleteDialog = false }, title = { Text("Excluir lançamento?") },
+    if (deleteDialog) AlertDialog(onDismissRequest = { deleteDialog = false }, title = { DialogSystemBars(); Text("Excluir lançamento?") },
         text = { Text("O lançamento será removido do histórico e dos totais. Esta ação não pode ser desfeita.") },
         confirmButton = { TextButton(onClick = { deleteDialog = false; onDelete?.invoke(); onDismiss() }) { Text("Excluir") } },
         dismissButton = { TextButton(onClick = { deleteDialog = false }) { Text("Cancelar") } })
@@ -122,7 +134,7 @@ fun <T> ChoiceField(label: String, value: T, options: List<T>, text: (T) -> Stri
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small, contentPadding = PaddingValues(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(text(value)); Text("⌄") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(text(value), Modifier.weight(1f)); AppIcon(R.drawable.ic_chevron_down) }
             }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
                 options.forEach { option -> DropdownMenuItem(text = { Text(text(option)) }, onClick = { onChange(option); expanded = false }) }

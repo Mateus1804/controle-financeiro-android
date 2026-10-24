@@ -49,7 +49,7 @@ No Linux ou macOS:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Utilizo um aparelho ou emulador conectado para os testes instrumentados do segundo comando. A primeira execução baixa as dependências. Mantenho Gradle 8.13, AGP 8.13.2 e Kotlin 2.2.21 com versões fixas para reproduzir a compilação.
+Executo os testes instrumentados do segundo comando somente em um emulador dedicado, sem dados reais. A suíte reinicia a base de desenvolvimento, e o runner bloqueia aparelhos físicos para preservar uma instalação de uso pessoal. Reservo o celular para os testes manuais do aplicativo. A primeira execução baixa as dependências. Mantenho Gradle 8.13, AGP 8.13.2 e Kotlin 2.2.21 com versões fixas para reproduzir a compilação.
 
 ## Integração contínua
 
@@ -62,3 +62,11 @@ Registro os resultados da integração contínua separadamente dos testes bancá
 Disponibilizo o APK de depuração no artefato `controle-financeiro-debug` da execução correspondente do GitHub Actions, com retenção de 14 dias. Esse pacote serve aos testes de desenvolvimento. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
 
 Preservo bases reais, exportações, arquivos de assinatura e configurações locais fora do repositório. A restauração de dados ainda está pendente nesta versão, e a desinstalação remove os dados locais do aplicativo.
+
+## Atualizações dos dados e da interface
+
+Mantenho o esquema Room em `app/schemas` e a migração 1→2 em `FinanceDatabase.kt`. Nos testes de migração, reconstruo uma base isolada a partir do esquema 1 exportado e abro essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
+
+Confiro os dez pares principais de texto e fundo com `python3 scripts/verify-contrast.py`. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
+
+Preservo o mesmo identificador do aplicativo e a mesma chave de assinatura ao instalar uma atualização sobre uma base que pretendo manter. Os APKs de depuração produzidos em ambientes diferentes podem usar chaves diferentes. Para o uso pessoal, mantenho minha chave local do Android Studio; não desinstalo uma instalação com dados reais como forma de contornar uma incompatibilidade de assinatura.

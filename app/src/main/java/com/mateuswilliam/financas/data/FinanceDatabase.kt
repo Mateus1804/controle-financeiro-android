@@ -12,10 +12,13 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.core.Movement
 import com.mateuswilliam.financas.core.PaymentMethod
 import com.mateuswilliam.financas.core.Record
+import com.mateuswilliam.financas.core.AccountOption
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "drafts", indices = [Index(value = ["sourceKey"], unique = true)])
@@ -68,8 +71,22 @@ class Converters {
     @TypeConverter fun category(value: Category) = value.name
 }
 
+@Entity(tableName = "accounts")
+data class AccountEntity(@PrimaryKey val nameKey: String, val label: String, val lastUsedAt: Long) {
+    fun toOption() = AccountOption(nameKey, label, lastUsedAt)
+}
+
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM accounts ORDER BY lastUsedAt DESC, nameKey ASC")
+    fun accounts(): Flow<List<AccountEntity>>
+    @Query("SELECT * FROM accounts ORDER BY lastUsedAt DESC, nameKey ASC")
+    suspend fun allAccounts(): List<AccountEntity>
+    @Query("SELECT * FROM accounts WHERE nameKey = :key LIMIT 1") suspend fun accountByKey(key: String): AccountEntity?
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertAccount(account: AccountEntity)
+    @Query("UPDATE accounts SET lastUsedAt = MAX(lastUsedAt, :time) WHERE nameKey = :key")
+    suspend fun touchAccount(key: String, time: Long)
+    @Query("DELETE FROM accounts") suspend fun clearAccounts()
     @Query("SELECT * FROM drafts WHERE status = 'PENDING' ORDER BY capturedAt DESC")
     fun pending(): Flow<List<DraftEntity>>
     @Query("SELECT * FROM records ORDER BY occurredAt DESC")
@@ -93,8 +110,15 @@ interface FinanceDao {
     @Query("DELETE FROM records") suspend fun clearRecords()
 }
 
-@Database(entities = [DraftEntity::class, RecordEntity::class], version = 1, exportSchema = true)
+@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class], version = 2, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
+    companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `accounts` (`nameKey` TEXT NOT NULL, `label` TEXT NOT NULL, `lastUsedAt` INTEGER NOT NULL, PRIMARY KEY(`nameKey`))")
+            }
+        }
+    }
 }

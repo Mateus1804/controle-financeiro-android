@@ -16,7 +16,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.mateuswilliam.financas.IsolatedAndroidTestRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -25,6 +25,7 @@ android {
     }
     lint { abortOnError = true }
     testOptions { animationsDisabled = true }
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 
@@ -52,5 +53,4 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
-    androidTestImplementation("androidx.room:room-testing:2.8.4")
 }
