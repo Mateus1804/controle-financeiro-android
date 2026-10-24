@@ -265,6 +265,41 @@ class FinanceUiTest {
         rule.onAllNodesWithText("100,00%").assertCountEquals(0)
     }
 
+
+    @Test fun notificationAccessRefreshesAfterResumeAndRevocationWithoutAlertPermission() {
+        val component = "com.mateuswilliam.financas/com.mateuswilliam.financas.notifications.BankNotificationListener"
+        fun command(value: String): String {
+            val descriptor = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(value)
+            return android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
+        }
+        fun resume() {
+            rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            rule.waitForIdle()
+        }
+        assertTrue(command("cmd notification help").contains("allow_listener"))
+        try {
+            rule.runOnIdle {
+                app.settings.acceptDisclosure()
+                app.settings.selectPackages(setOf("banco.exemplo"))
+            }
+            command("cmd notification allow_listener " + component)
+            resume()
+            rule.waitUntil(10000) { app.listenerConnected.value }
+            rule.onNodeWithText("Ajustes").performClick()
+            rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithText("Permitir alertas de revisão").assertExists()
+            command("cmd notification disallow_listener " + component)
+            resume()
+            rule.waitUntil(10000) { rule.onAllNodesWithText("Falta autorizar o acesso às notificações no Android.").fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithText("Resumo").performClick()
+            rule.onNodeWithText("Autorizar acesso").assertExists()
+        } finally {
+            command("cmd notification disallow_listener " + component)
+            rule.runOnIdle { app.settings.setEnabled(false) }
+        }
+    }
+
     private fun confirmEntry() {
         rule.onNodeWithText("Descrição").performTextReplacement("Lançamento fictício de teste")
         rule.onNodeWithText("Descrição").performImeAction()
