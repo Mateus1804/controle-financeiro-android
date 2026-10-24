@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Controle Financeiro</string>
+    <string name="notification_service_name">Controle Financeiro — revisão de movimentações</string>
+</resources>
