@@ -37,6 +37,7 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
         }
     }
     if (choosing) ModalBottomSheet(onDismissRequest = { choosing = false }) {
+        DialogSystemBars()
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(label, style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(query, { query = it.take(80) }, label = { Text("Buscar conta") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
@@ -53,7 +54,7 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
         }
     }
     if (adding) AlertDialog(onDismissRequest = { if (!saving) adding = false },
-        title = { Text("Adicionar conta ou banco") },
+        title = { DialogSystemBars(); Text("Adicionar conta ou banco") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it.take(80); error = null }, label = { Text("Nome da conta") }, singleLine = true, enabled = !saving)

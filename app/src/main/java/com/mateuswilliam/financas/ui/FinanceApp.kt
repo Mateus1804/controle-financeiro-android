@@ -28,6 +28,7 @@ import com.mateuswilliam.financas.core.ExpenseFilter
 import com.mateuswilliam.financas.core.ExpenseDimension
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.notifications.BankNotificationListener
+import com.mateuswilliam.financas.notifications.hasCaptureAccess
 import java.time.YearMonth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,7 +65,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
-    val hasAccess = remember(resumeCount, permissionVersion) { NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName) }
+    val hasAccess = remember(resumeCount, permissionVersion, connected) { hasCaptureAccess(context) }
     val canAlert = remember(resumeCount, permissionVersion) { NotificationManagerCompat.from(context).areNotificationsEnabled() &&
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
     val alertPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
@@ -182,7 +183,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     }
     if (state.loaded && !busy && !state.settings.introSeen) CaptureIntroduction(
         onActivate = { model.preferences.finishIntro(); disclosure = true },
-        onManual = { model.preferences.finishIntro() })
+        onManual = { model.preferences.setEnabled(false); model.preferences.finishIntro() })
     if (disclosure) DisclosureDialog(onDismiss = { disclosure = false }, onAccept = {
         model.preferences.acceptDisclosure(); disclosure = false; appPicker = true; model.loadApps()
     })
@@ -191,7 +192,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             model.preferences.selectPackages(it); appPicker = false
             if (it.isNotEmpty() && !hasAccess && state.settings.enabled) requestAccess()
         })
-    if (clearDialog) AlertDialog(onDismissRequest = { clearDialog = false }, title = { Text("Apagar todos os meus dados?") },
+    if (clearDialog) AlertDialog(onDismissRequest = { clearDialog = false }, title = { DialogSystemBars(); Text("Apagar todos os meus dados?") },
         text = { Text("Lançamentos, pendências e preferências serão apagados. A captura será desativada. Esta ação não pode ser desfeita.") },
         confirmButton = { TextButton(onClick = { clearDialog = false; model.clear() }, enabled = !busy) { Text("Apagar dados") } },
         dismissButton = { TextButton(onClick = { clearDialog = false }) { Text("Cancelar") } })

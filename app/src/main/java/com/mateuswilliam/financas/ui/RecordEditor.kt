@@ -58,7 +58,11 @@ fun RecordEditor(
     val context = LocalContext.current
     val dateDialogTheme = if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
         android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
-    val maximumHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * 0.84f
+    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val compactHeight = windowHeight < 480.dp
+    val maximumHeight = windowHeight * if (compactHeight) 0.96f else 0.84f
+    val compactScroll = rememberScrollState()
+    val fieldsScroll = rememberScrollState()
     val cents = if (invalidMoneyInput) null else MoneyInput.cents(amount.text.toString())
     val record = Record(id, cents ?: 0, movement, method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), destination)
@@ -69,14 +73,17 @@ fun RecordEditor(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding()) {
+        DialogSystemBars()
+        val scroll = if (compactHeight) Modifier.verticalScroll(compactScroll) else Modifier
+        Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding().then(scroll)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (draft != null) "Conferir movimentação" else if (existing != null) "Editar lançamento" else "Novo lançamento",
                     style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(if (draft != null) "A notificação só vira lançamento após sua confirmação." else "Seu controle, do seu jeito.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val fields = if (compactHeight) Modifier else Modifier.weight(1f, fill = false).verticalScroll(fieldsScroll)
+            Column(fields.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (draft != null) {
                     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -114,7 +121,7 @@ fun RecordEditor(
             }
         }
     }
-    if (deleteDialog) AlertDialog(onDismissRequest = { deleteDialog = false }, title = { Text("Excluir lançamento?") },
+    if (deleteDialog) AlertDialog(onDismissRequest = { deleteDialog = false }, title = { DialogSystemBars(); Text("Excluir lançamento?") },
         text = { Text("O lançamento será removido do histórico e dos totais. Esta ação não pode ser desfeita.") },
         confirmButton = { TextButton(onClick = { deleteDialog = false; onDelete?.invoke(); onDismiss() }) { Text("Excluir") } },
         dismissButton = { TextButton(onClick = { deleteDialog = false }) { Text("Cancelar") } })

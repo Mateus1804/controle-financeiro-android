@@ -15,7 +15,7 @@ import com.mateuswilliam.financas.core.CaptureIssue
 @Composable
 fun CaptureIntroduction(onActivate: () -> Unit, onManual: () -> Unit) {
     AlertDialog(onDismissRequest = onManual,
-        title = { Text("Seu dinheiro, com mais clareza") },
+        title = { DialogSystemBars(); Text("Seu dinheiro, com mais clareza") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Registre receitas e despesas ou receba sugestões a partir das notificações dos aplicativos que escolher.")

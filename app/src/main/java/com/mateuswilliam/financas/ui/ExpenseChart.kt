@@ -73,6 +73,7 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
         }
     }
     if (allGroups) ModalBottomSheet(onDismissRequest = { allGroups = false }) {
+        DialogSystemBars()
         Text("Todos os grupos", Modifier.padding(20.dp), style = MaterialTheme.typography.titleLarge)
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp).padding(horizontal = 20.dp)) {
             items(report.groups, key = { it.key }) { group ->

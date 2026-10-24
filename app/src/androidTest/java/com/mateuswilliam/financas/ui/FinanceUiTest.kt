@@ -300,6 +300,22 @@ class FinanceUiTest {
         }
     }
 
+
+    @Test fun choosingManualPausesPreviouslyEnabledCapture() {
+        app.settings.reset()
+        rule.runOnIdle {
+            app.settings.acceptDisclosure()
+            app.settings.selectPackages(setOf("banco.exemplo"))
+        }
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Usar manualmente").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Usar manualmente").performClick()
+        rule.runOnIdle {
+            assertTrue(app.settings.state.value.consented)
+            assertFalse(app.settings.state.value.enabled)
+            assertTrue(app.settings.state.value.introSeen)
+        }
+    }
+
     private fun confirmEntry() {
         rule.onNodeWithText("Descrição").performTextReplacement("Lançamento fictício de teste")
         rule.onNodeWithText("Descrição").performImeAction()
