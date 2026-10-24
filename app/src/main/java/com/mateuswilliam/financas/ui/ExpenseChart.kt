@@ -60,9 +60,9 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
                         Text(if (hidden) "••••" else Money.format(report.total), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                     }
                 }
-                visible.forEach { group ->
+                visible.forEachIndexed { index, group ->
                     ExpenseLegend(group, hidden, groupColor(dimension.name + group.key)) {
-                        if (group.key == "__remaining__") allGroups = true
+                        if (index == 5 && report.groups.size > 5) allGroups = true
                         else onGroup(ExpenseFilter(dimension, group.key, group.label))
                     }
                 }

@@ -150,7 +150,7 @@ class FinanceRepositoryTest {
 
     @Test fun originDestinationAndNotificationIdentityRemainIndependent() = runBlocking {
         repository.save(record("transferencia").copy(movement = Movement.TRANSFER, bank = "Origem", destination = "Destino"), null)
-        assertEquals("Origem", preferences.state.value.lastOrigin)
+        assertEquals("Origem", CapturePreferences(androidx.test.core.app.ApplicationProvider.getApplicationContext()).state.value.lastOrigin)
         assertEquals(2, database.financeDao().allAccounts().size)
         authorize()
         val draft = repository.capture(input)!!

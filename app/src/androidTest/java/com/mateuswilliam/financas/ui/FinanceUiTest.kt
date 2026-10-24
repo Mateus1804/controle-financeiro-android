@@ -196,7 +196,7 @@ class FinanceUiTest {
         assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
     }
 
-    @Test fun chartOpensOnlyTheSelectedExpenseGroup() = runBlocking {
+    @Test fun chartOpensOnlyTheSelectedExpenseGroup() = runBlocking<Unit> {
         val now = System.currentTimeMillis()
         app.repository.save(Record("grafico-gasto", 10000, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
             "Conta teste", "Despesa do gráfico", now), null)
@@ -208,6 +208,50 @@ class FinanceUiTest {
         rule.onNodeWithTag("expense-group-FOOD").performClick()
         rule.onNodeWithText("Despesa do gráfico").assertIsDisplayed()
         rule.onAllNodesWithText("Receita excluída do gráfico").assertCountEquals(0)
+    }
+
+
+    @Test fun rejectedPasteShowsAnErrorAndCannotSaveThePreviousAmount() {
+        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        rule.onNodeWithTag("amount-input").performTextInput("1234")
+        rule.onNodeWithTag("amount-input").performTextReplacement("1,234")
+        rule.onNodeWithText("Entrada inválida ou acima do limite. Digite números ou cole um valor como 1.234,56.").assertExists()
+        rule.onNodeWithText("Descrição").performTextInput("Teste de colagem inválida")
+        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
+    }
+
+    @Test fun largeTextAndOpenKeyboardAllowManualEntry() {
+        fun fontScale(value: String) {
+            val command = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+                .executeShellCommand("settings put system font_scale " + value)
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(command).use { it.readBytes() }
+        }
+        try {
+            fontScale("1.5")
+            rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.4f }
+            rule.onNodeWithContentDescription("Novo lançamento").performClick()
+            rule.onNodeWithTag("amount-input").performClick().performTextInput("1234")
+            rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Fonte ampliada")
+            screenshot("formulario-fonte-ampliada")
+            confirmEntry()
+            assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
+        } finally { fontScale("1.0") }
+    }
+
+    @Test fun landscapeLayoutKeepsTheFormUsable() {
+        try {
+            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
+            rule.onNodeWithContentDescription("Novo lançamento").performClick()
+            rule.onNodeWithTag("amount-input").performTextInput("1234")
+            rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Paisagem")
+            screenshot("formulario-paisagem")
+            confirmEntry()
+            assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
+        } finally {
+            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+        }
     }
 
     private fun confirmEntry() {

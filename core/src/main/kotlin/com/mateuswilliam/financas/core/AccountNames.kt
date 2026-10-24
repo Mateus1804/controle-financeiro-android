@@ -3,7 +3,7 @@ package com.mateuswilliam.financas.core
 import java.util.Locale
 
 object AccountNames {
-    private val spaces = Regex("\\s+")
+    private val spaces = Regex("[\\s\\p{Z}]+")
     fun clean(name: String): String = name.trim().replace(spaces, " ")
     fun key(name: String): String = clean(name).lowercase(Locale.ROOT)
 }

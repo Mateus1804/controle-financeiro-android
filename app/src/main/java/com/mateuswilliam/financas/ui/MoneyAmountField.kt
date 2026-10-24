@@ -12,15 +12,19 @@ import androidx.compose.foundation.text.input.placeCursorAtEnd
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import com.mateuswilliam.financas.core.MoneyInput
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.BufferOverflow
 
-private val CentInputTransformation = InputTransformation {
+private fun centInputTransformation(reportInvalid: (Boolean) -> Unit) = InputTransformation {
     val incoming = asCharSequence().toString()
     val normalized = MoneyInput.normalize(incoming)
+    reportInvalid(normalized == null)
     when {
         normalized == null -> revertAllChanges()
         normalized == incoming -> Unit
@@ -47,7 +51,12 @@ private val CurrencyOutputTransformation = OutputTransformation {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MoneyAmountField(state: TextFieldState, attempted: Boolean, enabled: Boolean) {
+fun MoneyAmountField(state: TextFieldState, attempted: Boolean, enabled: Boolean, onInvalidInput: (Boolean) -> Unit) {
+    val feedback = remember { MutableSharedFlow<Boolean>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST) }
+    var rejected by rememberSaveable { mutableStateOf(false) }
+    val notifyParent by rememberUpdatedState(onInvalidInput)
+    val transformation = remember(feedback) { centInputTransformation { feedback.tryEmit(it) } }
+    LaunchedEffect(feedback) { feedback.collect { rejected = it; notifyParent(it) } }
     val cents = MoneyInput.cents(state.text.toString())
     val invalid = (attempted || state.text.isNotEmpty()) && (cents == null || cents <= 0)
     OutlinedTextField(
@@ -59,12 +68,13 @@ fun MoneyAmountField(state: TextFieldState, attempted: Boolean, enabled: Boolean
         enabled = enabled,
         lineLimits = TextFieldLineLimits.SingleLine,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        inputTransformation = CentInputTransformation,
+        inputTransformation = transformation,
         outputTransformation = CurrencyOutputTransformation,
-        isError = invalid,
+        isError = invalid || rejected,
         supportingText = {
-            Text(if (invalid) "Informe um valor maior que zero."
-                else "Digite só números: 1234 vira 12,34. Também aceito colar um valor em reais.")
+            Text(if (rejected) "Entrada inválida ou acima do limite. Digite números ou cole um valor como 1.234,56."
+                else if (invalid) "Informe um valor maior que zero."
+                else "Digite só números: 1234 vira 12,34. Valores em reais também podem ser colados.")
         },
     )
 }

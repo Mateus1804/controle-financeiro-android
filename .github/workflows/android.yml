@@ -28,6 +28,8 @@ jobs:
           cache: gradle
       - name: Conferir Gradle Wrapper
         run: python3 scripts/verify-wrapper.py
+      - name: Conferir contraste dos pares principais
+        run: python3 scripts/verify-contrast.py
       - name: Preparar SDK
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:

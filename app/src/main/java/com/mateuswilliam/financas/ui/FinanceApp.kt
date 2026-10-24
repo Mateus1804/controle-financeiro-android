@@ -66,7 +66,8 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val hasAccess = remember(resumeCount, permissionVersion) { NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName) }
-    val canAlert = remember(resumeCount, permissionVersion) { Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED }
+    val canAlert = remember(resumeCount, permissionVersion) { NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+        (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
     val alertPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
     fun requestAccess() {
         runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
@@ -157,7 +158,12 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         onApps = { if (!state.settings.consented) disclosure = true else { appPicker = true; model.loadApps() } },
                         onAccess = ::requestAccess,
                         onReconnect = { NotificationListenerService.requestRebind(ComponentName(context, BankNotificationListener::class.java)) },
-                        onAlerts = { if (Build.VERSION.SDK_INT >= 33) alertPermission.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                        onAlerts = {
+                            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+                                alertPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            else runCatching { context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)) }
+                                .onFailure { model.message.value = "Abra as configurações de notificações do aplicativo no Android." }
+                        },
                         onExport = { export.launch("movimentacoes-${YearMonth.now()}.csv") },
                         onClear = { clearDialog = true }, onSimulate = model::simulate,
                         onAppearance = model.preferences::setAppearance, busy = busy)

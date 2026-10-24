@@ -43,6 +43,7 @@ fun RecordEditor(
     val originalDate = Instant.ofEpochMilli(originalAt).atZone(ZoneId.systemDefault())
     val id = rememberSaveable { existing?.id ?: UUID.randomUUID().toString() }
     val amount = rememberTextFieldState(initialText = (existing?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
+    var invalidMoneyInput by rememberSaveable { mutableStateOf(false) }
     var bank by rememberSaveable { mutableStateOf(existing?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
     var description by rememberSaveable { mutableStateOf(existing?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
     var movement by rememberSaveable { mutableStateOf(existing?.movement ?: draft?.movement ?: Movement.EXPENSE) }
@@ -56,7 +57,7 @@ fun RecordEditor(
     val dateDialogTheme = if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
         android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
     val maximumHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * 0.84f
-    val cents = MoneyInput.cents(amount.text.toString())
+    val cents = if (invalidMoneyInput) null else MoneyInput.cents(amount.text.toString())
     val record = Record(id, cents ?: 0, movement, method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), destination)
     val error = RecordValidation.error(record)
@@ -84,7 +85,7 @@ fun RecordEditor(
                         }
                     }
                 }
-                MoneyAmountField(amount, attempted, enabled = !busy)
+                MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
                 ChoiceField("Movimentação", movement, Movement.entries.toList(), { it.label }) { movement = it }
                 ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }

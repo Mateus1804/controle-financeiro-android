@@ -8,6 +8,8 @@ Desenvolvo o Controle Financeiro como um aplicativo de registro financeiro local
 
 Armazeno os lançamentos que forem confirmados: valor, data, movimentação, meio de pagamento, categoria, descrição, conta de origem e, quando aplicável, destino.
 
+Mantenho também os nomes das contas cadastradas e sua ordem de uso, a última origem escolhida manualmente, o tema da interface e as escolhas de apresentação inicial e fechamento dos avisos. Esses nomes funcionam como apelidos locais; não solicito número de conta nem senha bancária para cadastrá-los.
+
 Com consentimento e captura ativa, acesso o nome do aplicativo, identificador, horário, título e texto das notificações das origens selecionadas. O Android concede uma autorização ampla; aplico o filtro de origens antes de ler o texto.
 
 A seleção mostra nomes de aplicativos com ícone de abertura disponíveis no perfil atual do Android. Guardo somente os pacotes selecionados nas preferências locais.
@@ -16,7 +18,7 @@ A seleção mostra nomes de aplicativos com ícone de abertura disponíveis no p
 
 Uso notificações para sugerir pendências que ainda dependem de confirmação. Descarto mensagens identificadas como senha, código ou autenticação. Após confirmar ou ignorar, apago o título e o texto originais. Mantenho identificadores locais e o estado da revisão para evitar o reprocessamento do evento.
 
-Mantenho lançamentos confirmados até sua exclusão. A caixa pode conter informações financeiras e pessoais presentes em notificações pendentes; desligar a captura interrompe novas leituras, mas preserva o histórico já salvo. A opção de apagar todos os dados remove registros, pendências e preferências e desativa a captura local.
+Mantenho lançamentos confirmados até sua exclusão. A caixa pode conter informações financeiras e pessoais presentes em notificações pendentes; desligar a captura interrompe novas leituras, mas preserva o histórico já salvo. A opção de apagar todos os dados remove registros, pendências, contas e preferências e desativa a captura local.
 
 ## Compartilhamento e exportação
 
