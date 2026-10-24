@@ -136,8 +136,8 @@ class OptionalFeaturesUiTest {
             rule.runOnIdle { assertTrue(rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
             rule.activityRule.scenario.recreate()
             rule.onNodeWithText("Acesso protegido").assertExists()
-            rule.activityRule.scenario.onActivity { activity -> activity.onNewIntent(Intent(activity, MainActivity::class.java)
-                .putExtra(ReviewNotifications.EXTRA_DRAFT_ID, "pendencia-privada")) }
+            rule.activityRule.scenario.onActivity { activity -> InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(activity,
+                Intent(activity, MainActivity::class.java).putExtra(ReviewNotifications.EXTRA_DRAFT_ID, "pendencia-privada")) }
             rule.waitForIdle()
             rule.onNodeWithText("Acesso protegido").assertExists()
             rule.onAllNodesWithText("Conferir movimentação").assertCountEquals(0)

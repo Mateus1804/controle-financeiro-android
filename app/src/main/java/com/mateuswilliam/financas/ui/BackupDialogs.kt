@@ -2,11 +2,14 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -53,14 +56,14 @@ fun BackupPasswordDialog(creating: Boolean, busy: Boolean, onDismiss: () -> Unit
 @Composable
 fun BackupPreviewDialog(preview: StagedRestore, busy: Boolean, onCancel: () -> Unit, onRestore: () -> Unit) {
     var confirmed by remember(preview.databaseName) { mutableStateOf(false) }
-    AlertDialog(onDismissRequest = { if (!busy) onCancel() }, properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
+    AlertDialog(onDismissRequest = { if (!busy) onCancel() }, modifier = Modifier.testTag("restore-preview-dialog"), properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
         title = { DialogSystemBars(); Text("Conferir restauração") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Backup de ${shortDate(preview.createdAt)} conferido em uma base temporária.")
             Text("${preview.records} lançamentos · ${preview.pending} pendências · ${preview.accounts} contas cadastradas\n${preview.budgets} orçamentos · ${preview.recurring} recorrências")
             Text("A restauração substitui os dados financeiros locais. Crie um backup atual antes de continuar. Captura e lembretes ficam pausados; consentimento e permissões do Android não são transferidos.")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Checkbox(confirmed, { confirmed = it }, enabled = !busy)
+            Row(Modifier.fillMaxWidth().toggleable(value = confirmed, enabled = !busy, role = Role.Checkbox, onValueChange = { confirmed = it }), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Checkbox(confirmed, onCheckedChange = null, enabled = !busy)
                 Text("Substituir os dados locais por este backup", Modifier.weight(1f).padding(top = 8.dp))
             }
         } },
