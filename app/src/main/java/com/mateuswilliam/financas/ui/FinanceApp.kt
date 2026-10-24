@@ -130,7 +130,8 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         onReconnect = { NotificationListenerService.requestRebind(ComponentName(context, BankNotificationListener::class.java)) },
                         onAlerts = { if (Build.VERSION.SDK_INT >= 33) alertPermission.launch(Manifest.permission.POST_NOTIFICATIONS) },
                         onExport = { export.launch("movimentacoes-${YearMonth.now()}.csv") },
-                        onClear = { clearDialog = true }, onSimulate = model::simulate, busy = busy)
+                        onClear = { clearDialog = true }, onSimulate = model::simulate,
+                        onAppearance = model.preferences::setAppearance, busy = busy)
                 }
             }
         }

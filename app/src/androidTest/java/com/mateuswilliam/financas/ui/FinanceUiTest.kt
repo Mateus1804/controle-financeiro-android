@@ -2,6 +2,8 @@ package com.mateuswilliam.financas.ui
 
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -9,9 +11,12 @@ import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.DraftEntity
+import com.mateuswilliam.financas.data.Appearance
+import androidx.core.view.WindowCompat
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,13 +30,80 @@ class FinanceUiTest {
 
     @Test fun manualEntryWorksWithoutNotificationAccess() {
         rule.onNodeWithContentDescription("Novo lançamento").performClick()
-        rule.onNodeWithText("Valor (R$)").performTextInput("42,90")
+        rule.onNodeWithTag("amount-input").performTextInput("4290")
         rule.onNodeWithText("Descrição").performTextInput("Mercado de exemplo")
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Novo lançamento").fetchSemanticsNodes().isEmpty() }
         rule.onNodeWithText("Extrato").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Mercado de exemplo").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Mercado de exemplo").assertIsDisplayed()
+        assertEquals(4290L, runBlocking { app.repository.exportRecords().single().amountCents })
+    }
+
+    @Test fun formattedPasteKeepsItsValueInReais() {
+        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        rule.onNodeWithTag("amount-input").performTextInput("R$ 1.234,56")
+        confirmEntry()
+        assertEquals(123456L, runBlocking { app.repository.exportRecords().single().amountCents })
+    }
+
+    @Test fun cursorSelectionReplacementAndBackspaceKeepCents() {
+        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        val field = rule.onNodeWithTag("amount-input")
+        field.performTextInput("1234")
+        field.performTextInputSelection(TextRange(2), relativeToOriginalText = true)
+        field.performTextInput("9")
+        field.performTextInputSelection(TextRange(1, 3), relativeToOriginalText = true)
+        field.performTextInput("0")
+        field.performTextInputSelection(TextRange(4), relativeToOriginalText = true)
+        field.performKeyInput { pressKey(Key.Backspace) }
+        confirmEntry()
+        assertEquals(103L, runBlocking { app.repository.exportRecords().single().amountCents })
+    }
+
+    @Test fun clearingTheAmountDoesNotSaveZeroOrReuseTheOldValue() {
+        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        val field = rule.onNodeWithTag("amount-input")
+        field.performTextInput("1234")
+        field.performTextClearance()
+        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
+        field.performTextInput("1")
+        confirmEntry()
+        assertEquals(1L, runBlocking { app.repository.exportRecords().single().amountCents })
+    }
+
+    @Test fun existingAmountIsNotScaledAgainWhenEditing() = runBlocking {
+        app.repository.save(Record("editar-exemplo", 4290, Movement.EXPENSE, PaymentMethod.PIX,
+            Category.FOOD, "Conta de exemplo", "Editar valor de exemplo", System.currentTimeMillis()), null)
+        rule.onNodeWithText("Extrato").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Editar valor de exemplo").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Editar valor de exemplo").performClick()
+        confirmEntry()
+        assertEquals(4290L, app.repository.exportRecords().single().amountCents)
+    }
+
+    @Test fun appearancePersistsAfterActivityRecreationAndUpdatesSystemBars() {
+        rule.onNodeWithText("Ajustes").performClick()
+        rule.onNodeWithText("Escuro").performClick()
+        rule.runOnIdle {
+            assertEquals(Appearance.DARK, app.settings.state.value.appearance)
+            assertFalse(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
+        }
+        rule.activityRule.scenario.recreate()
+        rule.waitForIdle()
+        rule.onNodeWithText("Ajustes").performClick()
+        rule.onNodeWithText("Escuro").assertIsSelected()
+        screenshot("ajustes-escuro")
+        rule.onNodeWithText("Claro").performClick()
+        rule.onNodeWithText("Claro").assertIsSelected()
+        rule.runOnIdle {
+            assertEquals(Appearance.LIGHT, app.settings.state.value.appearance)
+            assertTrue(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
+        }
+        screenshot("ajustes-claro")
+        rule.onNodeWithText("Sistema").performClick()
+        rule.onNodeWithText("Sistema").assertIsSelected()
     }
 
     @Test fun decliningDisclosureKeepsCaptureDisabled() {
@@ -56,12 +128,26 @@ class FinanceUiTest {
             rule.onAllNodesWithText("Vamos conferir?").fetchSemanticsNodes().isNotEmpty() }
         rule.waitForIdle()
         screenshot("resumo")
+        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
+        rule.waitForIdle()
+        screenshot("resumo-escuro")
+        rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
+        rule.waitForIdle()
+        screenshot("resumo-claro")
         rule.onNodeWithText("Revisar").performClick()
         rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
         screenshot("pendencias")
         rule.onNodeWithTag("review-pendencia-exemplo").performClick()
         rule.onNodeWithText("Conferir movimentação").assertIsDisplayed()
         screenshot("revisao")
+        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
+        rule.waitForIdle()
+        screenshot("revisao-escuro")
+    }
+
+    private fun confirmEntry() {
+        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
     }
 
     private fun screenshot(name: String) {

@@ -30,6 +30,6 @@ private val Dark = darkColorScheme(
 )
 
 @Composable
-fun FinanceTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, typography = Typography(), content = content)
+fun FinanceTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = if (darkTheme) Dark else Light, typography = Typography(), content = content)
 }

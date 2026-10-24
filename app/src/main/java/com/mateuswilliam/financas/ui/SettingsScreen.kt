@@ -19,17 +19,34 @@ import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.BuildConfig
 import com.mateuswilliam.financas.SelectableApp
 import com.mateuswilliam.financas.data.CaptureSettings
+import com.mateuswilliam.financas.data.Appearance
 
 @Composable
 fun SettingsScreen(
     settings: CaptureSettings, connected: Boolean, hasAccess: Boolean, canAlert: Boolean, captureError: Boolean,
     onToggle: (Boolean) -> Unit, onApps: () -> Unit, onAccess: () -> Unit,
     onReconnect: () -> Unit, onAlerts: () -> Unit, onExport: () -> Unit,
-    onClear: () -> Unit, onSimulate: () -> Unit, busy: Boolean,
+    onClear: () -> Unit, onSimulate: () -> Unit, onAppearance: (Appearance) -> Unit, busy: Boolean,
 ) {
     var privacy by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { SectionTitle("Meus ajustes", "Privacidade e controle em primeiro lugar.") }
+        item {
+            SettingsCard {
+                Text("Aparência", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Escolha um tema ou acompanhe a configuração do aparelho.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    Appearance.entries.forEachIndexed { index, appearance ->
+                        SegmentedButton(
+                            selected = settings.appearance == appearance,
+                            onClick = { onAppearance(appearance) },
+                            shape = SegmentedButtonDefaults.itemShape(index, Appearance.entries.size),
+                        ) { Text(appearance.label) }
+                    }
+                }
+            }
+        }
         item {
             SettingsCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {

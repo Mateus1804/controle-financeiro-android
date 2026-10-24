@@ -4,17 +4,18 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.DraftEntity
@@ -38,7 +39,7 @@ fun RecordEditor(
     val originalAt = existing?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis()
     val originalDate = Instant.ofEpochMilli(originalAt).atZone(ZoneId.systemDefault())
     val id = rememberSaveable { existing?.id ?: UUID.randomUUID().toString() }
-    var amount by rememberSaveable { mutableStateOf((existing?.amountCents ?: draft?.amountCents)?.let(Money::editable).orEmpty()) }
+    val amount = rememberTextFieldState(initialText = (existing?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
     var bank by rememberSaveable { mutableStateOf(existing?.bank ?: draft?.bank ?: "Carteira") }
     var description by rememberSaveable { mutableStateOf(existing?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
     var movement by rememberSaveable { mutableStateOf(existing?.movement ?: draft?.movement ?: Movement.EXPENSE) }
@@ -49,8 +50,10 @@ fun RecordEditor(
     var attempted by rememberSaveable { mutableStateOf(false) }
     var deleteDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val dateDialogTheme = if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
+        android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
     val maximumHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * 0.84f
-    val cents = Money.parse(amount)
+    val cents = MoneyInput.cents(amount.text.toString())
     val record = Record(id, cents ?: 0, movement, method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), destination)
     val error = RecordValidation.error(record)
@@ -78,11 +81,7 @@ fun RecordEditor(
                         }
                     }
                 }
-                OutlinedTextField(amount, { amount = it.take(24) }, label = { Text("Valor (R$)") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    isError = (attempted || amount.isNotBlank()) && (cents == null || cents <= 0),
-                    supportingText = { if ((attempted || amount.isNotBlank()) && (cents == null || cents <= 0)) Text("Informe um valor válido, como 42,90.") })
+                MoneyAmountField(amount, attempted, enabled = !busy)
                 ChoiceField("Movimentação", movement, Movement.entries.toList(), { it.label }) { movement = it }
                 ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
@@ -92,7 +91,7 @@ fun RecordEditor(
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
                 OutlinedButton(onClick = {
                     val selected = LocalDate.parse(date)
-                    DatePickerDialog(context, { _, year, month, day -> date = LocalDate.of(year, month + 1, day).toString() },
+                    DatePickerDialog(context, dateDialogTheme, { _, year, month, day -> date = LocalDate.of(year, month + 1, day).toString() },
                         selected.year, selected.monthValue - 1, selected.dayOfMonth).show()
                 }, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
