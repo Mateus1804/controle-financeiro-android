@@ -116,10 +116,50 @@ class BackupStoreTest {
         repository.clear()
         repository.save(record("base-original"), null)
         preferences.acceptDisclosure()
+        preferences.setReminders(true)
         database.openHelper.writableDatabase.execSQL("CREATE TRIGGER falha_restauracao BEFORE INSERT ON records WHEN NEW.id = 'novo-backup' BEGIN SELECT RAISE(ABORT, 'falha fictícia'); END")
         assertTrue(runCatching { repository.restore(snapshot) }.isFailure)
         assertEquals("base-original", repository.exportRecords().single().id)
         assertTrue(preferences.snapshot().enabled)
+        assertTrue(preferences.snapshot().remindersEnabled)
+    }
+    @Test fun failedPausePersistencePreventsRestoringOrClearingTheLiveDatabase() = runBlocking<Unit> {
+        repository.save(record("backup-novo"), null)
+        val snapshot = repository.snapshot()
+        repository.clear()
+        repository.save(record("base-preservada"), null)
+        val isolated = context.getSharedPreferences("failing-restore-test", Context.MODE_PRIVATE)
+        try {
+            check(isolated.edit().clear().putBoolean("enabled", true).putBoolean("disclosure_v1", true).commit())
+            val failing = FinanceRepository(database, CapturePreferences(FailingPreferencesContext(context, isolated)))
+            assertTrue(runCatching { failing.restore(snapshot) }.exceptionOrNull() is IllegalStateException)
+            assertTrue(runCatching { failing.clear() }.exceptionOrNull() is IllegalStateException)
+            assertEquals("base-preservada", repository.exportRecords().single().id)
+        } finally { isolated.edit().clear().commit() }
+    }
+    @Test fun failedDeletionKeepsExistingFinancialDataAndAppProtection() = runBlocking<Unit> {
+        repository.save(record("base-protegida"), null)
+        preferences.setLockEnabled(true)
+        database.openHelper.writableDatabase.execSQL("CREATE TRIGGER falha_exclusao BEFORE DELETE ON records BEGIN SELECT RAISE(ABORT, 'falha fictícia'); END")
+        assertTrue(runCatching { repository.clear() }.isFailure)
+        assertEquals("base-protegida", repository.exportRecords().single().id)
+        assertTrue(preferences.snapshot().lockEnabled)
+        assertTrue(preferences.snapshot().secureScreen)
+        assertFalse(preferences.snapshot().enabled)
+    }
+    @Test fun preferenceCleanupFailureIsReportedAfterFinancialDataWasRemoved() = runBlocking<Unit> {
+        repository.save(record("a-apagar"), null)
+        val isolated = context.getSharedPreferences("failing-clear-test", Context.MODE_PRIVATE)
+        try {
+            check(isolated.edit().clear().putBoolean("enabled", true).putBoolean("lock_enabled", true).commit())
+            val failingSettings = CapturePreferences(FailingPreferencesContext(context, isolated, successfulCommits = 1))
+            val failing = FinanceRepository(database, failingSettings)
+            assertFalse(failing.clear())
+            assertTrue(repository.exportRecords().isEmpty())
+            assertFalse(failingSettings.snapshot().enabled)
+            assertFalse(failingSettings.snapshot().remindersEnabled)
+            assertTrue(failingSettings.snapshot().lockEnabled)
+        } finally { isolated.edit().clear().commit() }
     }
     @Test fun duplicateIdentifiersAndDanglingLinksCannotEnterRestoredDatabase() = runBlocking<Unit> {
         repository.save(record("preservado"), null)

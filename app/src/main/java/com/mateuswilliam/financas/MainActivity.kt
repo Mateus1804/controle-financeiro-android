@@ -158,12 +158,17 @@ class MainActivity : ComponentActivity() {
         session.action = null
         session.credentialInFlight = false
         session.authenticating = false
-        if (!success) { authenticationError("Autenticação não concluída. O acesso continua protegido."); return }
-        when (action) {
-            AuthenticationAction.ENABLE -> financeModel.preferences.setLockEnabled(true)
-            AuthenticationAction.DISABLE -> financeModel.preferences.setLockEnabled(false)
-            AuthenticationAction.UNLOCK -> Unit
-            null -> return
+        if (!success) { authenticationError("Autenticação não concluída. A configuração de proteção foi mantida."); return }
+        try {
+            when (action) {
+                AuthenticationAction.ENABLE -> financeModel.preferences.setLockEnabled(true)
+                AuthenticationAction.DISABLE -> financeModel.preferences.setLockEnabled(false)
+                AuthenticationAction.UNLOCK -> Unit
+                null -> return
+            }
+        } catch (exception: IllegalStateException) {
+            authenticationError(exception.message ?: "A alteração da proteção não foi salva.")
+            return
         }
         session.authenticated = true
         session.backgroundAt = null

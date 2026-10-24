@@ -77,7 +77,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun delete(id: String) = action { repository.deleteRecord(id); "Lançamento removido." }
-    fun clear() = action { repository.clear(); ReviewNotifications.cancelAll(app); "Dados apagados e captura desativada." }
+    fun clear() = action {
+        val preferencesCleared = repository.clear()
+        ReviewNotifications.cancelAll(app)
+        if (preferencesCleared) "Dados apagados e captura desativada."
+        else "Os dados financeiros foram apagados, mas as preferências não puderam ser limpas. Captura e lembretes permanecem pausados. Confira o armazenamento e tente novamente."
+    }
 
     fun saveBudget(budget: MonthlyBudget, onSaved: () -> Unit) = action { repository.saveBudget(budget); onSaved(); "Limite mensal salvo." }
     fun deleteBudget(month: String, category: Category) = action { repository.deleteBudget(month, category); "Limite mensal removido." }

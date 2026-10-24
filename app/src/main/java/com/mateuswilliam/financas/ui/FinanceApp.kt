@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.net.Uri
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.R
@@ -60,7 +60,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var selectedDraftId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedRecordId by rememberSaveable { mutableStateOf<String?>(null) }
     var expectedRevision by rememberSaveable { mutableStateOf<Int?>(null) }
-    var reviewIds by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    var reviewIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var reviewCompleted by rememberSaveable { mutableIntStateOf(0) }
     var reviewAfter by rememberSaveable { mutableStateOf<String?>(null) }
     var planningReturn by rememberSaveable { mutableIntStateOf(0) }
@@ -125,11 +125,11 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         expectedRevision = value.revision; editing = true; reviewAfter = null
     }
     fun openDraft(value: DraftEntity) {
-        reviewIds = ArrayList(ReviewQueue.snapshot(state.pending.map { it.id }, value.id)); reviewCompleted = 0
+        reviewIds = ReviewQueue.snapshot(state.pending.map { it.id }, value.id); reviewCompleted = 0
         showDraft(value)
     }
     fun finishReview(id: String) { reviewCompleted++; editing = false; reviewAfter = id }
-    fun finishSession() { reviewAfter = null; seen.addAll(state.pending.map { it.id }); reviewIds = arrayListOf(); tab = 1 }
+    fun finishSession() { reviewAfter = null; seen.addAll(state.pending.map { it.id }); reviewIds = emptyList(); tab = 1 }
     fun openPlanning() { if (tab != 4) planningReturn = tab; tab = 4 }
     BackHandler(tab == 4 && !editing) { tab = planningReturn }
 
@@ -259,7 +259,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         val creating = backupDialog == 1
         backupDialog = 0
         if (creating) model.createBackup(secret) { backupExport.launch("controle-financeiro-${LocalDate.now()}.cfbackup") }
-        else { val uri = restoreUri; restoreUri = null; if (uri != null) model.stageBackup(Uri.parse(uri), secret) else secret.fill('\u0000') }
+        else { val uri = restoreUri; restoreUri = null; if (uri != null) model.stageBackup(uri.toUri(), secret) else secret.fill('\u0000') }
     })
     stagedRestore?.let { BackupPreviewDialog(it, busy, model::cancelRestore, model::restoreBackup) }
     if (state.loaded && !busy && !state.settings.introSeen) CaptureIntroduction(

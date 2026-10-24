@@ -128,6 +128,7 @@ class OptionalFeaturesUiTest {
     }
 
     @Test fun enabledProtectionHidesFinancialScreensAndNotificationDeepLinks() {
+        val originalIntent = Intent(rule.activity.intent)
         try {
             rule.runOnIdle { app.settings.setLockEnabled(true) }
             rule.waitUntil(5000) { rule.onAllNodesWithText("Acesso protegido").fetchSemanticsNodes().isNotEmpty() }
@@ -141,7 +142,11 @@ class OptionalFeaturesUiTest {
             rule.waitForIdle()
             rule.onNodeWithText("Acesso protegido").assertExists()
             rule.onAllNodesWithText("Conferir movimentação").assertCountEquals(0)
-        } finally { rule.runOnIdle { app.settings.reset(); app.settings.finishIntro() } }
+        } finally {
+            // O monitor do ActivityScenario identifica a atividade pelo Intent de abertura.
+            rule.activityRule.scenario.onActivity { it.intent = originalIntent }
+            rule.runOnIdle { app.settings.reset(); app.settings.finishIntro() }
+        }
     }
 
     @Test fun backupPasswordIsNotSavedOnRecreationAndCancellingChangesNothing() = runBlocking<Unit> {

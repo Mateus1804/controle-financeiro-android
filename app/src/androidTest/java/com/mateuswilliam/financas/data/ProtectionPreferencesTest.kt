@@ -38,6 +38,18 @@ class ProtectionPreferencesTest {
         val saved = CapturePreferences(context).snapshot()
         assertFalse(saved.lockEnabled); assertFalse(saved.secureScreen); assertFalse(saved.remindersEnabled)
     }
+    @Test fun failedPersistenceDoesNotClaimLockActivationOrRemoveAnExistingLock() {
+        val isolated = context.getSharedPreferences("failing-protection-test", Context.MODE_PRIVATE)
+        try {
+            for (enabled in listOf(false, true)) {
+                check(isolated.edit().clear().putBoolean("lock_enabled", enabled).putBoolean("secure_screen", enabled).commit())
+                val failing = CapturePreferences(FailingPreferencesContext(context, isolated))
+                assertTrue(runCatching { failing.setLockEnabled(!enabled) }.exceptionOrNull() is IllegalStateException)
+                assertEquals(enabled, failing.snapshot().lockEnabled)
+                assertEquals(enabled, failing.snapshot().secureScreen)
+            }
+        } finally { isolated.edit().clear().commit() }
+    }
     @Test fun nativeReminderJobIsPeriodicPersistedAndCanBeCancelled() {
         preferences.setReminders(true)
         RecurringReminders.schedule(context, true)

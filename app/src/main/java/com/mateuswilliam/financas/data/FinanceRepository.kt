@@ -158,12 +158,15 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun restore(snapshot: FinanceSnapshot) = writes.withLock {
         BackupSnapshot.validate(snapshot)
-        val wasEnabled = settings.snapshot().enabled
-        withContext(Dispatchers.IO) { settings.pauseCapture() }
+        val previousSettings = settings.snapshot()
+        withContext(Dispatchers.IO) { settings.pauseForRestore() }
         try {
             database.withTransaction { clearTables(); insertSnapshot(dao, snapshot) }
         } catch (exception: Exception) {
-            if (wasEnabled) withContext(NonCancellable + Dispatchers.IO) { settings.setEnabled(true) }
+            withContext(NonCancellable + Dispatchers.IO) {
+                settings.setEnabled(previousSettings.enabled)
+                settings.setReminders(previousSettings.remindersEnabled)
+            }
             throw exception
         }
         withContext(Dispatchers.IO) { settings.restoreDisplay(snapshot.display) }
@@ -175,7 +178,9 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     suspend fun clear() = writes.withLock {
-        withContext(Dispatchers.IO) { settings.reset() }
+        // O bloqueio permanece configurado até a transação apagar os dados financeiros.
+        withContext(Dispatchers.IO) { settings.pauseForRestore() }
         database.withTransaction { clearTables() }
+        withContext(Dispatchers.IO) { runCatching { settings.reset() }.isSuccess }
     }
 }

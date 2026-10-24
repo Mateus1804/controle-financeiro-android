@@ -60,10 +60,24 @@ class CapturePreferences(context: Context) {
     fun setReminders(enabled: Boolean) { preferences.edit { putBoolean("reminders_enabled", enabled) }; mutable.value = read() }
     fun setSecureScreen(enabled: Boolean) { preferences.edit { putBoolean("secure_screen", enabled) }; mutable.value = read() }
     fun setLockEnabled(enabled: Boolean) {
-        preferences.edit(commit = true) { putBoolean("lock_enabled", enabled); if (enabled) putBoolean("secure_screen", true) }
+        val previous = read()
+        val editor = preferences.edit()
+        editor.putBoolean("lock_enabled", enabled)
+        if (enabled) editor.putBoolean("secure_screen", true)
+        if (!editor.commit()) {
+            preferences.edit { putBoolean("lock_enabled", previous.lockEnabled); putBoolean("secure_screen", previous.secureScreen) }
+            mutable.value = read()
+            throw IllegalStateException("A alteração da proteção não foi salva. Confira o armazenamento e tente novamente.")
+        }
         mutable.value = read()
     }
-    fun pauseCapture() { preferences.edit(commit = true) { putBoolean("enabled", false) }; mutable.value = read() }
+    fun pauseForRestore() {
+        val editor = preferences.edit()
+        editor.putBoolean("enabled", false)
+        editor.putBoolean("reminders_enabled", false)
+        check(editor.commit()) { "A pausa da captura e dos lembretes não pôde ser salva. Nenhum dado foi substituído." }
+        mutable.value = read()
+    }
     fun restoreDisplay(display: BackupDisplay) {
         preferences.edit(commit = true) {
             putString("appearance", display.appearance.name); putBoolean("hide_amounts", display.hideAmounts)
@@ -74,5 +88,8 @@ class CapturePreferences(context: Context) {
     }
     fun permits(packageName: String): Boolean = read().let { it.consented && it.enabled && packageName in it.packages }
     // Persiste a revogação antes de concluir a exclusão. O repositório chama esta operação em IO.
-    fun reset() { preferences.edit(commit = true) { clear() }; mutable.value = read() }
+    fun reset() {
+        check(preferences.edit().clear().commit()) { "As preferências não puderam ser limpas." }
+        mutable.value = read()
+    }
 }

@@ -39,7 +39,7 @@ O limite é de 16 MiB para o conteúdo e 50 mil itens no conjunto de tabelas. O 
 2. A tag GCM autentica o arquivo; senha incorreta e adulteração não produzem uma prévia utilizável.
 3. Os dados são validados e inseridos em um banco Room temporário no armazenamento privado do aplicativo.
 4. A estrutura Room, `PRAGMA integrity_check`, os valores e os vínculos são conferidos. A releitura das tabelas precisa corresponder ao conteúdo decodificado.
-5. Após a confirmação da prévia, a captura é pausada. A substituição das tabelas financeiras ocorre em uma única transação, protegida pela mesma exclusão de escrita usada nas confirmações.
+5. Após a confirmação da prévia, a pausa da captura e dos lembretes precisa ser persistida com sucesso. Uma falha nessa gravação impede a substituição da base. A substituição das tabelas financeiras ocorre em uma única transação, protegida pela mesma exclusão de escrita usada nas confirmações.
 6. Uma falha da transação restaura os dados anteriores por rollback e restabelece a configuração anterior da captura. Após sucesso, captura e lembretes permanecem pausados para conferência. Os alertas anteriores são cancelados.
 
 A restauração não troca o arquivo SQLite ativo enquanto ele está aberto. As preferências de apresentação são aplicadas após a transação financeira. Consentimento, seleção e proteção já configurados neste aparelho permanecem locais; um backup não concede essas autorizações.
