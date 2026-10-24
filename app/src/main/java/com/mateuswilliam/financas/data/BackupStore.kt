@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.util.UUID
 
-data class StagedRestore internal constructor(val databaseName: String, val createdAt: Long, val records: Int,
+class StagedRestore internal constructor(val databaseName: String, val createdAt: Long, val records: Int,
     val pending: Int, val accounts: Int, val budgets: Int, val recurring: Int, internal val display: BackupDisplay)
 
 class BackupStore(private val context: Context, private val repository: FinanceRepository) {

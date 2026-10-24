@@ -67,12 +67,16 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var selectedRecurringId by rememberSaveable { mutableStateOf<String?>(null) }
     var recurringDue by rememberSaveable { mutableStateOf("") }
     var recurringRecordId by rememberSaveable { mutableStateOf("") }
+    var recurringRecordAt by rememberSaveable { mutableLongStateOf(0L) }
     val recurringPlan = state.recurring.find { it.id == selectedRecurringId }
-    val recurringPreset = recurringPlan?.copy(nextDate = recurringDue)?.proposedRecord(recurringRecordId, ZoneId.systemDefault())
+    val recurringPreset = recurringPlan?.copy(nextDate = recurringDue)?.proposedRecord(recurringRecordId, ZoneId.systemDefault())?.copy(occurredAt = recurringRecordAt)
     val duplicateIndex = remember(state.manualRecords) { DuplicateCandidates(state.manualRecords) }
     var backupDialog by rememberSaveable { mutableIntStateOf(0) }
     var restoreUri by rememberSaveable { mutableStateOf<String?>(null) }
-    val draft = state.pending.find { it.id == selectedDraftId }
+    val pendingById = remember(state.pending) { state.pending.associateBy { it.id } }
+    val reviewIdSet = remember(reviewIds) { reviewIds.toHashSet() }
+    val newPendingCount = remember(state.pending, reviewIdSet) { state.pending.count { it.id !in reviewIdSet } }
+    val draft = pendingById[selectedDraftId]
     val record = state.records.find { it.id == selectedRecordId }
     var expenseDimension by rememberSaveable { mutableStateOf<ExpenseDimension?>(null) }
     var expenseKey by rememberSaveable { mutableStateOf("") }
@@ -146,19 +150,20 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); if (model.message.value == it) model.message.value = null }
     }
-    LaunchedEffect(incomingDraft, state.loaded, state.pending, editing, tab, backupDialog, stagedRestore) {
-        if (incomingDraft != null && state.loaded && !editing && tab != 4 && backupDialog == 0 && stagedRestore == null) {
+    LaunchedEffect(incomingDraft, state.loaded, state.pending, editing, tab, backupDialog, stagedRestore, busy) {
+        if (incomingDraft != null && state.loaded && !editing && !busy && tab != 4 && backupDialog == 0 && stagedRestore == null) {
             state.pending.find { it.id == incomingDraft }?.let { openDraft(it); tab = 1 }
                 ?: run { model.message.value = "Esta notificação já foi revisada." }
             consumeDraft()
         }
     }
-    LaunchedEffect(incomingPlanning, editing, backupDialog, stagedRestore) {
-        if (incomingPlanning && !editing && backupDialog == 0 && stagedRestore == null) { openPlanning(); consumePlanning() }
+    LaunchedEffect(incomingPlanning, editing, backupDialog, stagedRestore, busy, reviewAfter) {
+        if (incomingPlanning && !editing && !busy && backupDialog == 0 && stagedRestore == null && reviewAfter == null) { openPlanning(); consumePlanning() }
     }
-    LaunchedEffect(state.pending, editing, tab, reviewAfter, backupDialog, stagedRestore) {
-        if (!editing && incomingDraft == null && tab in 0..1 && reviewAfter == null && backupDialog == 0 && stagedRestore == null) state.pending.firstOrNull {
-            it.capturedAt >= model.sessionStartedAt && it.id !in seen
+    LaunchedEffect(state.pending, editing, tab, reviewAfter, backupDialog, stagedRestore, busy, state.settings.introSeen) {
+        val seenIds = seen.toHashSet()
+        if (!editing && !busy && state.settings.introSeen && incomingDraft == null && tab in 0..1 && reviewAfter == null && backupDialog == 0 && stagedRestore == null) state.pending.firstOrNull {
+            it.capturedAt >= model.sessionStartedAt && it.id !in seenIds
         }?.let(::openDraft)
     }
 
@@ -215,7 +220,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         onBack = { tab = planningReturn }, onBudget = model::saveBudget,
                         onDeleteBudget = { model.deleteBudget(month.toString(), it) }, onRecurring = model::saveRecurring,
                         onConfirmRecurring = {
-                            selectedRecurringId = it.id; recurringDue = it.nextDate; recurringRecordId = UUID.randomUUID().toString()
+                            selectedRecurringId = it.id; recurringDue = it.nextDate; recurringRecordId = UUID.randomUUID().toString(); recurringRecordAt = System.currentTimeMillis()
                             selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true
                         }, onSkip = model::skipRecurring,
                         onReminders = { model.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
@@ -238,14 +243,14 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             accounts = state.accounts, lastOrigin = state.settings.lastOrigin.ifBlank { state.records.firstOrNull()?.bank.orEmpty() }, onAddAccount = model::addAccount,
             preset = recurringPreset, duplicateIndex = duplicateIndex, hideAmounts = state.settings.hideAmounts,
             reviewProgress = if (draft != null) "Revisão ${reviewIds.indexOf(draft.id) + 1} de ${reviewIds.size}" else null,
-            newPendingCount = if (draft != null) state.pending.count { it.id !in reviewIds } else 0,
+            newPendingCount = if (draft != null) newPendingCount else 0,
             notificationChanged = draft != null && expectedRevision != draft.revision,
             onAcceptUpdate = { expectedRevision = draft?.revision })
     }
     if (reviewAfter != null && !editing) {
-        val next = ReviewQueue.next(reviewIds, reviewAfter!!, state.pending.map { it.id }.toSet())?.let { id -> state.pending.find { it.id == id } }
+        val next = ReviewQueue.next(reviewIds, reviewAfter!!, pendingById.keys)?.let { pendingById[it] }
         AlertDialog(onDismissRequest = ::finishSession, title = { DialogSystemBars(); Text("Movimentação revisada") },
-            text = { Text("$reviewCompleted de ${reviewIds.size} itens tratados nesta sessão. ${state.pending.count { it.id !in reviewIds }} nova(s) pendência(s) fora da sessão. A próxima revisão só abre ao continuar.") },
+            text = { Text("$reviewCompleted de ${reviewIds.size} itens tratados nesta sessão. $newPendingCount nova(s) pendência(s) fora da sessão. A próxima revisão só abre ao continuar.") },
             confirmButton = { if (next != null) TextButton(onClick = { showDraft(next) }) { Text("Revisar próxima") }
                 else TextButton(onClick = ::finishSession) { Text("Ver pendências") } },
             dismissButton = { if (next != null) TextButton(onClick = ::finishSession) { Text("Concluir sessão") } })

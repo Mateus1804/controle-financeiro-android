@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,7 +44,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     val zone = ZoneId.systemDefault()
     val usage = remember(state.records, state.budgets, month, zone) { Budgets.usage(state.records, state.budgets, month, zone) }
     val hidden = state.settings.hideAmounts
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(Modifier.testTag("planning-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             TextButton(onClick = onBack) { Text("Voltar") }
             SectionTitle("Planejamento", "Previsões e limites; os totais incluem apenas lançamentos confirmados")
@@ -164,7 +165,7 @@ private fun RecurringEditor(existing: RecurringPlan?, accounts: List<AccountOpti
     val theme = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { DialogSystemBars(); Text("Previsão mensal") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Cada vencimento depende de confirmação. A previsão não altera os totais nem o saldo do período.")
+            Text("Cada vencimento depende de confirmação. A previsão não modifica os lançamentos nem o resultado mensal.")
             OutlinedTextField(title, { title = it.take(200) }, label = { Text("Descrição da previsão") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done))
             MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalid = it })
             ChoiceField("Tipo previsto", movement, listOf(Movement.EXPENSE, Movement.INCOME), { it.label }) { movement = it }

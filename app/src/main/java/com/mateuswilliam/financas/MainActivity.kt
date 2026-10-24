@@ -141,7 +141,10 @@ class MainActivity : ComponentActivity() {
         val intent = getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent(
             "Controle Financeiro", "Confirme PIN, padrão ou senha para continuar.")
         if (intent == null) { authenticationError("A autenticação do aparelho está indisponível."); session.authenticating = false; session.action = null }
-        else { session.credentialInFlight = true; credential.launch(intent) }
+        else {
+            session.credentialInFlight = true
+            runCatching { credential.launch(intent) }.onFailure { completeAuthentication(false) }
+        }
     }
 
     private fun completeAuthentication(success: Boolean) {
@@ -163,5 +166,9 @@ class MainActivity : ComponentActivity() {
 
     private fun authenticationError(message: String) { session.message = message; financeModel.message.value = message }
 
-    override fun onDestroy() { biometricSignal?.cancel(); super.onDestroy() }
+    override fun onDestroy() {
+        if (isChangingConfigurations && !session.credentialInFlight) { session.authenticating = false; session.action = null }
+        biometricSignal?.cancel()
+        super.onDestroy()
+    }
 }

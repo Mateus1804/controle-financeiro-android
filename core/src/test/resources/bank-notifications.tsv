@@ -1,0 +1,27 @@
+# Casos sintéticos: não representam notificações reais coletadas ou homologação bancária.
+# origem	banco	caso	titulo	texto	centavos	movimentacao	meio	categoria	sensivel	evidencia
+SYNTHETIC	Inter	inter-despesa	Exemplo fictício	Pix enviado de R$ 42,90. Restaurante Exemplo.	4290	EXPENSE	PIX	FOOD	false	synthetic
+SYNTHETIC	Inter	inter-receita	Exemplo fictício	Pix recebido de R$ 250,00. Remetente fictício.	25000	INCOME	PIX	OTHER	false	synthetic
+SYNTHETIC	Inter	inter-valores-ambiguos	Exemplo fictício	Pagamento realizado de R$ 42,90. Saldo de R$ 300,00.	null	EXPENSE	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	Inter	inter-autenticacao	Exemplo fictício	Código fictício de autenticação. Não representa transação.	null	UNKNOWN	UNKNOWN	OTHER	true	synthetic
+SYNTHETIC	Inter	inter-promocao	Exemplo fictício	Oferta de R$ 10,00 para usar no aplicativo.	1000	UNKNOWN	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	Nubank	nubank-despesa	Exemplo fictício	Compra aprovada no cartão de R$ 119,90. Posto de combustível Exemplo.	11990	EXPENSE	CARD	TRANSPORT	false	synthetic
+SYNTHETIC	Nubank	nubank-receita	Exemplo fictício	Pix recebido de R$ 250,00. Remetente fictício.	25000	INCOME	PIX	OTHER	false	synthetic
+SYNTHETIC	Nubank	nubank-valores-ambiguos	Exemplo fictício	Pagamento realizado de R$ 42,90. Saldo de R$ 300,00.	null	EXPENSE	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	Nubank	nubank-autenticacao	Exemplo fictício	Código fictício de autenticação. Não representa transação.	null	UNKNOWN	UNKNOWN	OTHER	true	synthetic
+SYNTHETIC	Nubank	nubank-promocao	Exemplo fictício	Oferta de R$ 10,00 para usar no aplicativo.	1000	UNKNOWN	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	PicPay	picpay-despesa	Exemplo fictício	Pix enviado de R$ 42,90. Padaria Exemplo.	4290	EXPENSE	PIX	FOOD	false	synthetic
+SYNTHETIC	PicPay	picpay-receita	Exemplo fictício	Pix recebido de R$ 250,00. Remetente fictício.	25000	INCOME	PIX	OTHER	false	synthetic
+SYNTHETIC	PicPay	picpay-valores-ambiguos	Exemplo fictício	Pagamento realizado de R$ 42,90. Saldo de R$ 300,00.	null	EXPENSE	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	PicPay	picpay-autenticacao	Exemplo fictício	Código fictício de autenticação. Não representa transação.	null	UNKNOWN	UNKNOWN	OTHER	true	synthetic
+SYNTHETIC	PicPay	picpay-promocao	Exemplo fictício	Oferta de R$ 10,00 para usar no aplicativo.	1000	UNKNOWN	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	Mercado Pago	mercado-pago-despesa	Exemplo fictício	Pagamento realizado via Pix de R$ 42,90. Conta de luz fictícia.	4290	EXPENSE	PIX	HOME	false	synthetic
+SYNTHETIC	Mercado Pago	mercado-pago-receita	Exemplo fictício	Pix recebido de R$ 250,00. Remetente fictício.	25000	INCOME	PIX	OTHER	false	synthetic
+SYNTHETIC	Mercado Pago	mercado-pago-valores-ambiguos	Exemplo fictício	Pagamento realizado de R$ 42,90. Saldo de R$ 300,00.	null	EXPENSE	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	Mercado Pago	mercado-pago-autenticacao	Exemplo fictício	Código fictício de autenticação. Não representa transação.	null	UNKNOWN	UNKNOWN	OTHER	true	synthetic
+SYNTHETIC	Mercado Pago	mercado-pago-promocao	Exemplo fictício	Oferta de R$ 10,00 para usar no aplicativo.	1000	UNKNOWN	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	PagBank	pagbank-despesa	Exemplo fictício	Compra aprovada no cartão de R$ 42,90. Farmácia Exemplo.	4290	EXPENSE	CARD	HEALTH	false	synthetic
+SYNTHETIC	PagBank	pagbank-receita	Exemplo fictício	Pix recebido de R$ 250,00. Remetente fictício.	25000	INCOME	PIX	OTHER	false	synthetic
+SYNTHETIC	PagBank	pagbank-valores-ambiguos	Exemplo fictício	Pagamento realizado de R$ 42,90. Saldo de R$ 300,00.	null	EXPENSE	UNKNOWN	OTHER	false	synthetic
+SYNTHETIC	PagBank	pagbank-autenticacao	Exemplo fictício	Código fictício de autenticação. Não representa transação.	null	UNKNOWN	UNKNOWN	OTHER	true	synthetic
+SYNTHETIC	PagBank	pagbank-promocao	Exemplo fictício	Oferta de R$ 10,00 para usar no aplicativo.	1000	UNKNOWN	UNKNOWN	OTHER	false	synthetic

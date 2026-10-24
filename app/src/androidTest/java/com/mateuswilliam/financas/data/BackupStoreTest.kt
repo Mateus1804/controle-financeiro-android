@@ -110,4 +110,9 @@ class BackupStoreTest {
         assertTrue(runCatching { repository.restore(snapshot.copy(records = listOf(snapshot.records.single().copy(sourceDraftId = "ausente")))) }.isFailure)
         assertEquals("preservado", repository.exportRecords().single().id)
     }
+    @Test fun androidOpensThePortableVersionOneUnicodeVector() {
+        val vector = java.util.Base64.getDecoder().decode("Q0ZBQktQDQoAAAABAAknwAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhuOMJiLVRW1KPociHMYM7y2gIARYBCdokhkFKdsxh6rPg7ZN3WLfT3eeROPPq7CISZ+")
+        assertEquals("Exemplo fictício — R$ 1.234,56", BackupCrypto.decrypt(vector, "Senha fictícia de teste 2026!".toCharArray()).toString(Charsets.UTF_8))
+    }
+
 }

@@ -88,7 +88,7 @@ fun RecordEditor(
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (draft != null) "Conferir movimentação" else if (preset != null) "Conferir previsão" else if (existing != null) "Editar lançamento" else "Novo lançamento",
                     style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text(if (draft != null) "A notificação só vira lançamento após sua confirmação." else "Seu controle, do seu jeito.",
+                Text(if (draft != null) "A notificação só vira lançamento após sua confirmação." else if (preset != null) "Confira valor, conta e data efetiva antes de transformar a previsão em lançamento." else "Seu controle, do seu jeito.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 reviewProgress?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
             }

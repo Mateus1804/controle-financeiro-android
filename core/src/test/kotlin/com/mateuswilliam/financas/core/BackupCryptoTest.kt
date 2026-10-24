@@ -42,4 +42,9 @@ class BackupCryptoTest {
         assertThrows(IllegalArgumentException::class.java) { BackupCrypto.decrypt(ByteArray(BackupCrypto.HEADER_BYTES + 16), password()) }
         assertNull(BackupCrypto.passwordError(password()))
     }
+    @Test fun portableVersionOneVectorWithUnicodePasswordCanBeOpened() {
+        val vector = java.util.Base64.getDecoder().decode("Q0ZBQktQDQoAAAABAAknwAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhuOMJiLVRW1KPociHMYM7y2gIARYBCdokhkFKdsxh6rPg7ZN3WLfT3eeROPPq7CISZ+")
+        assertEquals("Exemplo fictício — R$ 1.234,56", BackupCrypto.decrypt(vector, "Senha fictícia de teste 2026!".toCharArray()).toString(Charsets.UTF_8))
+    }
+
 }
