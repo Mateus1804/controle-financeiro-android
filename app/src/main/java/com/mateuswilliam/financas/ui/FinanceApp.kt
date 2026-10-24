@@ -192,7 +192,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             model.preferences.selectPackages(it); appPicker = false
             if (it.isNotEmpty() && !hasAccess && state.settings.enabled) requestAccess()
         })
-    if (clearDialog) AlertDialog(onDismissRequest = { clearDialog = false }, title = { DialogSystemBars(); Text("Apagar todos os meus dados?") },
+    if (clearDialog) AlertDialog(onDismissRequest = { clearDialog = false }, title = { DialogSystemBars(); Text("Apagar todos os dados?") },
         text = { Text("Lançamentos, pendências e preferências serão apagados. A captura será desativada. Esta ação não pode ser desfeita.") },
         confirmButton = { TextButton(onClick = { clearDialog = false; model.clear() }, enabled = !busy) { Text("Apagar dados") } },
         dismissButton = { TextButton(onClick = { clearDialog = false }) { Text("Cancelar") } })

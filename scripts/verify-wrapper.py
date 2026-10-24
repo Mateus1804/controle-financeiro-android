@@ -1,4 +1,4 @@
-"""Confiro o wrapper distribuído pelo Gradle 8.13 antes da execução em CI."""
+"""Verificação do wrapper distribuído pelo Gradle 8.13 antes da execução em CI."""
 import hashlib
 from pathlib import Path
 

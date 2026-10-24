@@ -1,39 +1,39 @@
 # Ambiente de desenvolvimento
 
-Utilizo Android Studio estável, Git e o JDK 17 como base para o desenvolvimento deste projeto. No SDK Manager, mantenho Android SDK Platform 36, Android SDK Build-Tools 36.0.0 e Android SDK Platform-Tools. O Gradle também pode instalar a versão de Build Tools exigida pelo plugin quando a licença já estiver aceita.
+O ambiente de desenvolvimento utiliza Android Studio estável, Git e JDK 17. O SDK Manager deve incluir Android SDK Platform 36, Android SDK Build-Tools 36.0.0 e Android SDK Platform-Tools. O Gradle também pode instalar a versão de Build Tools exigida pelo plugin quando a licença já estiver aceita.
 
 ## Cópia local
 
-Para trabalhar em uma cópia local, utilizo os seguintes comandos no terminal do Windows:
+A criação de uma cópia local utiliza os seguintes comandos no terminal do Windows:
 
 ```powershell
 git clone https://github.com/Mateus1804/controle-financeiro-android.git
 cd controle-financeiro-android
 ```
 
-Com o repositório clonado, abro a pasta no Android Studio pelo botão **Open**. O projeto já reúne os módulos `app` e `core` e o Gradle Wrapper versionado. Durante a configuração, defino o Gradle JDK como 17 e aguardo a sincronização das dependências.
+Após a clonagem, a pasta pode ser aberta no Android Studio pelo botão **Open**. O projeto já reúne os módulos `app` e `core` e o Gradle Wrapper versionado. A configuração requer Gradle JDK 17 e sincronização das dependências.
 
-Mantenho o caminho do SDK no arquivo local `local.properties`, que fica fora do Git.
+O caminho do SDK fica no arquivo local `local.properties`, fora do Git.
 
 ## Execução no aparelho
 
-Nos testes locais, executo o módulo `app` em um celular conectado ao Android Studio. A conexão utiliza um cabo de dados e depende da ativação das Opções do desenvolvedor e da Depuração USB, além da autorização do computador no aparelho.
+Nos testes manuais locais, o módulo `app` pode ser executado em um celular conectado ao Android Studio. A conexão utiliza um cabo de dados e depende da ativação das Opções do desenvolvedor e da Depuração USB, além da autorização do computador no aparelho.
 
-Começo a avaliação da interface pelo cadastro manual, disponível no botão **+**. Na versão de depuração, também utilizo **Ajustes → Criar notificações fictícias** para conferir o preenchimento e a revisão. Esses exemplos não validam o serviço Android nem a compatibilidade com bancos reais.
+A avaliação inicial da interface pode começar pelo cadastro manual, disponível no botão **+**. Na versão de depuração, **Ajustes → Criar notificações fictícias** permite conferir o preenchimento e a revisão. Esses exemplos não validam o serviço Android nem a compatibilidade com bancos reais.
 
 ## Captura de notificações
 
-Trato a captura como um recurso opcional e organizo sua ativação em três etapas:
+A captura é opcional, com ativação organizada em três etapas:
 
 1. **Consentimento e seleção:** em **Ajustes**, a ativação da captura apresenta a explicação sobre o acesso. A continuidade depende da concordância com o tratamento descrito e da seleção dos aplicativos bancários instalados.
 2. **Autorização do Android:** o Controle Financeiro precisa receber acesso às notificações nas configurações do sistema.
 3. **Alertas de revisão:** a permissão para enviar alertas permite receber avisos fora do aplicativo. Ao recusar esses alertas, as pendências capturadas continuam disponíveis na caixa de revisão.
 
-Nos testes de captura, confiro os dados sugeridos a partir de novas notificações legítimas dos bancos. O serviço acompanha eventos futuros; a autorização do Android não fornece um extrato histórico.
+Os testes de captura devem conferir os dados sugeridos a partir de novas notificações legítimas dos bancos. O serviço acompanha eventos futuros; a autorização do Android não fornece um extrato histórico.
 
 ## Testes e compilação
 
-Verifico as regras, a análise estática e a geração dos APKs com os comandos abaixo.
+Os comandos abaixo verificam as regras, a análise estática e a geração dos APKs.
 
 No Windows:
 
@@ -49,24 +49,24 @@ No Linux ou macOS:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Executo os testes instrumentados do segundo comando somente em um emulador dedicado, sem dados reais. A suíte reinicia a base de desenvolvimento, e o runner bloqueia aparelhos físicos para preservar uma instalação de uso pessoal. Reservo o celular para os testes manuais do aplicativo. A primeira execução baixa as dependências. Mantenho Gradle 8.13, AGP 8.13.2 e Kotlin 2.2.21 com versões fixas para reproduzir a compilação.
+Os testes instrumentados do segundo comando devem ser executados somente em um emulador dedicado, sem dados reais. A suíte reinicia a base de desenvolvimento, e o runner bloqueia aparelhos físicos para preservar uma instalação de uso pessoal. O celular fica reservado aos testes manuais do aplicativo. A primeira execução baixa as dependências. Gradle 8.13, AGP 8.13.2 e Kotlin 2.2.21 têm versões fixas para reproduzir a compilação.
 
 ## Integração contínua
 
-Acompanho os resultados pelo GitHub Actions após cada push para `main` ou pull request. O fluxo executa testes de regras, Android Lint e a compilação. Um segundo job instala os APKs em um emulador Android 15 e executa os testes instrumentados de persistência e interface.
+Os resultados ficam disponíveis no GitHub Actions após cada push para `main` ou pull request. O fluxo executa testes de regras, Android Lint e a compilação. Um segundo job instala os APKs em um emulador Android 15 e executa os testes instrumentados de persistência e interface.
 
-Registro os resultados da integração contínua separadamente dos testes bancários realizados no aparelho.
+Os resultados da integração contínua são registrados separadamente dos testes bancários realizados no aparelho.
 
 ## APK de desenvolvimento e dados locais
 
-Disponibilizo o APK de depuração no artefato `controle-financeiro-debug` da execução correspondente do GitHub Actions, com retenção de 14 dias. Esse pacote serve aos testes de desenvolvimento. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
+O APK de depuração fica disponível no artefato `controle-financeiro-debug` da execução correspondente do GitHub Actions, com retenção de 14 dias. Esse pacote serve aos testes de desenvolvimento. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
 
-Preservo bases reais, exportações, arquivos de assinatura e configurações locais fora do repositório. A restauração de dados ainda está pendente nesta versão, e a desinstalação remove os dados locais do aplicativo.
+Bases reais, exportações, arquivos de assinatura e configurações locais devem permanecer fora do repositório. A restauração de dados ainda está pendente nesta versão, e a desinstalação remove os dados locais do aplicativo.
 
 ## Atualizações dos dados e da interface
 
-Mantenho o esquema Room em `app/schemas` e a migração 1→2 em `FinanceDatabase.kt`. Nos testes de migração, reconstruo uma base isolada a partir do esquema 1 exportado e abro essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
+O esquema Room fica em `app/schemas`, e a migração 1→2, em `FinanceDatabase.kt`. Os testes de migração reconstroem uma base isolada a partir do esquema 1 exportado e abrem essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
 
-Confiro os dez pares principais de texto e fundo com `python3 scripts/verify-contrast.py`. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
+O comando `python3 scripts/verify-contrast.py` confere os dez pares principais de texto e fundo. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
 
-Preservo o mesmo identificador do aplicativo e a mesma chave de assinatura ao instalar uma atualização sobre uma base que pretendo manter. Os APKs de depuração produzidos em ambientes diferentes podem usar chaves diferentes. Para o uso pessoal, mantenho minha chave local do Android Studio; não desinstalo uma instalação com dados reais como forma de contornar uma incompatibilidade de assinatura.
+A instalação de uma atualização sobre uma base que deve ser preservada exige o mesmo identificador do aplicativo e a mesma chave de assinatura. Os APKs de depuração produzidos em ambientes diferentes podem usar chaves diferentes. Para o uso pessoal, a chave local do Android Studio deve ser preservada. A desinstalação de uma instalação com dados reais não deve ser utilizada para contornar uma incompatibilidade de assinatura.

@@ -1,4 +1,4 @@
-"""Confiro o manifesto mesclado para detectar permissões introduzidas por dependências."""
+"""Verificação do manifesto mesclado para detectar permissões introduzidas por dependências."""
 from pathlib import Path
 import xml.etree.ElementTree as ET
 

@@ -39,7 +39,7 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
         report.groups.drop(5).sumOf { it.cents }, report.groups.drop(5).sumOf { it.basisPoints })
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            SectionTitle("Meu mapa de gastos", "Despesas confirmadas antes dos estornos")
+            SectionTitle("Mapa de gastos", "Despesas confirmadas antes dos estornos")
             ChoiceField("Agrupar por", dimension, ExpenseDimension.entries.toList(), { it.label }) { dimension = it }
             if (report.total == 0L) Text("Nenhuma despesa confirmada neste período.")
             else {

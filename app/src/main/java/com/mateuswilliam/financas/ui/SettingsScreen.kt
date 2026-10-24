@@ -30,7 +30,7 @@ fun SettingsScreen(
 ) {
     var privacy by remember { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { SectionTitle("Meus ajustes", "Privacidade e controle em primeiro lugar.") }
+        item { SectionTitle("Ajustes", "Privacidade e controle em primeiro lugar.") }
         item {
             SettingsCard {
                 Text("Aparência", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -52,7 +52,7 @@ fun SettingsScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Capturar notificações", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text("Somente dos aplicativos que eu selecionar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Somente dos aplicativos selecionados", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(settings.enabled, onToggle, modifier = Modifier.semantics { contentDescription = "Capturar notificações" })
                 }
@@ -76,11 +76,11 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("Meus dados", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Dados do aplicativo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("Os registros ficam neste aparelho. O CSV exporta os lançamentos confirmados; ele ainda não substitui um backup restaurável.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Exportar lançamentos em CSV") }
                 TextButton(onClick = { privacy = true }) { Text("Privacidade e uso dos dados") }
-                TextButton(onClick = onClear, enabled = !busy) { Text("Apagar todos os meus dados", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onClear, enabled = !busy) { Text("Apagar todos os dados", color = MaterialTheme.colorScheme.error) }
             }
         }
         if (BuildConfig.DEBUG) item {
@@ -93,7 +93,7 @@ fun SettingsScreen(
         item { Text("Controle Financeiro · ${BuildConfig.VERSION_NAME}\nPrimeira versão em desenvolvimento", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     if (privacy) AlertDialog(onDismissRequest = { privacy = false }, title = { DialogSystemBars(); Text("Privacidade") },
-        text = { Text("Processo as notificações autorizadas neste aparelho para sugerir lançamentos. Não transmito os textos bancários, não solicito credenciais de banco e não integro anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra a seleção antes de ler o conteúdo. Descarto mensagens identificadas como códigos, senhas ou autenticação.\n\nApago o texto original após confirmar ou ignorar a pendência. Mantenho identificadores locais para evitar reprocessar o mesmo evento.\n\nA exportação CSV contém os dados que você confirmou e é salva no destino escolhido. Os dados locais são removidos ao desinstalar ou usar a opção de apagar. A restauração de backup ainda está em desenvolvimento.") },
+        text = { Text("As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.\n\nO texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais são mantidos para evitar o reprocessamento do mesmo evento.\n\nA exportação CSV contém os lançamentos confirmados e é salva no destino escolhido. Os dados locais são removidos ao desinstalar ou usar a opção de apagar. A restauração de backup ainda está em desenvolvimento.") },
         confirmButton = { TextButton(onClick = { privacy = false }) { Text("Entendi") } })
 }
 

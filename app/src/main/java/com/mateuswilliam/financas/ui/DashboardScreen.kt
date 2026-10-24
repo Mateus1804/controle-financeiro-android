@@ -34,7 +34,7 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("CONTROLE FINANCEIRO", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
-                    Text("Minhas finanças", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Finanças", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
                 }
                 TextButton(onClick = onHide) { Text(if (hidden) "Mostrar" else "Ocultar") }
             }
