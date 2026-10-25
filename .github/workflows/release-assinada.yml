@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release-signing.jks
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -49,10 +48,12 @@ jobs:
           required = ('ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD', 'ANDROID_SIGNING_CERT_SHA256')
           if not all(os.environ.get(key) for key in required):
               raise SystemExit('Configure os segredos de assinatura e a impressão digital pública no ambiente assinatura. Nenhuma chave de teste será usada como alternativa.')
-          path = Path(os.environ['ANDROID_KEYSTORE_PATH'])
+          path = Path(os.environ['RUNNER_TEMP']) / 'release-signing.jks'
           with path.open('xb') as output:
               output.write(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
           path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'ANDROID_KEYSTORE_PATH={path}\n')
           PY
       - name: Conferir, testar e preparar APK e AAB
         run: |
@@ -70,4 +71,4 @@ jobs:
           retention-days: 7
       - name: Remover o keystore temporário
         if: always()
-        run: rm -f "$ANDROID_KEYSTORE_PATH"
+        run: rm -f "$RUNNER_TEMP/release-signing.jks"

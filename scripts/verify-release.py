@@ -23,6 +23,13 @@ if not package or package.groups() != ('com.mateuswilliam.financas', os.environ[
     raise SystemExit('Identidade ou versão divergente da preparação solicitada.')
 if 'application-debuggable' in badging:
     raise SystemExit('A versão release não pode ser depurável.')
+bundle_verification = subprocess.run(['jarsigner', '-verify', str(aab)], text=True, capture_output=True, check=True)
+if 'jar verified.' not in bundle_verification.stdout:
+    raise SystemExit('A assinatura do AAB não foi confirmada.')
+bundle_certificate = subprocess.check_output(['keytool', '-printcert', '-jarfile', str(aab)], text=True)
+bundle_digest = re.search(r'SHA256: ([a-fA-F0-9:]+)', bundle_certificate)
+if not bundle_digest or bundle_digest[1].replace(':', '').lower() != expected_certificate:
+    raise SystemExit('O certificado do AAB difere da assinatura esperada.')
 metadata = {'applicationId': package[1], 'versionCode': int(package[2]), 'versionName': package[3], 'certificateSha256': expected_certificate,
             'sha256': {file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in (apk, aab)}}
 (root / 'qa').mkdir(exist_ok=True)
