@@ -35,3 +35,5 @@ A matriz não substitui avaliação de fabricantes, bateria, leitura de tela, se
 Na API 26, a proteção do calendário é conferida diretamente na janela nativa retornada pelo componente, pois `WindowInspector` só existe a partir da API 29. Nas APIs 33 e 35, a verificação percorre as janelas abertas pelo formulário. Nenhuma reflexão em API privada é utilizada.
 
 O cenário dedicado também executa o exportador carregado do APK anterior antes da atualização. Depois da instalação da nova versão, o arquivo produzido é aberto pelo código atual, conferido em base temporária e restaurado após confirmação no teste. Um registro fictício acrescentado após a atualização permanece intacto até a restauração e só então é substituído. Isso complementa o vetor criptográfico independente com um arquivo efetivamente produzido pela versão anterior.
+
+A inicialização do emulador tem limite de 180 segundos, e cada execução instrumentada tem limite de oito minutos. Interrupções reprovam a execução; os registros já produzidos permanecem no artefato. A coleta de capturas também possui prazo próprio, inclusive quando há falha. Não há repetição automática da suíte para obter aprovação.

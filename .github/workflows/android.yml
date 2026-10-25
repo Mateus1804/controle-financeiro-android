@@ -145,6 +145,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
+          emulator-boot-timeout: 180
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: bash scripts/run-compatibility-scenario.sh ${{ matrix.scenario }}
       - name: Disponibilizar evidências do emulador
