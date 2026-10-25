@@ -18,7 +18,8 @@ for name in ("Light", "Dark"):
     colors = {}
     for key, value in re.findall(r"(\w+)\s*=\s*(Color\(0xFF[0-9A-Fa-f]{6}\)|Color.White|\w+)", body):
         colors[key] = "FFFFFF" if value == "Color.White" else value[10:-1] if value.startswith("Color(0xFF") else named[value]
-    for foreground, background in (("onBackground", "background"), ("onSurfaceVariant", "surfaceVariant"),
+    for foreground, background in (("onBackground", "background"), ("onSurface", "surface"), ("onSurfaceVariant", "surfaceVariant"),
+                                   ("onPrimaryContainer", "primaryContainer"), ("onSecondaryContainer", "secondaryContainer"),
                                    ("onPrimary", "primary"), ("tertiary", "surface"), ("error", "surface")):
         low, high = sorted((luminance(colors[foreground]), luminance(colors[background])))
         ratio = (high + 0.05) / (low + 0.05)

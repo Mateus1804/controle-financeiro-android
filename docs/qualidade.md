@@ -1,6 +1,37 @@
 # Qualidade e validação
 
-## Resultado consolidado — 25/10/2026
+## Revisão visual — 25/10/2026
+
+A execução [40209636647](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40209636647), commit `15ed9a498d486a2889f80001f9a33856f1f34c0f`, aprovou os três jobs: compilação, suíte e atualização. A validação final ficou concentrada na **API 35**, por decisão de escopo, sem repetir a matriz de versões anteriores.
+
+| Verificação | Resultado efetivo |
+| --- | --- |
+| `:core:test` | 104 testes; zero falhas, erros ou ignorados. |
+| Suíte instrumentada API 35 | 95 testes; zero falhas ou ignorados. |
+| Cenário de atualização API 35 | Uma execução no APK anterior e uma no atualizado, ambas aprovadas, com restauração do arquivo produzido pela versão anterior. |
+| `:app:lintDebug` e `:app:lintRelease` | Zero erros e falhas fatais; 14 avisos anteriores por variante. |
+| `:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:assembleRelease`, `:app:bundleRelease` | Concluídos. |
+| `verify-wrapper.py`, `verify-contrast.py`, `verify-manifest.py` | Aprovados; 16 pares explícitos de contraste de fallback com razão mínima de 4,5:1. |
+| `verify-bank-fixtures.py`, `test-bank-fixtures.py` | 25 casos sintéticos conferidos e cinco testes Python aprovados; nenhuma amostra bancária real. |
+| Assinatura de CI | Configuração ausente recusada; assinatura, certificado, versão e identidade conferidos com chave descartável. |
+
+O comando Gradle do CI foi `./gradlew --no-daemon --max-workers=2 :core:test :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:lintRelease :app:assembleRelease :app:bundleRelease`. Os cenários Android usam `bash scripts/run-compatibility-scenario.sh suite` e `upgrade`. A tentativa local de executar o Gradle não chegou aos testes: o download da distribuição estava bloqueado pelo ambiente. A aprovação acima vem do CI, e não dessa tentativa local.
+
+As regressões novas abrangem cores dinâmicas e fallback, contraste dos pares usados, valores máximos com fonte ampliada, ocultação visual e semântica, revelação explícita no editor, atalhos de tipos, navegação, ausência de sobreposição na última linha, apresentação inicial, tela de 320 dp e fonte em 200%. A suíte existente continua cobrindo migrações, contas, cálculos, filtros, revisão, exportação, planejamento, consentimento e recuperação.
+
+A inspeção visual utilizou capturas reais de emulador com dados fictícios. A [comparação visual e a procedência das imagens](redesign.md) distinguem as versões anterior e atual. Nenhuma imagem foi gerada ou editada, e as janelas protegidas de backup mantiveram `FLAG_SECURE`.
+
+### Passagens anteriores desta revisão
+
+A execução [40207475247](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40207475247) aprovou 92 testes nas APIs 26 e 33 antes da redução de escopo. Os demais jobs foram cancelados; isso não comprova aprovação final nas APIs 26, 33 ou 36 para os commits posteriores.
+
+Na execução [40208513031](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40208513031), compilação e atualização passaram. A suíte foi interrompida após uma falha de toque no fluxo de restauração e uma parada no cenário de fonte ampliada. O teste do seletor passou a aguardar a saída da mensagem temporária e a rolar até o controle antes do toque. Os formulários ganharam rolagem integral em fontes ampliadas; a captura recebeu limite próprio e marcadores de etapa. Os casos foram mantidos e passaram na execução consolidada acima.
+
+### Limites
+
+Não foram realizados testes manuais com TalkBack, biometria real, aparelhos físicos ou notificações reais de bancos. O teste de contraste dinâmico cobre a paleta do emulador, sem certificar todos os papéis de parede ou personalizações de fabricantes. As outras APIs não foram reexecutadas na validação final. A chave definitiva, o merge e a publicação continuam fora desta etapa.
+
+## Referência funcional anterior — 25/10/2026
 
 A revisão funcional `395029a078b1052b7aa564e4ee5755eeff786b61` concluiu a execução [40202162302](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40202162302) com todos os jobs aprovados. Os resultados abaixo distinguem testes únicos de repetições da mesma suíte em versões diferentes do Android.
 

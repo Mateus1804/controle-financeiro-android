@@ -2,7 +2,7 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,20 +18,24 @@ import java.time.ZoneId
 
 @Composable
 fun PendingScreen(pending: List<DraftEntity>, hidden: Boolean, onReview: (DraftEntity) -> Unit, onIgnore: (String) -> Unit, busy: Boolean) {
-    LazyColumn(contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { SectionTitle("Caixa de revisão", "Confira, edite e decida o que entra no seu controle.") }
-        if (pending.isEmpty()) item { EmptyCard("Tudo em dia", "Novas notificações dos aplicativos selecionados aparecerão aqui. Ative a captura em Ajustes ou registre um lançamento pelo botão +.") }
-        items(pending, key = { it.id }) { draft ->
-            Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(draft.bank, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                    Text(draft.sourceTitle.ifBlank { "Nova notificação" }, style = MaterialTheme.typography.titleMedium)
-                    if (draft.amountCents != null) Amount(draft.amountCents, hidden, size = 24)
-                    else Text("Valor a preencher", style = MaterialTheme.typography.titleMedium)
-                    Text("${draft.movement.label} · ${draft.method.label} · ${draft.category.label}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(draft.explanation, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { onReview(draft) }, enabled = !busy, modifier = Modifier.testTag("review-${draft.id}")) { Text("Revisar") }
+    LazyColumn(Modifier.testTag("pending-list"), contentPadding = PaddingValues(FinanceSpacing.page, 20.dp, FinanceSpacing.page, FinanceSpacing.listBottom)) {
+        item { Box(Modifier.padding(bottom = 20.dp)) { SectionTitle("Caixa de revisão", "Sugestões locais. Nenhum lançamento é registrado sem confirmação.") } }
+        if (pending.isEmpty()) item { EmptyCard("Tudo em dia", "As notificações dos aplicativos selecionados aparecem aqui. A captura opcional pode ser configurada em Ajustes.") }
+        itemsIndexed(pending, key = { _, it -> it.id }) { index, draft ->
+            Surface(shape = groupedShape(index, pending.size), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        leadingContent = { IconBadge(categoryIcon(draft.category), movementColor(draft.movement)) },
+                        overlineContent = { Text(privateDisplayText(draft.bank, hidden), style = MaterialTheme.typography.labelMedium) },
+                        headlineContent = { Text(privateDisplayText(draft.sourceTitle.ifBlank { "Nova notificação" }, hidden)) },
+                        supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("${draft.movement.label} · ${draft.method.label}", style = MaterialTheme.typography.bodySmall)
+                            if (draft.amountCents != null) Amount(draft.amountCents, hidden, size = 22) else Text("Valor a preencher")
+                            Text(privateDisplayText(draft.explanation, hidden), style = MaterialTheme.typography.bodySmall)
+                        } })
+                    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = { onReview(draft) }, enabled = !busy, modifier = Modifier.testTag("review-${draft.id}")) { Text("Revisar") }
                         TextButton(onClick = { onIgnore(draft.id) }, enabled = !busy) { Text("Ignorar") }
                     }
                 }
@@ -54,24 +58,24 @@ fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) 
             (category == null || it.category == category) && (movement == null || it.movement == movement) &&
             (search.isBlank() || "${it.description} ${it.bank} ${it.destination}".contains(search.trim(), ignoreCase = true))
     } }
-    LazyColumn(contentPadding = PaddingValues(20.dp, 20.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { SectionTitle("Extrato", "Histórico dos lançamentos registrados neste aparelho") }
-        item { MonthPicker(month, onMonth) }
+    LazyColumn(Modifier.testTag("records-list"), contentPadding = PaddingValues(FinanceSpacing.page, 20.dp, FinanceSpacing.page, FinanceSpacing.listBottom)) {
+        item { Box(Modifier.padding(bottom = 16.dp)) { SectionTitle("Extrato", "Lançamentos confirmados neste aparelho") } }
+        item { Box(Modifier.padding(bottom = 16.dp)) { MonthPicker(month, onMonth) } }
         if (expenseFilter != null) item {
-            InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${expenseFilter.label} · Limpar filtro") })
+            InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${privateDisplayText(expenseFilter.label, hidden)} · Limpar filtro") })
         }
-        item { OutlinedTextField(search, { search = it.take(100) }, label = { Text("Buscar descrição ou banco") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+        item { OutlinedTextField(search, { search = it.take(100) }, label = { Text("Buscar descrição ou banco") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), leadingIcon = { AppIcon(com.mateuswilliam.financas.R.drawable.ic_search) }, singleLine = true) }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f)) { ChoiceField("Tipo", movement, listOf(null) + Movement.entries.filter { it != Movement.UNKNOWN }, { it?.label ?: "Todos" }) { onClearExpenseFilter(); movement = it } }
                 Box(Modifier.weight(1f)) { ChoiceField("Categoria", category, listOf(null) + Category.entries, { it?.label ?: "Todas" }) { onClearExpenseFilter(); onCategory(it) } }
             }
         }
-        item { Text("${filtered.size} lançamento(s)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("${filtered.size} lançamento(s)", Modifier.padding(bottom = 12.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (filtered.isEmpty()) item { EmptyCard("Nenhum lançamento neste filtro", "Mude o período ou os filtros. Os lançamentos só entram aqui após a confirmação.") }
-        items(filtered, key = { it.id }) { record ->
-            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
-                Box(Modifier.padding(14.dp)) { RecordRow(record, hidden) { onEdit(record) } }
+        itemsIndexed(filtered, key = { _, it -> it.id }) { index, record ->
+            Surface(shape = groupedShape(index, filtered.size), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                RecordRow(record, hidden) { onEdit(record) }
             }
         }
     }

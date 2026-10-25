@@ -53,27 +53,27 @@ Os testes instrumentados do segundo comando devem ser executados somente em um e
 
 ## Integração contínua
 
-Os resultados ficam disponíveis no GitHub Actions após cada push para `main` ou pull request. O fluxo executa testes de regras, Android Lint e a compilação. Um segundo job instala os APKs em um emulador Android 15 e executa os testes instrumentados de persistência e interface.
+Os resultados ficam disponíveis no GitHub Actions após cada push para `main` ou pull request. O fluxo executa testes de regras, Android Lint e a compilação. O CI desta revisão concentra a suíte em um emulador isolado da API 35. Um cenário adicional na mesma API instala a atualização sobre o APK anterior e restaura um backup produzido por ele.
 
 Os resultados da integração contínua são registrados separadamente dos testes bancários realizados no aparelho.
 
 ## APK de desenvolvimento e dados locais
 
-O APK de depuração fica disponível no artefato `controle-financeiro-debug` da execução correspondente do GitHub Actions, com retenção de 14 dias. Esse pacote serve aos testes de desenvolvimento. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
+Os APKs ficam no artefato `apks-compatibilidade`, com retenção de sete dias. Relatórios e capturas têm retenção de 14 dias. Os pacotes de CI usam chave descartável e dados fictícios; servem à validação em ambiente isolado. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
 
-Bases reais, exportações, arquivos de assinatura e configurações locais devem permanecer fora do repositório. A restauração de dados ainda está pendente nesta versão, e a desinstalação remove os dados locais do aplicativo.
+Bases reais, exportações, arquivos de assinatura e configurações locais devem permanecer fora do repositório. A recuperação está disponível por backup criptografado, senha original e conferência da prévia. A desinstalação remove os dados locais do aplicativo.
 
 ## Atualizações dos dados e da interface
 
-O esquema Room fica em `app/schemas`, e a migração 1→2, em `FinanceDatabase.kt`. Os testes de migração reconstroem uma base isolada a partir do esquema 1 exportado e abrem essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
+O esquema Room fica em `app/schemas`, e as migrações 1→2, 2→3 e 3→4, em `FinanceDatabase.kt`. Os testes de migração reconstroem uma base isolada a partir do esquema 1 exportado e abrem essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
 
-O comando `python3 scripts/verify-contrast.py` confere os dez pares principais de texto e fundo. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
+O comando `python3 scripts/verify-contrast.py` confere os 16 pares principais das paletas de fallback de texto e fundo. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
 
 A instalação de uma atualização sobre uma base que deve ser preservada exige o mesmo identificador do aplicativo e a mesma chave de assinatura. Os APKs de depuração produzidos em ambientes diferentes podem usar chaves diferentes. Para o uso pessoal, a chave local do Android Studio deve ser preservada. A desinstalação de uma instalação com dados reais não deve ser utilizada para contornar uma incompatibilidade de assinatura.
 
 ## Backup e planejamento
 
-O esquema atual é Room 3, com migrações aditivas 1→2 e 2→3. Os testes de migração abrem bases isoladas reconstruídas dos esquemas anteriores exportados e conferem os dados existentes antes de utilizar as novas tabelas. `BackupStoreTest` cobre o envelope criptográfico no Android, a base temporária, o cancelamento, entradas inválidas e o rollback de uma restauração com falha simulada.
+O esquema atual é Room 4, com migrações aditivas 1→2, 2→3 e 3→4. Os testes de migração abrem bases isoladas reconstruídas dos esquemas anteriores exportados e conferem os dados existentes antes de utilizar as novas tabelas. `BackupStoreTest` cobre o envelope criptográfico no Android, a base temporária, o cancelamento, entradas inválidas e o rollback de uma restauração com falha simulada.
 
 A recuperação usa **Ajustes → Restaurar backup**, senha original e confirmação da prévia. Um teste manual utiliza emulador dedicado e arquivo com dados fictícios; a instalação de uso pessoal permanece preservada. Os arquivos `.cfbackup` e a pasta `casos-locais/` ficam fora do Git. O formato e os limites estão descritos em [Backup e recuperação](backup.md).
 
@@ -99,3 +99,9 @@ A proteção pode ser avaliada em **Ajustes → Autenticar ao abrir**. O recurso
 A preparação de versões, variáveis de assinatura e matriz de atualização estão descritas em [Atualizações assinadas](atualizacoes.md). O CI usa somente chave descartável e bases fictícias. Os arquivos de backup congelados e a migração 3→4 possuem testes separados.
 
 A avaliação local das notificações reais utiliza `:core:validateBankEvidence -PbankEvidenceDirectory=casos-locais`, conforme [Validação bancária](validacao-bancaria.md). A execução exige amostras anonimizadas e metadados efetivos; não utiliza os exemplos sintéticos como comprovação de captura real.
+
+## Sistema de interface
+
+O sistema visual está descrito em [Revisão visual](redesign.md). `Theme.kt` concentra tokens, cores dinâmicas e fallback. `Components.kt` reúne linhas agrupadas, ícones e valores adaptáveis. A preferência de aparência continua em `CapturePreferences`; a apresentação não altera regras do módulo `core`.
+
+`FinanceDesignTest` cobre paletas, contraste, valores longos, máscara e revelação explícita. `RedesignInteractionTest` cobre atalhos, navegação e privacidade de pendências. As capturas usam somente registros fictícios; os diálogos protegidos de backup permanecem sem captura pública.

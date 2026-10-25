@@ -1,0 +1,303 @@
+{
+  "dados": "Exclusivamente fictícios, criados pela suíte de testes. Os PNGs foram copiados sem edição.",
+  "commit_depois": "15ed9a498d486a2889f80001f9a33856f1f34c0f",
+  "capturas": [
+    {
+      "arquivo": "antes-ajustes-claro.png",
+      "origem": "screenshots/ajustes-claro.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "5caba2fa67558a2d15513359f93a459e929e184e104f0d298bc25e1c53057a6b",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "antes-ajustes-escuro.png",
+      "origem": "screenshots/ajustes-escuro.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "59f5808514cf5d82f942ce3e22a83738d61409a769429bc1a6b20227cdd58882",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "antes-planejamento-claro.png",
+      "origem": "screenshots/planejamento-claro.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "3c8ef3afdef264e44be7be070cbf996c594cc73b2140b556779d0ae6189708a6",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "antes-planejamento-escuro.png",
+      "origem": "screenshots/planejamento-escuro.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "ae64b43d4baf3a2be48c4964f4064789f3320b638894f7d3259be9ee8dced759",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "antes-resumo-claro.png",
+      "origem": "screenshots/resumo-claro.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "bf41935f2775ec09dae97a09e5c607b6263220954ad7b24509deceb7c655f81c",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "antes-resumo-escuro.png",
+      "origem": "screenshots/resumo-escuro.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "c4b2e9e7d98971c0e4995de3abc060a45bc24a76b6e2fecebcd7944437c1fe3f",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "antes-revisao-escuro.png",
+      "origem": "screenshots/revisao-escuro.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "b2650dcd3492900e1216c671ebc3fa43ea6a6413e539f0c196dbad4198e48c0b",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "antes-revisao.png",
+      "origem": "screenshots/revisao.png",
+      "etapa": "antes",
+      "execucao": 40203715541,
+      "artefato": 12603316560,
+      "api": 35,
+      "sha256": "3ad131a840f8c49f2b4bf460aa0d2e4b1f38dba6166e46f53dcd07333064b498",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-ajustes-claro.png",
+      "origem": "screenshots/ajustes-claro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "5c28dcfb137a4348aba8b7a10239ed936c61626adc01ec8fa4fe321da77a38a1",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-ajustes-escuro.png",
+      "origem": "screenshots/ajustes-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "8f068f8932fd502b0f3941f498f057ef257563f69626a4e5dc1ff780066b375d",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-extrato-claro.png",
+      "origem": "screenshots/extrato-claro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "a154c87ef2b1d75244bc5435978ee28f76b366f6f89eb29ab42066bb46d18873",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-extrato-escuro.png",
+      "origem": "screenshots/extrato-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "f81ac843bbd9883db9b13519136847addd36128f3fa8f8465b82909f0669c4db",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-formulario-paisagem.png",
+      "origem": "screenshots/formulario-paisagem.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "19baf744f210c1dd03755cfe98bacd69d12f2924a75b5eaad30923984100812c",
+      "largura": 1600,
+      "altura": 720
+    },
+    {
+      "arquivo": "depois-formulario-pequeno-teclado.png",
+      "origem": "screenshots/formulario-pequeno-teclado.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "b49c47c2bff797118f0bb9c599b2c22780ba6448d360b14a86c7737405579ec8",
+      "largura": 640,
+      "altura": 1280
+    },
+    {
+      "arquivo": "depois-grafico-categorias.png",
+      "origem": "screenshots/grafico-categorias.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "0f76700ad2fa6ce7fc5c3cb4b3eaabaaef8525010e318eebc4aef4028477e9c1",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-introducao-claro.png",
+      "origem": "screenshots/introducao-claro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "d5622944f1dac02856340b41a7add0c4ea1f88e6001783bf096bec50e52b6772",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-introducao-escuro.png",
+      "origem": "screenshots/introducao-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "6593770850bb899ebd17c7206aac325aba2b862cfcb5e40d5b03f47d241ba337",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-pendencias-claro.png",
+      "origem": "screenshots/pendencias.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "87c5a4d188ec1bb23b92707710146118bd483ec21b481033d3c37895a3c74a48",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-pendencias-escuro.png",
+      "origem": "screenshots/pendencias-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "73891b27c560ce67ebc0f63b8078a203173b75221455fbd0a623ae22a65cf364",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-planejamento-claro.png",
+      "origem": "screenshots/planejamento-claro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "f69adfd7ace1fd33724c53ee86a7a6aed96b48112ff434919bbd011450c15800",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-planejamento-escuro.png",
+      "origem": "screenshots/planejamento-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "56ccc7ca22599b17f3531fcfb6173ae4768b954ea111eb3bd9c37ad7ecbbf17e",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-resumo-claro.png",
+      "origem": "screenshots/resumo-claro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "76bdded3fb9eaf272b21b228d2059ba794a5d071c45166633988d947d9278996",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-resumo-escuro.png",
+      "origem": "screenshots/resumo-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "3ed27afcf5f0a1d48742f0c1af17155c5081d4734797a9a1fcdba9b8fd02f6da",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-resumo-fonte-ampliada-claro.png",
+      "origem": "screenshots/resumo-fonte-ampliada-claro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "ae9f70b52b2fc356970b98b583f6516521beae73c6ecbbec21189ff831e0bcd1",
+      "largura": 640,
+      "altura": 1280
+    },
+    {
+      "arquivo": "depois-resumo-fonte-ampliada-escuro.png",
+      "origem": "screenshots/resumo-fonte-ampliada-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "e51fe538ebe2c12cfdb338dc55a50546d0f2ff0aaeb6ff97c65d81db5eb833a0",
+      "largura": 640,
+      "altura": 1280
+    },
+    {
+      "arquivo": "depois-revisao-claro.png",
+      "origem": "screenshots/revisao.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "4070cac95e52d765a680ab1d1a25e00f7d16bc7b37744a02b5e156e6f00be995",
+      "largura": 720,
+      "altura": 1600
+    },
+    {
+      "arquivo": "depois-revisao-escuro.png",
+      "origem": "screenshots/revisao-escuro.png",
+      "etapa": "depois",
+      "execucao": 40209636647,
+      "artefato": 12605495829,
+      "api": 35,
+      "sha256": "5e77b2fe83cb8ba28b126612adb24ace3750cb1765ddb4ace0bdf6f91929a0e8",
+      "largura": 720,
+      "altura": 1600
+    }
+  ]
+}

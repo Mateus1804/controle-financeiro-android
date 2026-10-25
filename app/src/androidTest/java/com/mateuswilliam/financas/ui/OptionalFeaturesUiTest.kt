@@ -34,7 +34,10 @@ class OptionalFeaturesUiTest {
     private fun draft(id: String, source: String = id) = DraftEntity(id, source, "fixture.local", "Inter pessoal",
         "EXEMPLO FICTÍCIO", "Compra aprovada no cartão de R$ 42,90. Mercado Exemplo.", 4290,
         Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Dados fictícios para revisão.", System.currentTimeMillis(), System.currentTimeMillis() - 60_000)
-    private fun openPlanning() { rule.onNodeWithText("Planejar limites e recorrências").performClick() }
+    private fun openPlanning() {
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
+        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+    }
     private fun openReview(id: String) {
         rule.onNodeWithText("Revisar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("review-$id").fetchSemanticsNodes().isNotEmpty() }
