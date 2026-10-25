@@ -75,20 +75,25 @@ class RedesignInteractionTest {
         val previousDensity = Regex("Override density: ([0-9]+)").find(command("wm density"))?.groupValues?.get(1) ?: "reset"
         val previousFont = command("settings get system font_scale").trim().takeIf { it.toFloatOrNull() != null } ?: "1.0"
         try {
+            checkpoint("Aplicando tela estreita e fonte 200%")
             command("wm size 640x1280"); command("wm density 320"); command("settings put system font_scale 2.0")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.9f && rule.activity.resources.configuration.screenWidthDp <= 320 }
+            checkpoint("Conferindo navegação com fonte ampliada")
             for (label in listOf("Resumo", "Revisar", "Extrato", "Ajustes")) {
                 rule.onNode(hasText(label) and hasClickAction()).assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
             }
             rule.onNode(hasText("Resumo") and hasClickAction()).performClick()
+            checkpoint("Conferindo atalhos com fonte ampliada")
             for (type in listOf("income", "expense", "transfer")) {
                 rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("quick-$type"))
                 rule.onNodeWithTag("quick-$type").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
             }
             rule.runOnIdle { app.settings.setAppearance(com.mateuswilliam.financas.data.Appearance.DARK) }
+            checkpoint("Capturando resumo escuro com fonte ampliada")
             rule.waitForIdle(); capture("resumo-fonte-ampliada-escuro")
             rule.runOnIdle { app.settings.setAppearance(com.mateuswilliam.financas.data.Appearance.LIGHT) }
             rule.waitForIdle(); capture("resumo-fonte-ampliada-claro")
+            checkpoint("Abrindo formulário em tela estreita")
             rule.onNodeWithContentDescription("Novo lançamento").performClick()
             rule.onNodeWithTag("amount-input").performTextInput("1234")
             rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Fonte ampliada fictícia")
@@ -98,6 +103,7 @@ class RedesignInteractionTest {
             rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
             assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
         } finally {
+            checkpoint("Restaurando configuração do emulador")
             command("settings put system font_scale $previousFont"); command("wm density $previousDensity"); command("wm size $previousSize")
         }
     }
@@ -116,14 +122,25 @@ class RedesignInteractionTest {
         assertFalse(app.settings.state.value.consented)
     }
 
+    private fun checkpoint(message: String) {
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().sendStatus(2, android.os.Bundle().apply {
+            putString("stream", "\n[redesign] $message\n")
+        })
+    }
+
     private fun capture(name: String) {
         rule.waitForIdle()
-        val bitmap = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-            ?: error("Captura do emulador indisponível")
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor { task -> Thread(task, "redesign-capture").apply { isDaemon = true } }
         try {
-            val directory = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
-            java.io.File(directory, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
-        } finally { bitmap.recycle() }
+            val bitmap = executor.submit<android.graphics.Bitmap> {
+                androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                    ?: error("Captura do emulador indisponível")
+            }.get(15, java.util.concurrent.TimeUnit.SECONDS)
+            try {
+                val directory = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                java.io.File(directory, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            } finally { bitmap.recycle() }
+        } finally { executor.shutdownNow() }
     }
 
     @Test fun lastTransactionCanBeReadAboveTheFixedActionWithoutOcclusion() = runBlocking<Unit> {

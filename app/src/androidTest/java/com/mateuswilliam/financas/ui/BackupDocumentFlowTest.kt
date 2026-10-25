@@ -55,8 +55,10 @@ class BackupDocumentFlowTest {
             rule.runOnIdle { app.settings.finishIntro() }
             rule.waitForIdle()
             assertTrue(app.repository.exportRecords().isEmpty())
+            // O aviso temporário fica acima da navegação e não deve receber o toque destinado à restauração.
+            rule.waitUntil(8000) { rule.onAllNodesWithText("Backup salvo.", substring = true).fetchSemanticsNodes().isEmpty() }
             rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Restaurar backup"))
-            rule.onNodeWithText("Restaurar backup").performClick()
+            rule.onNodeWithText("Restaurar backup").performScrollTo().assertIsDisplayed().performClick()
             click(awaitSystemNode { it.text?.toString() == fileName })
             awaitApplication()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Senha do backup").fetchSemanticsNodes().isNotEmpty() }
