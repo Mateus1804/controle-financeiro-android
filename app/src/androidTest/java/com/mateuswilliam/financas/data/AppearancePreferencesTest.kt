@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 class AppearancePreferencesTest {
     private val app get() = ApplicationProvider.getApplicationContext<FinanceApplication>()
 
-    @Before fun reset() = runBlocking { app.repository.clear() }
+    @Before fun reset() = runBlocking<Unit> { app.repository.clear(); Unit }
 
     @Test fun defaultFollowsSystemAndExplicitChoicesOverrideIt() {
         assertEquals(Appearance.SYSTEM, app.settings.state.value.appearance)

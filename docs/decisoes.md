@@ -58,7 +58,7 @@ Antes de uma publicação, permanecem pendentes a validação do APK assinado, a
 
 ## Contas reutilizáveis e compatibilidade
 
-A tabela `accounts` integra o esquema Room 2, com migração aditiva a partir da versão 1. O cadastro é combinado com os nomes encontrados no histórico, com normalização de espaços e caixa apenas para pesquisa e comparação. Os nomes gravados nos lançamentos antigos são preservados. Nomes como Inter pessoal e Inter trabalho continuam distintos. A mesma comparação nas transferências impede origem e destino iguais por diferenças de espaços ou maiúsculas.
+O esquema Room 2 introduziu a tabela `accounts`, com migração aditiva a partir da versão 1. O cadastro é combinado com os nomes encontrados no histórico, com normalização de espaços e caixa apenas para pesquisa e comparação. Os nomes gravados nos lançamentos antigos são preservados. Nomes como Inter pessoal e Inter trabalho continuam distintos. A mesma comparação nas transferências impede origem e destino iguais por diferenças de espaços ou maiúsculas.
 
 A ordem de uso é atualizada junto com a gravação dos lançamentos, dentro da mesma transação. A última origem utilizada manualmente é armazenada separadamente. A conta escolhida na revisão não modifica o pacote ou a identificação original da notificação. Contas com saldo inicial e conciliação continuam em planejamento.
 
@@ -79,3 +79,45 @@ O estado da captura diferencia falta de consentimento, captura pausada, seleçã
 A organização por contas e relatórios tem como referência o Expense Manager; a hierarquia visual e as opções de aparência, o Cashew; e a simplicidade dos componentes Material 3, o GreenStash. Ivy Wallet permanece como referência histórica, pois seu repositório está arquivado. Após a avaliação do ComposeCharts, a implementação utiliza o Canvas existente na stack para uma única rosca com legenda acessível, sem acrescentar uma dependência de gráficos.
 
 O estudo de padrões de experiência não envolve cópia de marcas, imagens ou código desses aplicativos. As licenças e os créditos já presentes no projeto são preservados.
+
+## Backup portátil e restauração conferida
+
+O backup é um snapshot lógico das tabelas, com formato versionado e criptografia autenticada. O envelope utiliza AES-256-GCM, salt e nonce aleatórios e PBKDF2-HMAC-SHA256 com 600 mil iterações. As APIs criptográficas da plataforma atendem ao formato sem nova dependência de produção. O cabeçalho é autenticado; valores de versão ou custo não suportados são recusados antes da derivação.
+
+A importação limita tamanho e quantidade de itens e exige centavos inteiros, enums conhecidos, identificadores únicos e vínculos válidos. O conteúdo passa por um banco Room temporário privado, conferência de integridade e releitura. A substituição financeira ocorre em uma transação da base ativa, sob a mesma exclusão de escrita das confirmações; não há troca de arquivo SQLite em uso. Cancelamento e falhas preservam os dados existentes. A limpeza da base temporária permanece executável mesmo durante o cancelamento da operação.
+
+Preferências de apresentação são restauráveis. Consentimento, seleção de origens, permissões e proteção continuam pertencendo ao aparelho. Captura e lembretes ficam pausados após sucesso. O arquivo pode conter textos de pendências, e a senha não é recuperável. Os detalhes do formato e da retenção ficam em [Backup e recuperação](backup.md).
+
+## Migração do planejamento
+
+O esquema Room 3 acrescenta `budgets`, `recurring` e `occurrences`. A migração 2→3 cria somente as tabelas e o índice necessários; as migrações 1→2 e 2→3 podem ser encadeadas. Registros, pendências e nomes históricos não são reescritos. Os esquemas 1, 2 e 3 permanecem versionados.
+
+Os orçamentos usam mês e categoria como chave e acompanham despesas líquidas confirmadas. Quando os estornos superam as despesas da categoria, o consumo exibido é zero, sem criar crédito artificial para o orçamento. Proporções de desenho não alteram os centavos.
+
+As recorrências são previsões mensais de receita ou despesa. A confirmação de um vencimento insere o lançamento, registra o vínculo e avança a previsão na mesma transação. A chave de recorrência e data impede confirmar duas vezes o mesmo vencimento. Pular avança a previsão com um registro próprio, sem criar movimentação financeira. O dia original é preservado nos meses curtos. A data efetiva sugerida no formulário é a data atual e continua editável.
+
+## Possíveis duplicidades e revisão em sequência
+
+O índice de candidatos agrupa lançamentos manuais por valor e movimentação. A comparação considera até 48 horas de diferença e exige conta equivalente, indício do mesmo banco ou descrição com termos significativos em comum. A apresentação limita os candidatos a três, com motivos visíveis e ordenação estável. Um banco semelhante não identifica qual conta foi usada. A decisão permanece na revisão; não há união nem exclusão automática.
+
+A sessão de revisão utiliza uma lista estável de identificadores obtida ao abrir o primeiro item. Novas pendências aparecem na contagem, sem substituir a edição ou entrar silenciosamente na sessão. O próximo item só abre por ação explícita. A confirmação usa a revisão esperada da pendência; quando o texto de origem muda, os campos editados permanecem, e a nova versão exige conferência explícita antes do salvamento.
+
+## Lembretes sem horário exato
+
+O `JobScheduler` nativo realiza verificações periódicas, complementadas pela abertura do aplicativo. A escolha evita uma dependência adicional para um único trabalho periódico e não solicita alarmes exatos. A permissão normal `RECEIVE_BOOT_COMPLETED` permite persistir o agendamento; o serviço permanece protegido por `BIND_JOB_SERVICE`. O Android ainda pode adiar ou impedir uma execução conforme bateria, parada forçada e condições do aparelho.
+
+Os lembretes têm controle próprio e dependem da permissão e do canal de alertas. A recusa não desativa a captura autorizada. O vencimento só é marcado como avisado depois da publicação aceita; o identificador estável e `setOnlyAlertOnce` reduzem alertas repetidos se houver interrupção entre publicação e persistência. Um encerramento nesse intervalo não permite prometer entrega exatamente uma vez. Confirmar, pular, pausar ou mudar o vencimento cancela o alerta anterior. Valor, conta e descrição não aparecem no alerta.
+
+## Proteção da interface
+
+A proteção começa desativada. Ativar ou desativar exige autenticação do Android. O Android 11 ou superior utiliza `BiometricPrompt` com biometria forte ou credencial; versões anteriores utilizam os caminhos nativos compatíveis, com credencial do aparelho como alternativa. A sessão vive apenas em memória e exige autenticação ao iniciar, após 30 segundos em segundo plano e quando a tela é desligada ou o aparelho é observado bloqueado. Uma simples recriação por configuração não concede nem remove autenticação já obtida.
+
+Links de notificação passam pela mesma tela de bloqueio. O estado editável da interface é preservado pelo contêiner de estado ao bloquear; uma autenticação em andamento pode ser cancelada durante a recriação, mantendo o acesso protegido e permitindo nova tentativa. A proteção da imagem usa `FLAG_SECURE` na atividade, nos formulários e nos calendários nativos. Os diálogos de senha e restauração têm proteção explícita. A escolha de ocultação pode ser alterada separadamente.
+
+O banco Room permanece no armazenamento privado do Android, sem nova camada própria de criptografia. Biometria e proteção de tela não substituem criptografia do banco, proteção do sistema ou avaliação em aparelhos reais. Não há coleta de dados biométricos pelo aplicativo.
+
+A ativação ou desativação do bloqueio só é apresentada como salva após confirmação da persistência. Antes de restaurar ou apagar dados, a pausa da captura e dos lembretes também precisa ser persistida. Na exclusão, a proteção permanece configurada até a transação financeira terminar; falha do banco preserva os registros e o bloqueio. Falha posterior na limpeza das preferências é informada separadamente da exclusão já concluída.
+
+## Navegação com fonte ampliada
+
+Em telas estreitas com fonte ampliada, a barra inferior mantém quatro destinos e o botão de novo lançamento passa para uma área reservada acima dela. O conteúdo recebe espaço próprio para impedir sobreposição de valores e ações. A navegação usual mantém o botão central nas demais configurações. Os rótulos permanecem em uma linha, com texto completo na semântica, e o teste em 150% confere que Resumo não foi quebrado nem abreviado. Os ícones das barras do Android também são sincronizados na retomada e no retorno do foco da janela.

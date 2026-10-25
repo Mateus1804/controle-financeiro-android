@@ -16,6 +16,9 @@ data class CaptureSettings(
     val introSeen: Boolean = false,
     val captureCondition: String = "",
     val dismissedCondition: String = "",
+    val remindersEnabled: Boolean = false,
+    val lockEnabled: Boolean = false,
+    val secureScreen: Boolean = false,
 )
 
 class CapturePreferences(context: Context) {
@@ -35,6 +38,9 @@ class CapturePreferences(context: Context) {
         preferences.getBoolean("intro_seen", false),
         preferences.getString("capture_condition", "").orEmpty(),
         preferences.getString("dismissed_condition", "").orEmpty(),
+        preferences.getBoolean("reminders_enabled", false),
+        preferences.getBoolean("lock_enabled", false),
+        preferences.getBoolean("secure_screen", false),
     )
 
     fun acceptDisclosure() { preferences.edit { putBoolean("disclosure_v1", true); putBoolean("enabled", true) } }
@@ -50,7 +56,40 @@ class CapturePreferences(context: Context) {
         }
     }
     fun dismissCaptureNotice(condition: String) { preferences.edit { putString("dismissed_condition", condition) } }
+    fun snapshot(): CaptureSettings = read()
+    fun setReminders(enabled: Boolean) { preferences.edit { putBoolean("reminders_enabled", enabled) }; mutable.value = read() }
+    fun setSecureScreen(enabled: Boolean) { preferences.edit { putBoolean("secure_screen", enabled) }; mutable.value = read() }
+    fun setLockEnabled(enabled: Boolean) {
+        val previous = read()
+        val editor = preferences.edit()
+        editor.putBoolean("lock_enabled", enabled)
+        if (enabled) editor.putBoolean("secure_screen", true)
+        if (!editor.commit()) {
+            preferences.edit { putBoolean("lock_enabled", previous.lockEnabled); putBoolean("secure_screen", previous.secureScreen) }
+            mutable.value = read()
+            throw IllegalStateException("A alteração da proteção não foi salva. Confira o armazenamento e tente novamente.")
+        }
+        mutable.value = read()
+    }
+    fun pauseForRestore() {
+        val editor = preferences.edit()
+        editor.putBoolean("enabled", false)
+        editor.putBoolean("reminders_enabled", false)
+        check(editor.commit()) { "A pausa da captura e dos lembretes não pôde ser salva. Nenhum dado foi substituído." }
+        mutable.value = read()
+    }
+    fun restoreDisplay(display: BackupDisplay) {
+        preferences.edit(commit = true) {
+            putString("appearance", display.appearance.name); putBoolean("hide_amounts", display.hideAmounts)
+            putString("last_origin", display.lastOrigin); putBoolean("enabled", false)
+            putBoolean("reminders_enabled", false); remove("capture_condition"); remove("dismissed_condition")
+        }
+        mutable.value = read()
+    }
     fun permits(packageName: String): Boolean = read().let { it.consented && it.enabled && packageName in it.packages }
     // Persiste a revogação antes de concluir a exclusão. O repositório chama esta operação em IO.
-    fun reset() { preferences.edit(commit = true) { clear() }; mutable.value = read() }
+    fun reset() {
+        check(preferences.edit().clear().commit()) { "As preferências não puderam ser limpas." }
+        mutable.value = read()
+    }
 }

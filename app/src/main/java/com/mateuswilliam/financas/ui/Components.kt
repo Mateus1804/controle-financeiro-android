@@ -17,6 +17,10 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import android.os.Build
+import android.app.DatePickerDialog
+import android.content.Context
+import android.view.WindowManager
+import com.mateuswilliam.financas.FinanceApplication
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -27,9 +31,19 @@ import com.mateuswilliam.financas.core.Movement
 import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.R
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+fun showFinanceDatePicker(context: Context, theme: Int, selected: LocalDate, onSelected: (LocalDate) -> Unit) {
+    DatePickerDialog(context, theme, { _, year, month, day -> onSelected(LocalDate.of(year, month + 1, day)) },
+        selected.year, selected.monthValue - 1, selected.dayOfMonth).apply {
+        // Diálogos nativos têm janela própria e precisam respeitar a proteção da tela.
+        if ((context.applicationContext as? FinanceApplication)?.settings?.snapshot()?.secureScreen == true)
+            window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }.show()
+}
 
 @Composable
 fun DialogSystemBars() {

@@ -25,7 +25,7 @@ import java.util.Locale
 @Composable
 fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -> Unit, onHide: () -> Unit,
                     onPending: () -> Unit, onCategory: (Category) -> Unit, onExpenseGroup: (ExpenseFilter) -> Unit,
-                    notice: (@Composable () -> Unit)? = null) {
+                    notice: (@Composable () -> Unit)? = null, onPlanning: () -> Unit = {}) {
     val zone = ZoneId.systemDefault()
     val summary = androidx.compose.runtime.remember(state.records, month, zone) { Ledger.month(state.records, month, zone) }
     val hidden = state.settings.hideAmounts
@@ -38,6 +38,7 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
                 }
                 TextButton(onClick = onHide) { Text(if (hidden) "Mostrar" else "Ocultar") }
             }
+            TextButton(onClick = onPlanning) { Text("Planejar limites e recorrências") }
         }
         if (notice != null) item { notice() }
         item { MonthPicker(month, onMonth) }

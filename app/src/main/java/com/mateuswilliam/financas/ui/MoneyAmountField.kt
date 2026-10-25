@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import com.mateuswilliam.financas.core.MoneyInput
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.channels.BufferOverflow
@@ -67,7 +68,7 @@ fun MoneyAmountField(state: TextFieldState, attempted: Boolean, enabled: Boolean
         modifier = Modifier.fillMaxWidth().testTag("amount-input"),
         enabled = enabled,
         lineLimits = TextFieldLineLimits.SingleLine,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
         inputTransformation = transformation,
         outputTransformation = CurrencyOutputTransformation,
         isError = invalid || rejected,

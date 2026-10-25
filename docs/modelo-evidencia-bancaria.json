@@ -1,0 +1,18 @@
+{
+  "formatVersion": 1,
+  "evidence": [
+    {
+      "id": "caso-local-001",
+      "bank": "Inter",
+      "packageName": "PREENCHER_A_PARTIR_DO_APLICATIVO_INSTALADO",
+      "appVersion": "PREENCHER",
+      "androidVersion": "PREENCHER",
+      "deviceModel": "PREENCHER",
+      "collectedOn": "AAAA-MM-DD",
+      "redactionReviewed": false,
+      "listenerConnected": false,
+      "notificationDelivered": false,
+      "reviewResult": "PENDENTE"
+    }
+  ]
+}

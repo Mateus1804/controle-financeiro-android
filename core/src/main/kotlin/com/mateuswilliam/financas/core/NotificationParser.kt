@@ -16,7 +16,7 @@ object NotificationParser {
     fun parse(input: NotificationInput): Suggestion {
         val combined = "${input.title} ${input.body}"
         val text = normalize(combined)
-        // Múltiplos valores podem representar compra, saldo e limite. Não escolho um deles sem revisão.
+        // Múltiplos valores podem representar compra, saldo e limite. A escolha depende de revisão.
         val amounts = currency.findAll(combined).mapNotNull { Money.parse(it.groupValues[1]) }.toSet()
         val amount = amounts.singleOrNull()
         val isIncoming = incoming.containsMatchIn(text)

@@ -9,6 +9,8 @@ android = "{http://schemas.android.com/apk/res/android}"
 permissions = {node.get(android + "name") for node in tree.findall("uses-permission")}
 allowed = {
     "android.permission.POST_NOTIFICATIONS",
+    "android.permission.USE_BIOMETRIC",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
     "com.mateuswilliam.financas.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
 }
 if permissions - allowed:
@@ -19,4 +21,7 @@ if application.get(android + "allowBackup") != "false":
 listener = next(node for node in application.findall("service") if node.get(android + "name", "").endswith("BankNotificationListener"))
 if listener.get(android + "exported") != "false" or listener.get(android + "permission") != "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE":
     raise SystemExit("O serviço de captura precisa ser privado e protegido pela permissão do sistema.")
-print("Manifesto conferido: permissões limitadas, serviço protegido e backup automático desativado.")
+reminders = next(node for node in application.findall("service") if node.get(android + "name", "").endswith("RecurringReminderService"))
+if reminders.get(android + "exported") != "false" or reminders.get(android + "permission") != "android.permission.BIND_JOB_SERVICE":
+    raise SystemExit("O agendador de lembretes precisa ser privado e protegido pela permissão do sistema.")
+print("Manifesto conferido: permissões limitadas, serviços protegidos e backup automático do Android desativado.")
