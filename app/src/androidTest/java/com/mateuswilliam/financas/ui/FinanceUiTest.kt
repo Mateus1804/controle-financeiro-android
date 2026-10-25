@@ -177,7 +177,11 @@ class FinanceUiTest {
     @Test fun accountCanBeAddedWithoutLosingTheAmount() {
         rule.onNodeWithContentDescription("Novo lançamento").performClick()
         rule.onNodeWithTag("amount-input").performTextInput("1234")
-        rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo().performClick()
+        // O teclado mede a janela fora do relógio Compose; o toque só ocorre após estabilizar a geometria.
+        waitForStableBounds(rule.onNodeWithTag("amount-input"))
+        val addAccount = rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo()
+        waitForStableBounds(addAccount)
+        addAccount.performClick()
         try {
             rule.waitUntil(5000) { rule.onAllNodesWithTag("account-name-input").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithTag("account-name-input").performTextInput("Inter pessoal")
@@ -345,6 +349,20 @@ class FinanceUiTest {
             assertFalse(app.settings.state.value.enabled)
             assertTrue(app.settings.state.value.introSeen)
         }
+    }
+
+    private fun waitForStableBounds(node: SemanticsNodeInteraction) {
+        var previous: androidx.compose.ui.geometry.Rect? = null
+        var stableSince = android.os.SystemClock.uptimeMillis()
+        rule.waitUntil(5000) {
+            val bounds = node.fetchSemanticsNode().boundsInWindow
+            val now = android.os.SystemClock.uptimeMillis()
+            if (bounds != previous) {
+                previous = bounds; stableSince = now
+                false
+            } else now - stableSince >= 300
+        }
+        node.assertIsDisplayed()
     }
 
     private fun confirmEntry() {
