@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mateuswilliam.financas.FinanceApplication
@@ -193,6 +195,11 @@ class OptionalFeaturesUiTest {
             rule.runOnIdle { app.settings.hideAmounts(true); app.settings.setAppearance(Appearance.DARK) }
             command("settings put system font_scale 1.5")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.4f }
+            rule.onNodeWithText("Resumo", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                assertTrue(action(layouts)); assertEquals(1, layouts.single().lineCount); assertFalse(layouts.single().isLineEllipsized(0))
+            }
+            rule.runOnIdle { assertFalse(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars) }
             openPlanning()
             rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Gasto e limite ocultos"))
             rule.onAllNodesWithText(Money.format(123456), substring = true).assertCountEquals(0)
@@ -229,6 +236,16 @@ class OptionalFeaturesUiTest {
     private fun screenshot(name: String) {
         rule.waitUntil(8000) { rule.onAllNodesWithText("Limite mensal salvo.").fetchSemanticsNodes().isEmpty() }
         rule.waitForIdle()
+        if (app.settings.snapshot().appearance == Appearance.DARK) rule.waitUntil(5000) {
+            val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return@waitUntil false
+            var bright = 0
+            for (x in 20 until minOf(200, bitmap.width)) for (y in 0 until minOf(44, bitmap.height)) {
+                val color = bitmap.getPixel(x, y)
+                if (android.graphics.Color.red(color) > 180 && android.graphics.Color.green(color) > 180 && android.graphics.Color.blue(color) > 180) bright++
+            }
+            bitmap.recycle()
+            bright > 8
+        }
         val directory = File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: error("Captura do emulador indisponível")
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

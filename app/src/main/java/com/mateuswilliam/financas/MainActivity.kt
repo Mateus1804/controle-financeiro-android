@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.app.KeyguardManager
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
@@ -26,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mateuswilliam.financas.notifications.ReviewNotifications
@@ -87,6 +89,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         resumeCount++
+        synchronizeSystemBarIcons()
         if (::session.isInitialized) {
             val app = application as FinanceApplication
             val keyguard = getSystemService(KeyguardManager::class.java)
@@ -115,6 +118,21 @@ class MainActivity : ComponentActivity() {
     private fun updateScreenProtection(enabled: Boolean) {
         if (enabled) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) synchronizeSystemBarIcons()
+    }
+
+    private fun synchronizeSystemBarIcons() {
+        if (!::financeModel.isInitialized) return
+        val systemDark = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        val dark = financeModel.preferences.snapshot().appearance.usesDarkTheme(systemDark)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
+        }
     }
 
     private fun authenticate(action: AuthenticationAction) {
