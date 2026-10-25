@@ -169,7 +169,7 @@ private fun RecurringEditor(existing: RecurringPlan?, accounts: List<AccountOpti
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição para edição") { OutlinedTextField(title, { title = it.take(200) }, label = { Text("Descrição da previsão") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)) }
             PrivateValueGate(hidden, "Mostrar valor para edição") { MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalid = it }) }
             ChoiceField("Tipo previsto", movement, listOf(Movement.EXPENSE, Movement.INCOME), { it.label }) { movement = it }
-            ChoiceField("Meio previsto", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
+            ChoiceField("Meio previsto", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
             ChoiceField("Categoria prevista", category, Category.entries.toList(), { it.label }) { category = it }
             AccountPickerField("Conta da previsão", bank, accounts, { bank = it }, onAddAccount, hidden = hidden)
             OutlinedButton(onClick = {

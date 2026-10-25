@@ -173,8 +173,12 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = { NewRecordAction { openManual() } },
         bottomBar = {
+            Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+            Column {
+                Box(Modifier.fillMaxWidth().padding(horizontal = FinanceSpacing.page, vertical = 6.dp)) {
+                    NewRecordAction { openManual() }
+                }
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest, tonalElevation = 0.dp) {
                 val labels = listOf("Resumo", "Revisar", "Extrato", "Ajustes")
                 val icons = listOf(R.drawable.ic_overview, R.drawable.ic_pending, R.drawable.ic_records, R.drawable.ic_settings)
@@ -186,6 +190,8 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                             AppIcon(icons[index])
                         } else AppIcon(icons[index]) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
                 }
+            }
+            }
             }
         },
     ) { padding ->
@@ -279,8 +285,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
 
 @Composable
 private fun NewRecordAction(onClick: () -> Unit) {
-    FloatingActionButton(onClick = onClick, containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = MaterialTheme.shapes.medium, elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)) {
+    FilledTonalButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch),
+        shape = MaterialTheme.shapes.medium) {
         AppIcon(R.drawable.ic_add, description = "Novo lançamento")
+        Spacer(Modifier.width(8.dp)); Text("Registrar")
     }
 }

@@ -16,14 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Tokens de layout compartilhados; a reserva inferior corresponde ao FAB do Scaffold.
+// Tokens de layout compartilhados. O Scaffold reserva o espaço da navegação e da ação fixa.
 object FinanceSpacing {
     val small = 8.dp
     val medium = 12.dp
     val section = 20.dp
     val page = 20.dp
     val large = 24.dp
-    val listBottom = 96.dp
+    val listBottom = 24.dp
     val touch = 48.dp
 }
 

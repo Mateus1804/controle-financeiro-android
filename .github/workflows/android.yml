@@ -101,17 +101,8 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - api: 26
-            target: default
-            scenario: suite
-          - api: 33
-            target: default
-            scenario: suite
           - api: 35
             target: default
-            scenario: suite
-          - api: 36
-            target: google_apis
             scenario: suite
           - api: 35
             target: default

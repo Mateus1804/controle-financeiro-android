@@ -12,4 +12,4 @@ Kotlin, Coroutines, AndroidX/Compose e Room são utilizados por meio de dependê
 
 ## Material Icons Round
 
-Os ícones de interface são recursos vetoriais do Google Material Icons Round, sob Apache-2.0. Os paths oficiais foram convertidos de SVG para VectorDrawable, sem redesenho. A licença integral consta em `licenses/material-icons-LICENSE.txt`; a origem e a revisão de cada recurso estão em `docs/icones-material.json`. O símbolo do aplicativo permanece próprio.
+Os ícones de interface são recursos vetoriais do Google Material Icons Round, sob Apache-2.0. Os paths oficiais foram convertidos de SVG para VectorDrawable, sem redesenho. A licença integral consta em `licenses/material-icons-LICENSE.txt`; a origem e a revisão de cada recurso estão em `docs/icones-material.json`. A licença e a procedência também integram os APKs em `assets/licenses/`. O símbolo do aplicativo permanece próprio.

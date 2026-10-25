@@ -1,0 +1,5 @@
+Google Material Icons Round
+Fonte: https://github.com/google/material-design-icons
+Revisão: 10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7
+Licença: Apache-2.0, material-icons-LICENSE.txt nesta pasta.
+Adaptação: conversão de SVG para VectorDrawable; os desenhos oficiais foram preservados.

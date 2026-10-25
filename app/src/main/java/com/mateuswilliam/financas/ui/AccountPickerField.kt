@@ -31,7 +31,7 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { choosing = true }, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.small, border = null, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                AppIcon(R.drawable.ic_wallet); Spacer(Modifier.width(8.dp))
+                AppIcon(R.drawable.ic_bank); Spacer(Modifier.width(8.dp))
                 Text(privateDisplayText(value.ifBlank { "Escolher conta" }, hidden), Modifier.weight(1f).padding(vertical = 8.dp))
                 AppIcon(R.drawable.ic_chevron_down)
             }

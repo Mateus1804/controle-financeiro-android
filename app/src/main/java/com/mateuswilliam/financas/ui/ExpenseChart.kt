@@ -38,6 +38,7 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
         report.groups.take(5) + if (report.groups.size > 5) listOf(ExpenseGroup("__remaining__", "Outros grupos",
             report.groups.drop(5).sumOf { it.cents }, report.groups.drop(5).sumOf { it.basisPoints })) else emptyList()
     }
+    val chartTrack = MaterialTheme.colorScheme.surfaceContainerHigh
     val chartAlpha by androidx.compose.animation.core.animateFloatAsState(if (report.total > 0L) 1f else 0f, label = "Entrada do gráfico")
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -49,7 +50,8 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
                     Canvas(Modifier.size(208.dp).graphicsLayer { alpha = chartAlpha }.clearAndSetSemantics { }) {
                         val stroke = 18.dp.toPx()
                         var start = -90f
-                        visible.forEach { group ->
+                        if (hidden) drawCircle(chartTrack, radius = (size.minDimension - stroke) / 2, style = Stroke(stroke))
+                        else visible.forEach { group ->
                             val sweep = (group.cents.toDouble() / report.total * 360).toFloat()
                             drawArc(groupColor(dimension.name + group.key), start + if (visible.size > 1) 0.8f else 0f,
                                 (sweep - if (visible.size > 1) minOf(sweep, 1.6f) else 0f).coerceAtLeast(0f), false,

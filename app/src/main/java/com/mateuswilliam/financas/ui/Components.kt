@@ -129,7 +129,7 @@ fun movementIcon(movement: Movement): Int = when (movement) {
 @Composable
 fun Amount(cents: Long, hidden: Boolean, modifier: Modifier = Modifier, size: Int = 20) {
     androidx.compose.foundation.text.BasicText(
-        text = if (hidden) "••••" else Money.format(cents), modifier = modifier,
+        text = if (hidden) "••••" else Money.format(cents), modifier = modifier.semantics { if (hidden) contentDescription = "Valor oculto" },
         style = LocalTextStyle.current.copy(color = LocalContentColor.current, fontSize = size.sp,
             lineHeight = (size * 1.25f).sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
         maxLines = 2,
@@ -151,14 +151,17 @@ fun RecordRow(record: Record, hidden: Boolean, onEdit: (() -> Unit)? = null) {
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("${privateDisplayText(record.bank, hidden)} · ${shortDate(record.occurredAt)}", style = MaterialTheme.typography.bodySmall)
-                Text("${record.movement.label} · ${record.category.label}", style = MaterialTheme.typography.labelSmall)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    AppIcon(movementIcon(record.movement), Modifier.size(14.dp))
+                    Text("${record.movement.label} · ${record.category.label}", style = MaterialTheme.typography.labelSmall)
+                }
                 if (largeText) CompositionLocalProvider(LocalContentColor provides color) { Amount(record.amountCents, hidden, size = 18) }
             }
         },
         trailingContent = if (!largeText) {{
             Column(Modifier.widthIn(max = 132.dp), horizontalAlignment = Alignment.End) {
                 CompositionLocalProvider(LocalContentColor provides color) { Amount(record.amountCents, hidden, size = 17) }
-                if (onEdit != null) TextButton(onClick = onEdit, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Editar", style = MaterialTheme.typography.labelSmall) }
+                if (onEdit != null) AppIcon(R.drawable.ic_chevron_right, Modifier.padding(top = 4.dp).size(16.dp))
             }
         }} else if (onEdit != null) {{ AppIcon(R.drawable.ic_chevron_right) }} else null,
     )

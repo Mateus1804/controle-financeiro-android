@@ -96,7 +96,7 @@ fun RecordEditor(
                 if (draft != null) {
                     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("${draft.bank} · ${shortDate(draft.occurredAt)}", style = MaterialTheme.typography.labelMedium)
+                            Text("${privateDisplayText(draft.bank, hideAmounts)} · ${shortDate(draft.occurredAt)}", style = MaterialTheme.typography.labelMedium)
                             Text(privateDisplayText(draft.sourceTitle, hideAmounts), style = MaterialTheme.typography.titleSmall)
                             Text(privateDisplayText(draft.sourceBody, hideAmounts), style = MaterialTheme.typography.bodySmall)
                             Text(privateDisplayText(draft.explanation, hideAmounts), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
@@ -125,7 +125,7 @@ fun RecordEditor(
                 }
                 PrivateValueGate(hideAmounts, "Mostrar valor para edição") { MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it }) }
                 ChoiceField("Movimentação", movement, if (preset != null) listOf(Movement.EXPENSE, Movement.INCOME) else Movement.entries.toList(), { it.label }) { movement = it }
-                ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
+                ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
                 AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount, hidden = hideAmounts)
                 if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount, hidden = hideAmounts)
@@ -158,14 +158,17 @@ fun RecordEditor(
 }
 
 @Composable
-fun <T> ChoiceField(label: String, value: T, options: List<T>, text: (T) -> String, onChange: (T) -> Unit) {
+fun <T> ChoiceField(label: String, value: T, options: List<T>, text: (T) -> String, @androidx.annotation.DrawableRes icon: Int? = null, onChange: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small, border = null,
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, contentColor = MaterialTheme.colorScheme.onSurface), contentPadding = PaddingValues(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(text(value), Modifier.weight(1f)); AppIcon(R.drawable.ic_chevron_down) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    if (icon != null) AppIcon(icon)
+                    Text(text(value), Modifier.weight(1f)); AppIcon(R.drawable.ic_chevron_down)
+                }
             }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
                 options.forEach { option -> DropdownMenuItem(text = { Text(text(option)) }, onClick = { onChange(option); expanded = false }) }

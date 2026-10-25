@@ -66,6 +66,63 @@ class RedesignInteractionTest {
         rule.onNodeWithContentDescription("Novo lançamento").assertIsDisplayed()
     }
 
+    @Test fun narrowScreenWithDoubleFontScaleKeepsActionsAndNavigationReachable() {
+        fun command(value: String) {
+            val fd = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(value)
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
+        }
+        try {
+            command("wm size 640x1280"); command("wm density 320"); command("settings put system font_scale 2.0")
+            rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.9f && rule.activity.resources.configuration.screenWidthDp <= 320 }
+            for (label in listOf("Resumo", "Revisar", "Extrato", "Ajustes")) {
+                rule.onNode(hasText(label) and hasClickAction()).assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+            }
+            rule.onNode(hasText("Resumo") and hasClickAction()).performClick()
+            for (type in listOf("income", "expense", "transfer")) {
+                rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("quick-$type"))
+                rule.onNodeWithTag("quick-$type").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+            }
+            rule.runOnIdle { app.settings.setAppearance(com.mateuswilliam.financas.data.Appearance.DARK) }
+            rule.waitForIdle(); capture("resumo-fonte-ampliada-escuro")
+            rule.runOnIdle { app.settings.setAppearance(com.mateuswilliam.financas.data.Appearance.LIGHT) }
+            rule.waitForIdle(); capture("resumo-fonte-ampliada-claro")
+            rule.onNodeWithContentDescription("Novo lançamento").performClick()
+            rule.onNodeWithTag("amount-input").performTextInput("1234")
+            rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Fonte ampliada fictícia")
+            capture("formulario-pequeno-teclado")
+            rule.onNodeWithText("Descrição").performImeAction(); waitKeyboard()
+            rule.onNodeWithText("Confirmar", useUnmergedTree = true).assertIsDisplayed().performClick()
+            rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
+            assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
+        } finally {
+            command("settings put system font_scale 1.0"); command("wm density reset"); command("wm size reset")
+        }
+    }
+
+    @Test fun introductionHasManualChoiceAndKeepsExplicitConsentInBothThemes() {
+        app.settings.reset()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Usar manualmente").fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle { app.settings.setAppearance(com.mateuswilliam.financas.data.Appearance.LIGHT) }
+        rule.waitForIdle(); capture("introducao-claro")
+        rule.runOnIdle { app.settings.setAppearance(com.mateuswilliam.financas.data.Appearance.DARK) }
+        rule.waitForIdle(); capture("introducao-escuro")
+        rule.onNodeWithText("Ativar preenchimento por notificações").performClick()
+        rule.onNodeWithText("Antes de ativar a captura").assertIsDisplayed()
+        assertFalse(app.settings.state.value.consented)
+        rule.onNodeWithText("Agora não").performClick()
+        assertFalse(app.settings.state.value.consented)
+    }
+
+    private fun capture(name: String) {
+        rule.waitForIdle()
+        val bitmap = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            ?: error("Captura do emulador indisponível")
+        try {
+            val directory = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            java.io.File(directory, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        } finally { bitmap.recycle() }
+    }
+
     private fun openQuick(type: String) {
         rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("quick-$type"))
         rule.onNodeWithTag("quick-$type").assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()

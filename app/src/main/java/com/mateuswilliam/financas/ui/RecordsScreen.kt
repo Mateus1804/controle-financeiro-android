@@ -62,7 +62,7 @@ fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) 
         item { Box(Modifier.padding(bottom = 16.dp)) { SectionTitle("Extrato", "Lançamentos confirmados neste aparelho") } }
         item { Box(Modifier.padding(bottom = 16.dp)) { MonthPicker(month, onMonth) } }
         if (expenseFilter != null) item {
-            InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${expenseFilter.label} · Limpar filtro") })
+            InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${privateDisplayText(expenseFilter.label, hidden)} · Limpar filtro") })
         }
         item { OutlinedTextField(search, { search = it.take(100) }, label = { Text("Buscar descrição ou banco") }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), leadingIcon = { AppIcon(com.mateuswilliam.financas.R.drawable.ic_search) }, singleLine = true) }
         item {

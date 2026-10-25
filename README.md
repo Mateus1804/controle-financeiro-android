@@ -10,10 +10,12 @@ O Controle Financeiro Android permite acompanhar receitas e despesas com menos d
 - Edição e exclusão de lançamentos confirmados.
 - Caixa de revisão para notificações, com valor, origem, movimentação, meio de pagamento e categoria editáveis.
 - Captura opcional dos aplicativos selecionados, após consentimento e autorização do Android.
-- Resumo mensal, comparação de receitas e despesas e barras de gastos por categoria.
+- Resumo do período com receitas e despesas líquidas confirmadas, sem confundir o resultado calculado com saldo bancário.
 - Gráfico de rosca das despesas brutas por categoria, conta ou meio de pagamento, com detalhamento e estornos indicados separadamente.
 - Busca e filtros no histórico, navegação por mês e exportação CSV.
-- Escolha persistente entre os temas Sistema, Claro e Escuro em Ajustes, além da opção de ocultar totais.
+- Temas Sistema, Claro e Escuro persistentes, com cores dinâmicas do Material You no Android 12 ou superior e paletas próprias nas versões anteriores.
+- Ações rápidas de receita, despesa e transferência, histórico em superfícies agrupadas e ícones vetoriais Material Icons Round.
+- Ocultação de valores nos resumos, gráficos, textos de notificações e leitores de tela, com revelação explícita no editor.
 - Apresentação inicial da captura opcional e avisos de configuração que podem ser fechados, mantendo o cadastro manual disponível.
 - Backup criptografado com senha e formato versionado, com prévia e conferência em banco temporário antes da restauração.
 - Avisos de possível duplicidade entre lançamentos manuais e novas pendências, sem união ou exclusão automática.
@@ -57,33 +59,31 @@ Os valores monetários são armazenados em centavos inteiros. Transferências fi
 
 ## Qualidade
 
-A execução de referência aprovou **102 testes Kotlin e 76 testes instrumentados no Android 15**, sem testes pulados. O Android Lint concluiu com zero erros e 14 avisos documentados. A validação abrange persistência e fluxos de interface. A cobertura inclui valores monetários, contas, migrações, relatórios, consentimento, confirmação simultânea, criptografia, restauração, planejamento e revisão em sequência. Os casos bancários distinguem procedência sintética de coleta real anonimizada.
+A validação combina testes Kotlin, persistência Room, migrações, fluxos de interface e atualização sobre a versão anterior. A validação atual está concentrada na API 35; as execuções anteriores em outras APIs permanecem documentadas. Os resultados e as limitações de cada execução ficam registrados em [Qualidade e validação](docs/qualidade.md). As novas interações e o sistema de temas são descritos em [Revisão visual](docs/redesign.md).
 
 Os resultados dos comandos, as execuções aprovadas, os avisos e as verificações ainda pendentes estão registrados em [Qualidade e validação](docs/qualidade.md). A validação com bancos reais, a autenticação no aparelho e a recuperação em condições reais de uso exigem avaliação própria.
 
 ## Interface
 
-As capturas utilizam dados fictícios para demonstrar os temas, os relatórios, o planejamento e a revisão de movimentações. Foram obtidas no emulador Android 15 durante a validação desta revisão; a origem das imagens está documentada em [Qualidade e validação](docs/qualidade.md).
+A interface utiliza superfícies neutras, espaçamentos compartilhados e cores tonais. O cartão principal apresenta o resultado dos lançamentos confirmados; revisões e planejamento ficam disponíveis sem interferir nesses totais. A implementação mantém os componentes e as interações nativas do Android.
+
+As capturas utilizam somente dados fictícios. A comparação entre o visual anterior e o atual, a procedência das imagens e os critérios de acessibilidade estão em [Revisão visual](docs/redesign.md).
 
 | Resumo claro | Resumo escuro |
 | --- | --- |
-| <img src="docs/imagens/resumo-claro.png" alt="Resumo mensal no tema claro, com dados fictícios" width="260"> | <img src="docs/imagens/resumo-escuro.png" alt="Resumo mensal no tema escuro, com dados fictícios" width="260"> |
+| <img src="docs/imagens/redesign/depois-resumo-claro.png" alt="Resumo redesenhado no tema claro com valores fictícios" width="260"> | <img src="docs/imagens/redesign/depois-resumo-escuro.png" alt="Resumo redesenhado no tema escuro com valores fictícios" width="260"> |
 
-| Relatório por categoria | Revisão da notificação |
+| Extrato | Revisão de notificação |
 | --- | --- |
-| <img src="docs/imagens/relatorio-categorias.png" alt="Gráfico de despesas brutas por categoria" width="260"> | <img src="docs/imagens/revisao-escuro.png" alt="Formulário de revisão no tema escuro, com exemplo fictício" width="260"> |
+| <img src="docs/imagens/redesign/depois-extrato-claro.png" alt="Lançamentos fictícios em uma lista agrupada" width="260"> | <img src="docs/imagens/redesign/depois-revisao-escuro.png" alt="Revisão de uma sugestão fictícia no tema escuro" width="260"> |
 
 | Planejamento claro | Planejamento escuro |
 | --- | --- |
-| <img src="docs/imagens/planejamento-claro.png" alt="Orçamento mensal com dados fictícios no tema claro" width="260"> | <img src="docs/imagens/planejamento-escuro.png" alt="Orçamento mensal com dados fictícios no tema escuro" width="260"> |
-
-| Possível duplicidade | Revisão em sequência |
-| --- | --- |
-| <img src="docs/imagens/possivel-duplicidade.png" alt="Aviso de lançamento manual semelhante, com dados fictícios" width="260"> | <img src="docs/imagens/revisao-em-sequencia.png" alt="Segunda revisão de uma sessão com nova pendência aguardando" width="260"> |
+| <img src="docs/imagens/redesign/depois-planejamento-claro.png" alt="Orçamento fictício no tema claro" width="260"> | <img src="docs/imagens/redesign/depois-planejamento-escuro.png" alt="Orçamento fictício no tema escuro" width="260"> |
 
 ## Estágio do projeto
 
-A versão **0.1.0** está em desenvolvimento, com a base de registro e revisão disponível. Os padrões são validados com exemplos sintéticos; a conferência de notificações reais de cada aplicativo bancário e do comportamento dos aparelhos permanece pendente.
+A versão **0.2.0** está em desenvolvimento, com a base de registro e revisão disponível. Os padrões são validados com exemplos sintéticos; a conferência de notificações reais de cada aplicativo bancário e do comportamento dos aparelhos permanece pendente.
 
 A captura não equivale a uma integração oficial com os bancos ou ao acesso ao extrato completo. Contas com saldo inicial, conciliação, faturas, parcelamentos, metas e sincronização em nuvem continuam fora desta etapa, conforme o [planejamento](docs/planejamento.md). Os valores apresentados representam lançamentos registrados, sem promessa de saldo bancário conciliado.
 
