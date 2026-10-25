@@ -1,0 +1,135 @@
+{
+  "source": "https://github.com/google/material-design-icons",
+  "commit": "10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7",
+  "license": "Apache-2.0",
+  "icons": [
+    {
+      "name": "ic_overview",
+      "path": "src/action/dashboard/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_pending",
+      "path": "src/action/pending_actions/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_settings",
+      "path": "src/action/settings/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_add",
+      "path": "src/content/add/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_income",
+      "path": "src/navigation/arrow_downward/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_expense",
+      "path": "src/navigation/arrow_upward/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_transfer",
+      "path": "src/action/swap_horiz/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_refund",
+      "path": "src/content/undo/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_chevron_left",
+      "path": "src/navigation/chevron_left/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_chevron_right",
+      "path": "src/navigation/chevron_right/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_chevron_down",
+      "path": "src/navigation/expand_more/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_wallet",
+      "path": "src/action/account_balance_wallet/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_calendar",
+      "path": "src/action/calendar_today/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_food",
+      "path": "src/maps/restaurant/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_home",
+      "path": "src/action/home/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_transport",
+      "path": "src/maps/directions_bus/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_health",
+      "path": "src/maps/local_hospital/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_education",
+      "path": "src/social/school/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_leisure",
+      "path": "src/maps/local_activity/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_category",
+      "path": "src/maps/category/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_bank",
+      "path": "src/action/account_balance/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_card",
+      "path": "src/action/credit_card/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_lock",
+      "path": "src/action/lock/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_backup",
+      "path": "src/content/archive/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_restore",
+      "path": "src/action/restore/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_visibility",
+      "path": "src/action/visibility/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_visibility_off",
+      "path": "src/action/visibility_off/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_close",
+      "path": "src/navigation/close/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_search",
+      "path": "src/action/search/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_check",
+      "path": "src/navigation/check/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_notification",
+      "path": "src/social/notifications_none/materialiconsround/24px.svg"
+    },
+    {
+      "name": "ic_records",
+      "path": "src/action/receipt/materialiconsround/24px.svg"
+    }
+  ]
+}

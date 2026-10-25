@@ -39,7 +39,7 @@ fun RecordEditor(
     accounts: List<AccountOption>,
     lastOrigin: String,
     onAddAccount: suspend (String) -> String,
-    preset: Record? = null,
+    preset: Record? = null, initialMovement: Movement = Movement.EXPENSE,
     duplicateIndex: DuplicateCandidates? = null,
     hideAmounts: Boolean = false,
     reviewProgress: String? = null,
@@ -55,7 +55,7 @@ fun RecordEditor(
     var invalidMoneyInput by rememberSaveable { mutableStateOf(false) }
     var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
     var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
-    var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: Movement.EXPENSE) }
+    var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: initialMovement) }
     var method by rememberSaveable { mutableStateOf(initial?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
     var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.category ?: Category.OTHER) }
     var destination by rememberSaveable { mutableStateOf(initial?.destination.orEmpty()) }
@@ -79,7 +79,7 @@ fun RecordEditor(
     ModalBottomSheet(
         onDismissRequest = { if (!busy) onDismiss() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {
         DialogSystemBars()
         val scroll = if (compactHeight) Modifier.verticalScroll(compactScroll) else Modifier
@@ -87,19 +87,19 @@ fun RecordEditor(
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (draft != null) "Conferir movimentação" else if (preset != null) "Conferir previsão" else if (existing != null) "Editar lançamento" else "Novo lançamento",
                     style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text(if (draft != null) "A notificação só vira lançamento após sua confirmação." else if (preset != null) "Confira valor, conta e data efetiva antes de transformar a previsão em lançamento." else "Seu controle, do seu jeito.",
+                Text(if (draft != null) "A notificação só vira lançamento após revisão e confirmação." else if (preset != null) "Confira valor, conta e data efetiva antes de transformar a previsão em lançamento." else "Valores, contas e categorias podem ser ajustados antes de salvar.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 reviewProgress?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
             }
             val fields = if (compactHeight) Modifier else Modifier.weight(1f, fill = false).verticalScroll(fieldsScroll)
             Column(fields.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (draft != null) {
-                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
+                    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("${draft.bank} · ${shortDate(draft.occurredAt)}", style = MaterialTheme.typography.labelMedium)
-                            Text(draft.sourceTitle, style = MaterialTheme.typography.titleSmall)
-                            Text(draft.sourceBody, style = MaterialTheme.typography.bodySmall)
-                            Text(draft.explanation, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                            Text(privateDisplayText(draft.sourceTitle, hideAmounts), style = MaterialTheme.typography.titleSmall)
+                            Text(privateDisplayText(draft.sourceBody, hideAmounts), style = MaterialTheme.typography.bodySmall)
+                            Text(privateDisplayText(draft.explanation, hideAmounts), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -114,8 +114,8 @@ fun RecordEditor(
                             Text("Possível duplicidade", fontWeight = FontWeight.SemiBold)
                             Text("Há lançamentos manuais semelhantes. A sugestão não confirma duplicidade e não une ou remove registros.", style = MaterialTheme.typography.bodySmall)
                             duplicates.forEach { candidate ->
-                                Text(candidate.record.description, style = MaterialTheme.typography.titleSmall)
-                                Text("${candidate.record.bank} · ${shortDate(candidate.record.occurredAt)}", style = MaterialTheme.typography.bodySmall)
+                                Text(privateDisplayText(candidate.record.description, hideAmounts), style = MaterialTheme.typography.titleSmall)
+                                Text("${privateDisplayText(candidate.record.bank, hideAmounts)} · ${shortDate(candidate.record.occurredAt)}", style = MaterialTheme.typography.bodySmall)
                                 Amount(candidate.record.amountCents, hideAmounts, size = 16)
                                 Text(candidate.reasons.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
                             }
@@ -123,18 +123,20 @@ fun RecordEditor(
                         }
                     }
                 }
-                MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
+                PrivateValueGate(hideAmounts, "Mostrar valor para edição") { MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it }) }
                 ChoiceField("Movimentação", movement, if (preset != null) listOf(Movement.EXPENSE, Movement.INCOME) else Movement.entries.toList(), { it.label }) { movement = it }
                 ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
-                AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount)
-                if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount)
+                AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount, hidden = hideAmounts)
+                if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount, hidden = hideAmounts)
+                PrivateValueGate(hideAmounts && privateDisplayText(description, true) != description, "Mostrar descrição para edição") {
                 OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
+                }
                 OutlinedButton(onClick = {
                     val selected = LocalDate.parse(date)
                     showFinanceDatePicker(context, dateDialogTheme, selected) { date = it.toString() }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
+                }, modifier = Modifier.fillMaxWidth()) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 if (onDelete != null) TextButton(onClick = { deleteDialog = true }, enabled = !busy) { Text("Excluir lançamento", color = MaterialTheme.colorScheme.error) }
                 Spacer(Modifier.height(8.dp))
@@ -161,7 +163,8 @@ fun <T> ChoiceField(label: String, value: T, options: List<T>, text: (T) -> Stri
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small, contentPadding = PaddingValues(16.dp)) {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small, border = null,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, contentColor = MaterialTheme.colorScheme.onSurface), contentPadding = PaddingValues(16.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(text(value), Modifier.weight(1f)); AppIcon(R.drawable.ic_chevron_down) }
             }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {

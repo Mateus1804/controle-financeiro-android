@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -18,7 +19,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountPickerField(label: String, value: String, options: List<AccountOption>, onChange: (String) -> Unit,
-                       onAdd: suspend (String) -> String) {
+                       onAdd: suspend (String) -> String, hidden: Boolean = false) {
     var choosing by rememberSaveable { mutableStateOf(false) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -29,8 +30,10 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { choosing = true }, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.small) {
-                Text(value.ifBlank { "Escolher conta" }, modifier = Modifier.padding(vertical = 8.dp))
+            OutlinedButton(onClick = { choosing = true }, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.small, border = null, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                AppIcon(R.drawable.ic_wallet); Spacer(Modifier.width(8.dp))
+                Text(privateDisplayText(value.ifBlank { "Escolher conta" }, hidden), Modifier.weight(1f).padding(vertical = 8.dp))
+                AppIcon(R.drawable.ic_chevron_down)
             }
             IconButton(onClick = { adding = true; error = null }, modifier = Modifier.size(48.dp)) {
                 AppIcon(R.drawable.ic_add, description = "Adicionar $label")
@@ -39,15 +42,19 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
     }
     if (choosing) ModalBottomSheet(onDismissRequest = { choosing = false }) {
         DialogSystemBars()
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(label, style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(query, { query = it.take(80) }, label = { Text("Buscar conta") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(query, { query = it.take(80) }, label = { Text("Buscar conta") }, leadingIcon = { AppIcon(R.drawable.ic_search) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            val matches = remember(options, query) { options.filter { it.label.contains(AccountNames.clean(query), ignoreCase = true) } }
+            Text("Contas recentes primeiro", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                val matches = options.filter { it.label.contains(AccountNames.clean(query), ignoreCase = true) }
                 items(matches, key = { it.key }) { option ->
-                    TextButton(onClick = { onChange(option.label); choosing = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text(option.label)
-                    }
+                    ListItem(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onChange(option.label); choosing = false },
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        leadingContent = { IconBadge(R.drawable.ic_wallet) },
+                        headlineContent = { Text(privateDisplayText(option.label, hidden)) },
+                        trailingContent = if (AccountNames.key(value) == option.key) {{ AppIcon(R.drawable.ic_check) }} else null)
+
                 }
                 if (matches.isEmpty()) item { Text("Nenhuma conta encontrada. Adicione uma opção pelo botão +.") }
             }
@@ -63,7 +70,7 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { TextButton(enabled = !saving, onClick = {
+        confirmButton = { FilledTonalButton(enabled = !saving, onClick = {
             saving = true
             scope.launch {
                 try { onChange(onAdd(name)); adding = false; name = "" }

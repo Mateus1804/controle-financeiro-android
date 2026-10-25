@@ -5,6 +5,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.platform.LocalDensity
+import com.mateuswilliam.financas.R
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -32,13 +35,23 @@ fun SettingsScreen(
     onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit,
 ) {
     var privacy by remember { mutableStateOf(false) }
-    LazyColumn(Modifier.testTag("settings-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { SectionTitle("Ajustes", "Privacidade e controle em primeiro lugar.") }
+    LazyColumn(Modifier.testTag("settings-list"), contentPadding = PaddingValues(FinanceSpacing.page, 20.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { SectionTitle("Ajustes", "Preferências, captura e proteção dos dados") }
         item {
             SettingsCard {
-                Text("Aparência", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SettingsHeading("Aparência", R.drawable.ic_visibility)
                 Text("Escolha um tema ou acompanhe a configuração do aparelho.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (LocalDensity.current.fontScale > 1.3f) {
+                    Appearance.entries.forEach { appearance ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(
+                            selected = settings.appearance == appearance, role = Role.RadioButton,
+                            onClick = { onAppearance(appearance) }), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = settings.appearance == appearance, onClick = null)
+                            Spacer(Modifier.width(12.dp)); Text(appearance.label)
+                        }
+                    }
+                } else {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     Appearance.entries.forEachIndexed { index, appearance ->
                         SegmentedButton(
@@ -47,6 +60,7 @@ fun SettingsScreen(
                             shape = SegmentedButtonDefaults.itemShape(index, Appearance.entries.size),
                         ) { Text(appearance.label) }
                     }
+                }
                 }
             }
         }
@@ -79,7 +93,7 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("Dados do aplicativo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SettingsHeading("Dados do aplicativo", R.drawable.ic_records)
                 Text("Os registros ficam neste aparelho. O CSV é um relatório; o backup criptografado permite recuperar os dados do aplicativo.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Exportar lançamentos em CSV") }
                 TextButton(onClick = { privacy = true }) { Text("Privacidade e uso dos dados") }
@@ -88,7 +102,7 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("Backup e recuperação", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SettingsHeading("Backup e recuperação", R.drawable.ic_backup)
                 Text("Arquivo criptografado com senha, conferência em base temporária e confirmação antes de substituir os dados. A senha não pode ser recuperada.")
                 OutlinedButton(onClick = onBackup, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Criar backup criptografado") }
                 OutlinedButton(onClick = onRestore, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Restaurar backup") }
@@ -96,14 +110,14 @@ fun SettingsScreen(
         }
         item {
             SettingsCard {
-                Text("Planejamento", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SettingsHeading("Planejamento", R.drawable.ic_calendar)
                 Text("Limites mensais por categoria e previsões recorrentes. Uma previsão só entra nos totais após confirmação.")
                 OutlinedButton(onClick = onPlanning, modifier = Modifier.fillMaxWidth()) { Text("Orçamentos e recorrências") }
             }
         }
         item {
             SettingsCard {
-                Text("Proteção do aplicativo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SettingsHeading("Proteção do aplicativo", R.drawable.ic_lock)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Autenticar ao abrir", Modifier.weight(1f))
                     Switch(settings.lockEnabled, onLockChange, modifier = Modifier.semantics { contentDescription = "Autenticar ao abrir" })
@@ -118,22 +132,22 @@ fun SettingsScreen(
         }
         if (BuildConfig.DEBUG) item {
             SettingsCard {
-                Text("Experimentar a revisão", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                SettingsHeading("Experimentar a revisão", R.drawable.ic_pending)
                 Text("Exemplos fictícios mostram o preenchimento e a confirmação, sem acessar bancos. Eles ficam identificados como simulação.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedButton(onClick = onSimulate, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Criar notificações fictícias") }
             }
         }
-        item { Text("Controle Financeiro · ${BuildConfig.VERSION_NAME}\nPrimeira versão em desenvolvimento", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Controle Financeiro · ${BuildConfig.VERSION_NAME}\nDados locais · revisão obrigatória das sugestões", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     if (privacy) AlertDialog(onDismissRequest = { privacy = false }, title = { DialogSystemBars(); Text("Privacidade") },
-        text = { Text("As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.\n\nO texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais são mantidos para evitar o reprocessamento do mesmo evento.\n\nO CSV contém os lançamentos confirmados. O backup criptografado também inclui pendências e planejamento; o arquivo e a senha ficam sob responsabilidade do usuário. O bloqueio da interface não criptografa o banco local.\n\nOs dados locais são removidos ao desinstalar ou usar a opção de apagar. A recuperação depende de um backup válido e da senha original.") },
+        text = { Text(modifier = Modifier.verticalScroll(rememberScrollState()), text = "As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.\n\nO texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais são mantidos para evitar o reprocessamento do mesmo evento.\n\nO CSV contém os lançamentos confirmados. O backup criptografado também inclui pendências e planejamento; o arquivo e a senha ficam sob responsabilidade do usuário. O bloqueio da interface não criptografa o banco local.\n\nOs dados locais são removidos ao desinstalar ou usar a opção de apagar. A recuperação depende de um backup válido e da senha original.") },
         confirmButton = { TextButton(onClick = { privacy = false }) { Text("Entendi") } })
 }
 
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = content)
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
     }
 }
 
@@ -143,12 +157,12 @@ fun DisclosureDialog(onDismiss: () -> Unit, onAccept: () -> Unit) {
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Para sugerir receitas e despesas, o Controle Financeiro acessa o título e o texto das notificações dos aplicativos selecionados, inclusive quando esta tela está fechada.")
-                Text("A autorização do Android permite acesso amplo às notificações. Dentro do aplicativo, apenas as origens escolhidas são processadas. Você pode alterar a seleção ou desligar a captura a qualquer momento.")
+                Text("A autorização do Android permite acesso amplo às notificações. Dentro do aplicativo, apenas as origens escolhidas são processadas. A seleção pode ser alterada e a captura desativada a qualquer momento.")
                 Text("As pendências são armazenadas e interpretadas neste aparelho. Nenhum texto bancário é transmitido. Mensagens identificadas como autenticação são descartadas. O texto original é apagado ao confirmar ou ignorar a pendência.")
-                Text("Você revisa os dados antes de criar qualquer lançamento. Recusar a captura permite continuar usando o cadastro manual.")
+                Text("A revisão e a confirmação são obrigatórias antes de criar qualquer lançamento. Recusar a captura permite continuar usando o cadastro manual.")
             }
         },
-        confirmButton = { TextButton(onClick = onAccept) { Text("Concordar e continuar") } },
+        confirmButton = { FilledTonalButton(onClick = onAccept) { Text("Concordar e continuar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Agora não") } })
 }
 
@@ -156,11 +170,11 @@ fun DisclosureDialog(onDismiss: () -> Unit, onAccept: () -> Unit) {
 fun AppPickerDialog(apps: List<SelectableApp>, loading: Boolean, selected: Set<String>, onDismiss: () -> Unit, onSave: (Set<String>) -> Unit) {
     var selection by remember { mutableStateOf(selected.toSet()) }
     var search by remember { mutableStateOf("") }
-    val visible = apps.filter { it.label.contains(search, true) || it.packageName.contains(search, true) }
+    val visible = remember(apps, search) { apps.filter { it.label.contains(search, true) || it.packageName.contains(search, true) } }
     AlertDialog(onDismissRequest = onDismiss, title = { DialogSystemBars(); Text("Bancos e carteiras") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Selecione as origens que deseja acompanhar. A lista mostra aplicativos com ícone de abertura disponíveis neste perfil do Android.", style = MaterialTheme.typography.bodySmall)
+                Text("As origens podem ser selecionadas abaixo. A lista mostra aplicativos com ícone de abertura disponíveis neste perfil do Android.", style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(search, { search = it.take(80) }, label = { Text("Buscar aplicativo") }, singleLine = true)
                 Text("${selection.size} selecionado(s)", style = MaterialTheme.typography.labelMedium)
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -179,4 +193,12 @@ fun AppPickerDialog(apps: List<SelectableApp>, loading: Boolean, selected: Set<S
         },
         confirmButton = { TextButton(onClick = { onSave(selection) }, enabled = !loading) { Text("Salvar seleção") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
+}
+
+@Composable
+private fun SettingsHeading(title: String, icon: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        IconBadge(icon)
+        Text(title, style = MaterialTheme.typography.titleMedium)
+    }
 }

@@ -9,3 +9,7 @@ Os arquivos `gradlew`, `gradlew.bat` e `gradle/wrapper/gradle-wrapper.jar` perte
 ## Dependências
 
 Kotlin, Coroutines, AndroidX/Compose e Room são utilizados por meio de dependências declaradas no Gradle. Suas licenças permanecem aplicáveis. A documentação registra os projetos consultados como referência de produto e de uso de APIs.
+
+## Material Icons Round
+
+Os ícones de interface são recursos vetoriais do Google Material Icons Round, sob Apache-2.0. Os paths oficiais foram convertidos de SVG para VectorDrawable, sem redesenho. A licença integral consta em `licenses/material-icons-LICENSE.txt`; a origem e a revisão de cada recurso estão em `docs/icones-material.json`. O símbolo do aplicativo permanece próprio.

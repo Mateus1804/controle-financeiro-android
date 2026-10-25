@@ -17,9 +17,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -27,6 +24,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.R
+import com.mateuswilliam.financas.core.Movement
 import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.core.CaptureIssue
 import com.mateuswilliam.financas.core.ExpenseFilter
@@ -91,8 +89,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var permissionVersion by remember { mutableIntStateOf(0) }
     val seen = rememberSaveable { arrayListOf<String>() }
     val context = LocalContext.current
-    val density = LocalDensity.current
-    val compactNavigation = density.fontScale > 1.15f && with(density) { LocalWindowInfo.current.containerSize.width.toDp() } < 480.dp
+    var manualMovement by rememberSaveable { mutableStateOf(Movement.EXPENSE) }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val hasAccess = remember(resumeCount, permissionVersion, connected) { hasCaptureAccess(context) }
@@ -136,7 +133,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     fun finishReview(id: String) { reviewCompleted++; editing = false; reviewAfter = id }
     fun finishSession() { reviewAfter = null; seen.addAll(state.pending.map { it.id }); reviewIds = emptyList(); tab = 1 }
     fun openPlanning() { if (tab != 4) planningReturn = tab; tab = 4 }
-    fun openManual() { selectedDraftId = null; selectedRecordId = null; selectedRecurringId = null; expectedRevision = null; reviewAfter = null; editing = true }
+    fun openManual(movement: Movement = Movement.EXPENSE) { manualMovement = movement; selectedDraftId = null; selectedRecordId = null; selectedRecurringId = null; expectedRevision = null; reviewAfter = null; editing = true }
     BackHandler(tab == 4 && !editing) { tab = planningReturn }
 
     val captureIssue = CaptureIssue.evaluate(state.settings.consented, state.settings.enabled, state.settings.packages.isNotEmpty(), hasAccess, connected)
@@ -176,35 +173,32 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = { if (compactNavigation) NewRecordAction(::openManual) },
+        floatingActionButton = { NewRecordAction { openManual() } },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest, tonalElevation = 0.dp) {
                 val labels = listOf("Resumo", "Revisar", "Extrato", "Ajustes")
                 val icons = listOf(R.drawable.ic_overview, R.drawable.ic_pending, R.drawable.ic_records, R.drawable.ic_settings)
                 labels.forEachIndexed { index, label ->
-                    if (index == 2 && !compactNavigation) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        NewRecordAction(::openManual)
-                    }
                     NavigationBarItem(selected = tab == index, onClick = { tab = index },
                         colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                             selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.onSurface),
                         icon = { if (index == 1 && state.pending.isNotEmpty()) BadgedBox(badge = { Badge { Text(state.pending.size.toString()) } }) {
                             AppIcon(icons[index])
-                        } else AppIcon(icons[index]) }, label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) })
+                        } else AppIcon(icons[index]) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
                 }
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding).padding(bottom = if (compactNavigation) 80.dp else 0.dp), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             Box(Modifier.widthIn(max = 840.dp).fillMaxSize()) {
                 when (tab) {
                     0 -> DashboardScreen(state, month, { monthString = it.toString() },
                         { model.preferences.hideAmounts(!state.settings.hideAmounts) },
-                        { tab = 1 }, { categoryFilter = it; expenseDimension = null; tab = 2 },
+                        { tab = 1 },
                         onExpenseGroup = { categoryFilter = null; expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; tab = 2 },
                         notice = if (state.loaded && captureIssue != CaptureIssue.READY && state.settings.dismissedCondition != captureIssue.name) {
                             { CaptureNotice(captureIssue, ::resolveCapture) { model.preferences.dismissCaptureNotice(captureIssue.name) } }
-                        } else null, onPlanning = ::openPlanning)
+                        } else null, onPlanning = ::openPlanning, onNew = ::openManual)
                     1 -> PendingScreen(state.pending, state.settings.hideAmounts, ::openDraft, { model.dismiss(it) }, busy)
                     2 -> RecordsScreen(state.records, month, { monthString = it.toString() }, state.settings.hideAmounts,
                         categoryFilter, { categoryFilter = it }, { selectedRecordId = it.id; selectedDraftId = null; selectedRecurringId = null; expectedRevision = null; editing = true },
@@ -245,7 +239,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             onIgnore = draft?.let { current -> { model.dismiss(current.id) { finishReview(current.id) } } },
             onDelete = record?.let { current -> { model.delete(current.id) } },
             accounts = state.accounts, lastOrigin = state.settings.lastOrigin.ifBlank { state.records.firstOrNull()?.bank.orEmpty() }, onAddAccount = model::addAccount,
-            preset = recurringPreset, duplicateIndex = duplicateIndex, hideAmounts = state.settings.hideAmounts,
+            preset = recurringPreset, initialMovement = manualMovement, duplicateIndex = duplicateIndex, hideAmounts = state.settings.hideAmounts,
             reviewProgress = if (draft != null) "Revisão ${reviewIds.indexOf(draft.id) + 1} de ${reviewIds.size}" else null,
             newPendingCount = if (draft != null) newPendingCount else 0,
             notificationChanged = draft != null && expectedRevision != draft.revision,
@@ -285,7 +279,8 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
 
 @Composable
 private fun NewRecordAction(onClick: () -> Unit) {
-    FloatingActionButton(onClick = onClick, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
+    FloatingActionButton(onClick = onClick, containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = MaterialTheme.shapes.medium, elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)) {
         AppIcon(R.drawable.ic_add, description = "Novo lançamento")
     }
 }

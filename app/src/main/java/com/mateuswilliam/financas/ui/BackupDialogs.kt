@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
+import com.mateuswilliam.financas.R
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,6 +35,7 @@ fun BackupPasswordDialog(creating: Boolean, busy: Boolean, onDismiss: () -> Unit
         title = { DialogSystemBars(); Text(if (creating) "Criar backup criptografado" else "Abrir backup") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconBadge(if (creating) R.drawable.ic_backup else R.drawable.ic_lock)
                 Text(if (creating) "O arquivo inclui lançamentos, pendências, contas, orçamentos e recorrências. Use uma senha longa e exclusiva. Sem essa senha, o backup não pode ser recuperado."
                     else "A senha será usada somente para abrir este arquivo. Os dados locais só serão substituídos após a conferência em uma base temporária e a confirmação da prévia.")
                 OutlinedTextField(password, { password = it.take(256) }, label = { Text("Senha do backup") }, singleLine = true,
@@ -46,7 +48,7 @@ fun BackupPasswordDialog(creating: Boolean, busy: Boolean, onDismiss: () -> Unit
                 Text("A senha não é salva no aplicativo. O destino é escolhido pelo seletor de arquivos do Android.", style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(enabled = !busy, onClick = {
+        confirmButton = { FilledTonalButton(enabled = !busy, onClick = {
             attempted = true
             if (error == null) { val secret = password.toCharArray(); password = ""; repeated = ""; onConfirm(secret) }
         }) { Text(if (creating) "Preparar backup" else "Conferir backup") } },
@@ -59,6 +61,7 @@ fun BackupPreviewDialog(preview: StagedRestore, busy: Boolean, onCancel: () -> U
     AlertDialog(onDismissRequest = { if (!busy) onCancel() }, modifier = Modifier.testTag("restore-preview-dialog"), properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
         title = { DialogSystemBars(); Text("Conferir restauração") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconBadge(R.drawable.ic_restore)
             Text("Backup de ${shortDate(preview.createdAt)} conferido em uma base temporária.")
             Text("${preview.records} lançamentos · ${preview.pending} pendências · ${preview.accounts} contas cadastradas\n${preview.budgets} orçamentos · ${preview.recurring} recorrências")
             Text("A restauração substitui os dados financeiros locais. Crie um backup atual antes de continuar. Captura e lembretes ficam pausados; consentimento e permissões do Android não são transferidos.")
@@ -67,6 +70,6 @@ fun BackupPreviewDialog(preview: StagedRestore, busy: Boolean, onCancel: () -> U
                 Text("Substituir os dados locais por este backup", Modifier.weight(1f).padding(top = 8.dp))
             }
         } },
-        confirmButton = { TextButton(onClick = onRestore, enabled = confirmed && !busy) { Text(if (busy) "Restaurando…" else "Restaurar backup") } },
+        confirmButton = { FilledTonalButton(onClick = onRestore, enabled = confirmed && !busy) { Text(if (busy) "Restaurando…" else "Restaurar backup") } },
         dismissButton = { TextButton(onClick = onCancel, enabled = !busy) { Text("Cancelar") } })
 }

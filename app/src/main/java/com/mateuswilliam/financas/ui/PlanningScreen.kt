@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
+import com.mateuswilliam.financas.R
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -43,9 +44,9 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     val zone = ZoneId.systemDefault()
     val usage = remember(state.records, state.budgets, month, zone) { Budgets.usage(state.records, state.budgets, month, zone) }
     val hidden = state.settings.hideAmounts
-    LazyColumn(Modifier.testTag("planning-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(Modifier.testTag("planning-list"), contentPadding = PaddingValues(FinanceSpacing.page, 20.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            TextButton(onClick = onBack) { Text("Voltar") }
+            TextButton(onClick = onBack) { AppIcon(R.drawable.ic_chevron_left); Text("Voltar") }
             SectionTitle("Planejamento", "Previsões e limites; os totais incluem apenas lançamentos confirmados")
         }
         item { MonthPicker(month, onMonth) }
@@ -55,9 +56,9 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
         }
         if (usage.isEmpty()) item { EmptyCard("Sem limites neste mês", "O cadastro de um limite organiza o acompanhamento e não modifica os lançamentos.") }
         items(usage, key = { "budget:${it.budget.month}:${it.budget.category}" }) { item ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(item.budget.category.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                Column(Modifier.fillMaxWidth().padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { IconBadge(categoryIcon(item.budget.category)); Text(item.budget.category.label, style = MaterialTheme.typography.titleMedium) }
                     Text(if (hidden) "Gasto e limite ocultos" else "${Money.format(item.spentCents)} de ${Money.format(item.budget.limitCents)}")
                     if (!hidden) {
                         LinearProgressIndicator(progress = { (item.spentCents.toDouble() / item.budget.limitCents).toFloat().coerceIn(0f, 1f) },
@@ -78,11 +79,11 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
         }
         if (state.recurring.isEmpty()) item { EmptyCard("Nenhuma recorrência cadastrada", "O vencimento pode ser lembrado sem criar pagamentos ou receitas automaticamente.") }
         items(state.recurring, key = { "recurring:${it.id}" }) { plan ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(plan.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+                Column(Modifier.fillMaxWidth().padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(privateDisplayText(plan.title, hidden), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("${plan.movement.label} prevista · ${formatDate(plan.nextDate)}${if (!plan.active) " · pausada" else ""}")
-                    Text("${plan.bank} · ${plan.category.label}", style = MaterialTheme.typography.bodySmall)
+                    Text("${privateDisplayText(plan.bank, hidden)} · ${plan.category.label}", style = MaterialTheme.typography.bodySmall)
                     Amount(plan.amountCents, hidden)
                     OutlinedButton(onClick = { onConfirmRecurring(plan) }, enabled = !busy && plan.active, modifier = Modifier.fillMaxWidth()) { Text("Conferir e registrar") }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -94,8 +95,8 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
             }
         }
         item {
-            Card {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Column(Modifier.fillMaxWidth().padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Lembretes de vencimentos", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         Switch(state.settings.remindersEnabled, onReminders, modifier = Modifier.semantics { contentDescription = "Lembretes de vencimentos" })
@@ -110,11 +111,11 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
         }
     }
     if (budgetEditor) key(budgetCategory, month) {
-        BudgetEditor(state.budgets.find { it.month == month.toString() && it.category == budgetCategory }, month, busy,
+        BudgetEditor(state.budgets.find { it.month == month.toString() && it.category == budgetCategory }, month, busy, hidden,
             onDismiss = { budgetEditor = false }, onSave = { onBudget(it) { budgetEditor = false } })
     }
     if (recurringEditor) key(recurringId) {
-        RecurringEditor(state.recurring.find { it.id == recurringId }, state.accounts, state.settings.lastOrigin, busy,
+        RecurringEditor(state.recurring.find { it.id == recurringId }, state.accounts, state.settings.lastOrigin, busy, hidden,
             onDismiss = { recurringEditor = false }, onSave = { onRecurring(it) { recurringEditor = false } }, onAddAccount = onAddAccount)
     }
     val plan = state.recurring.find { it.id == skipping }
@@ -125,7 +126,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
 }
 
 @Composable
-private fun BudgetEditor(existing: MonthlyBudget?, month: YearMonth, busy: Boolean, onDismiss: () -> Unit, onSave: (MonthlyBudget) -> Unit) {
+private fun BudgetEditor(existing: MonthlyBudget?, month: YearMonth, busy: Boolean, hidden: Boolean, onDismiss: () -> Unit, onSave: (MonthlyBudget) -> Unit) {
     var category by rememberSaveable { mutableStateOf(existing?.category ?: Category.FOOD) }
     val amount = rememberTextFieldState(initialText = existing?.limitCents?.let(MoneyInput::fromCents).orEmpty())
     var invalid by rememberSaveable { mutableStateOf(false) }
@@ -136,15 +137,15 @@ private fun BudgetEditor(existing: MonthlyBudget?, month: YearMonth, busy: Boole
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("O limite vale para ${month.format(DateTimeFormatter.ofPattern("MM/yyyy"))}. Salvar uma categoria já cadastrada atualiza o limite desse mês.")
             ChoiceField("Categoria do orçamento", category, Category.entries.toList(), { it.label }) { category = it }
-            MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalid = it })
+            PrivateValueGate(hidden, "Mostrar valor para edição") { MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalid = it }) }
             if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error)
         } },
-        confirmButton = { TextButton(enabled = !busy, onClick = { attempted = true; if (error == null) onSave(budget) }) { Text("Salvar limite") } },
+        confirmButton = { FilledTonalButton(enabled = !busy, onClick = { attempted = true; if (error == null) onSave(budget) }) { Text("Salvar limite") } },
         dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("Cancelar") } })
 }
 
 @Composable
-private fun RecurringEditor(existing: RecurringPlan?, accounts: List<AccountOption>, lastOrigin: String, busy: Boolean,
+private fun RecurringEditor(existing: RecurringPlan?, accounts: List<AccountOption>, lastOrigin: String, busy: Boolean, hidden: Boolean,
     onDismiss: () -> Unit, onSave: (RecurringPlan) -> Unit, onAddAccount: suspend (String) -> String) {
     val id = rememberSaveable { existing?.id ?: UUID.randomUUID().toString() }
     var title by rememberSaveable { mutableStateOf(existing?.title.orEmpty()) }
@@ -165,12 +166,12 @@ private fun RecurringEditor(existing: RecurringPlan?, accounts: List<AccountOpti
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { DialogSystemBars(); Text("Previsão mensal") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Cada vencimento depende de confirmação. A previsão não modifica os lançamentos nem o resultado mensal.")
-            OutlinedTextField(title, { title = it.take(200) }, label = { Text("Descrição da previsão") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done))
-            MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalid = it })
+            PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição para edição") { OutlinedTextField(title, { title = it.take(200) }, label = { Text("Descrição da previsão") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)) }
+            PrivateValueGate(hidden, "Mostrar valor para edição") { MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalid = it }) }
             ChoiceField("Tipo previsto", movement, listOf(Movement.EXPENSE, Movement.INCOME), { it.label }) { movement = it }
             ChoiceField("Meio previsto", method, PaymentMethod.entries.toList(), { it.label }) { method = it }
             ChoiceField("Categoria prevista", category, Category.entries.toList(), { it.label }) { category = it }
-            AccountPickerField("Conta da previsão", bank, accounts, { bank = it }, onAddAccount)
+            AccountPickerField("Conta da previsão", bank, accounts, { bank = it }, onAddAccount, hidden = hidden)
             OutlinedButton(onClick = {
                 val selected = LocalDate.parse(date)
                 showFinanceDatePicker(context, theme, selected) { date = it.toString() }
@@ -178,7 +179,7 @@ private fun RecurringEditor(existing: RecurringPlan?, accounts: List<AccountOpti
             Text("Repetição mensal no dia $day. Meses mais curtos usam o último dia, mantendo o dia original para o próximo mês.", style = MaterialTheme.typography.bodySmall)
             if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error)
         } },
-        confirmButton = { TextButton(enabled = !busy, onClick = { attempted = true; if (error == null) onSave(plan) }) { Text("Salvar previsão") } },
+        confirmButton = { FilledTonalButton(enabled = !busy, onClick = { attempted = true; if (error == null) onSave(plan) }) { Text("Salvar previsão") } },
         dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("Cancelar") } })
 }
 

@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,70 +72,117 @@ fun AppIcon(@DrawableRes icon: Int, modifier: Modifier = Modifier, description: 
 
 @Composable
 fun SectionTitle(title: String, subtitle: String? = null) {
-    Column(Modifier.padding(top = 8.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+    Column(Modifier.padding(top = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge)
         if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 fun EmptyCard(title: String, message: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(24.dp)) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shape = MaterialTheme.shapes.large) {
+        Column(Modifier.fillMaxWidth().padding(FinanceSpacing.large), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconBadge(R.drawable.ic_records)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
+fun IconBadge(@DrawableRes icon: Int, color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary) {
+    Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(color.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
+        Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+    }
+}
+
+@DrawableRes
+fun categoryIcon(category: com.mateuswilliam.financas.core.Category): Int = when (category) {
+    com.mateuswilliam.financas.core.Category.FOOD -> R.drawable.ic_food
+    com.mateuswilliam.financas.core.Category.HOME -> R.drawable.ic_home
+    com.mateuswilliam.financas.core.Category.TRANSPORT -> R.drawable.ic_transport
+    com.mateuswilliam.financas.core.Category.HEALTH -> R.drawable.ic_health
+    com.mateuswilliam.financas.core.Category.EDUCATION -> R.drawable.ic_education
+    com.mateuswilliam.financas.core.Category.LEISURE -> R.drawable.ic_leisure
+    else -> R.drawable.ic_category
+}
+
+@Composable
+fun movementColor(movement: Movement): androidx.compose.ui.graphics.Color = when (movement) {
+    Movement.INCOME -> LocalFinanceColors.current.income
+    Movement.EXPENSE -> LocalFinanceColors.current.expense
+    Movement.TRANSFER -> MaterialTheme.colorScheme.secondary
+    Movement.REFUND -> MaterialTheme.colorScheme.tertiary
+    Movement.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+@DrawableRes
+fun movementIcon(movement: Movement): Int = when (movement) {
+    Movement.INCOME -> R.drawable.ic_income
+    Movement.EXPENSE -> R.drawable.ic_expense
+    Movement.TRANSFER -> R.drawable.ic_transfer
+    Movement.REFUND -> R.drawable.ic_refund
+    Movement.UNKNOWN -> R.drawable.ic_pending
+}
+
+// A formatação é apenas visual. Cálculos e persistência continuam em centavos inteiros.
+@Composable
 fun Amount(cents: Long, hidden: Boolean, modifier: Modifier = Modifier, size: Int = 20) {
-    Text(if (hidden) "••••" else Money.format(cents), modifier, fontSize = size.sp, fontWeight = FontWeight.SemiBold)
+    androidx.compose.foundation.text.BasicText(
+        text = if (hidden) "••••" else Money.format(cents), modifier = modifier,
+        style = LocalTextStyle.current.copy(color = LocalContentColor.current, fontSize = size.sp,
+            lineHeight = (size * 1.25f).sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
+        maxLines = 2,
+        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = minOf(size, 14).sp,
+            maxFontSize = size.sp, stepSize = 1.sp),
+    )
 }
 
 @Composable
 fun RecordRow(record: Record, hidden: Boolean, onEdit: (() -> Unit)? = null) {
-    val color = when (record.movement) {
-        Movement.EXPENSE -> MaterialTheme.colorScheme.error
-        Movement.TRANSFER -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.tertiary
-    }
-    val clickable = if (onEdit != null) Modifier.clickable(onClick = onEdit) else Modifier
-    Row(Modifier.fillMaxWidth().then(clickable).heightIn(min = 48.dp).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(color.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-            Icon(painterResource(when (record.movement) {
-                Movement.EXPENSE -> R.drawable.ic_expense
-                Movement.TRANSFER -> R.drawable.ic_transfer
-                else -> R.drawable.ic_income
-            }), contentDescription = null, tint = color)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(record.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text("${record.bank} · ${record.category.label}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${record.movement.label} · ${shortDate(record.occurredAt)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Amount(record.amountCents, hidden, size = 15)
-            if (onEdit != null) TextButton(onClick = onEdit, contentPadding = PaddingValues(horizontal = 6.dp)) { Text("Editar", style = MaterialTheme.typography.labelSmall) }
-        }
-    }
+    val color = movementColor(record.movement)
+    val largeText = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.25f
+    val clickable = if (onEdit != null) Modifier.clickable(onClickLabel = "Editar lançamento", onClick = onEdit) else Modifier
+    ListItem(
+        modifier = Modifier.fillMaxWidth().then(clickable).heightIn(min = 80.dp),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        leadingContent = { IconBadge(if (record.movement == Movement.TRANSFER) R.drawable.ic_transfer else categoryIcon(record.category), color) },
+        headlineContent = { Text(privateDisplayText(record.description, hidden), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium) },
+        supportingContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("${privateDisplayText(record.bank, hidden)} · ${shortDate(record.occurredAt)}", style = MaterialTheme.typography.bodySmall)
+                Text("${record.movement.label} · ${record.category.label}", style = MaterialTheme.typography.labelSmall)
+                if (largeText) CompositionLocalProvider(LocalContentColor provides color) { Amount(record.amountCents, hidden, size = 18) }
+            }
+        },
+        trailingContent = if (!largeText) {{
+            Column(Modifier.widthIn(max = 132.dp), horizontalAlignment = Alignment.End) {
+                CompositionLocalProvider(LocalContentColor provides color) { Amount(record.amountCents, hidden, size = 17) }
+                if (onEdit != null) TextButton(onClick = onEdit, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Editar", style = MaterialTheme.typography.labelSmall) }
+            }
+        }} else if (onEdit != null) {{ AppIcon(R.drawable.ic_chevron_right) }} else null,
+    )
 }
+
+// Superfícies adjacentes compartilham o mesmo fundo sem divisórias ou cartões aninhados.
+fun groupedShape(index: Int, count: Int): RoundedCornerShape = RoundedCornerShape(
+    topStart = if (index == 0) 24.dp else 0.dp, topEnd = if (index == 0) 24.dp else 0.dp,
+    bottomStart = if (index == count - 1) 24.dp else 0.dp, bottomEnd = if (index == count - 1) 24.dp else 0.dp)
 
 @Composable
 fun CategoryBar(label: String, cents: Long, maximum: Long, hidden: Boolean, onClick: (() -> Unit)? = null) {
     Surface(modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-        color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(16.dp)) {
-        Column(Modifier.fillMaxWidth().padding(12.dp).semantics {
-            contentDescription = if (hidden) "$label, valor oculto" else "$label, ${Money.format(cents)}" + if (onClick != null) ". Toque para ver os lançamentos." else ""
-        }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(label, style = MaterialTheme.typography.bodyMedium)
-                Amount(cents, hidden, size = 14)
+        color = MaterialTheme.colorScheme.surfaceContainerLowest, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                Amount(cents, hidden, Modifier.widthIn(max = 168.dp), size = 16)
             }
-            LinearProgressIndicator(
+            if (!hidden) LinearProgressIndicator(
                 progress = { (cents.toDouble() / maximum.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(7.dp),
-                color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth().height(6.dp).clearAndSetSemantics {},
+                color = if (label.startsWith("Receita")) LocalFinanceColors.current.income else LocalFinanceColors.current.expense,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             )
         }
     }
