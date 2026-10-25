@@ -26,4 +26,18 @@ class AccountCatalogTest {
         assertEquals(listOf("Banco", "Carteira"), AccountCatalog.options(emptyList(), listOf(record("Banco", "Carteira"))).map { it.label })
         assertTrue(AccountCatalog.options(emptyList(), listOf(record("  "))).isEmpty())
     }
+    @Test fun `projecao leve preserva rotulo cadastrado recencia e contas distintas`() {
+        val options = AccountCatalog.merge(listOf(AccountOption("inter pessoal", "Inter pessoal", 1)), listOf(
+            AccountOption("", "  INTER\u00a0pessoal ", 30), AccountOption("", "Inter trabalho", 20),
+            AccountOption("", "Carteira", 30), AccountOption("", " ", 100),
+        ))
+        assertEquals(listOf("Carteira", "Inter pessoal", "Inter trabalho"), options.map { it.label })
+        assertEquals(listOf(30L, 30L, 20L), options.map { it.lastUsedAt })
+    }
+    @Test fun `catalogo de nomes projetados equivale ao historico completo`() {
+        val history = listOf(record("Inter pessoal", "Carteira", 30), record("Inter trabalho", time = 20))
+        val projected = history.flatMap { listOf(AccountOption("", it.bank, it.occurredAt), AccountOption("", it.destination, it.occurredAt)) }
+        assertEquals(AccountCatalog.options(emptyList(), history), AccountCatalog.merge(emptyList(), projected))
+    }
+
 }

@@ -121,3 +121,11 @@ A ativação ou desativação do bloqueio só é apresentada como salva após co
 ## Navegação com fonte ampliada
 
 Em telas estreitas com fonte ampliada, a barra inferior mantém quatro destinos e o botão de novo lançamento passa para uma área reservada acima dela. O conteúdo recebe espaço próprio para impedir sobreposição de valores e ações. A navegação usual mantém o botão central nas demais configurações. Os rótulos permanecem em uma linha, com texto completo na semântica, e o teste em 150% confere que Resumo não foi quebrado nem abreviado. Os ícones das barras do Android também são sincronizados na retomada e no retorno do foco da janela.
+
+## Histórico crescente e recuperação
+
+O esquema 4 utiliza índices compostos que correspondem à ordenação do histórico e ao filtro de pendências. A migração 3→4 somente cria índices. O identificador desempata datas iguais de maneira estável. A validação inspeciona `EXPLAIN QUERY PLAN` e usa cinco mil registros fictícios; não promete um limite de desempenho para qualquer aparelho.
+
+O estado da interface recebe o histórico e os candidatos manuais na mesma emissão. Isso elimina uma observação completa independente. O catálogo de contas consulta apenas nomes e datas agregados por SQL e continua normalizando espaços e caixa em Kotlin, sem alterar os nomes históricos ou confundir contas distintas do mesmo banco. As contas cadastradas mantêm preferência de apresentação.
+
+A lista de candidatos à duplicidade continua cobrindo o histórico manual, inclusive quando a proposta é editada. Não foi introduzido um filtro SQL pelo valor original da notificação, pois esse filtro perderia correspondências após edição. Paginação completa e busca por período ficam para uma etapa orientada por medições; as telas e a exportação ainda podem carregar o histórico inteiro.

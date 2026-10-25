@@ -52,11 +52,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val message = MutableStateFlow<String?>(null)
     val apps = MutableStateFlow<List<SelectableApp>>(emptyList())
     val loadingApps = MutableStateFlow(false)
-    private val baseState = combine(repository.records, repository.pending, preferences.state, repository.accounts) { records, drafts, settings, accounts ->
-        FinanceState(records, drafts, settings, loaded = true, accounts = accounts)
+    private val baseState = combine(repository.ledger, repository.pending, preferences.state, repository.accounts) { ledger, drafts, settings, accounts ->
+        FinanceState(ledger.records, drafts, settings, loaded = true, accounts = accounts, manualRecords = ledger.manualRecords)
     }
-    val state = combine(baseState, repository.manualRecords, repository.budgets, repository.recurring) { base, manual, budgets, recurring ->
-        base.copy(manualRecords = manual, budgets = budgets, recurring = recurring)
+    val state = combine(baseState, repository.budgets, repository.recurring) { base, budgets, recurring ->
+        base.copy(budgets = budgets, recurring = recurring)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
     val stagedRestore = MutableStateFlow<StagedRestore?>(null)
     private var encryptedBackup: ByteArray? = null

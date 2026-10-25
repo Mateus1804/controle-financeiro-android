@@ -93,3 +93,9 @@ Os recursos de teste contêm exemplos sintéticos identificados. Notificações 
 Os testes automatizados conferem política de sessão, persistência, bloqueio da interface, links de notificação e flags das janelas. O teste de inspeção das janelas nativas exige API 29 ou superior; a execução de referência utiliza Android 15. A confirmação biométrica ou por PIN, a revogação da credencial e o comportamento do seletor precisam de testes manuais em aparelho configurado.
 
 A proteção pode ser avaliada em **Ajustes → Autenticar ao abrir**. O recurso depende de PIN, padrão ou senha no Android. A opção de ocultar a imagem também impede capturas e compartilhamento de tela; capturas públicas de evidência utilizam emulador e dados fictícios, com essa opção desativada. A documentação não deve apresentar uma tela capturada nessas condições como comprovação de proteção contra capturas.
+
+## Assinatura, compatibilidade e evidência privada
+
+A preparação de versões, variáveis de assinatura e matriz de atualização estão descritas em [Atualizações assinadas](atualizacoes.md). O CI usa somente chave descartável e bases fictícias. Os arquivos de backup congelados e a migração 3→4 possuem testes separados.
+
+A avaliação local das notificações reais utiliza `:core:validateBankEvidence -PbankEvidenceDirectory=casos-locais`, conforme [Validação bancária](validacao-bancaria.md). A execução exige amostras anonimizadas e metadados efetivos; não utiliza os exemplos sintéticos como comprovação de captura real.

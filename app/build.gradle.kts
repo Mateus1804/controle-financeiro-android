@@ -7,6 +7,23 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val signingEnvironment = listOf("ANDROID_KEYSTORE_PATH", "ANDROID_KEYSTORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD")
+    .associateWith { providers.environmentVariable(it).orNull }
+val releaseVersionCode = providers.gradleProperty("appVersionCode").orElse("2").get().toIntOrNull()
+    ?: throw GradleException("appVersionCode precisa ser um inteiro.")
+require(releaseVersionCode >= 2) { "appVersionCode precisa ser maior que o da versão anterior (1)." }
+val releaseVersionName = providers.gradleProperty("appVersionName").orElse("0.2.0").get()
+require(releaseVersionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:[-.][A-Za-z0-9.]+)?"))) { "appVersionName precisa identificar uma versão, por exemplo 0.2.0." }
+
+val validateReleaseSigning by tasks.registering {
+    doLast {
+        check(signingEnvironment.values.all { !it.isNullOrBlank() }) {
+            "Configure ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD fora do repositório. A assinatura debug não substitui a chave definitiva."
+        }
+        check(file(signingEnvironment.getValue("ANDROID_KEYSTORE_PATH")!!).isFile) { "Keystore de assinatura indisponível." }
+    }
+}
+
 android {
     namespace = "com.mateuswilliam.financas"
     compileSdk = 36
@@ -14,10 +31,21 @@ android {
         applicationId = "com.mateuswilliam.financas"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
         testInstrumentationRunner = "com.mateuswilliam.financas.IsolatedAndroidTestRunner"
     }
+    signingConfigs {
+        create("release") {
+            if (signingEnvironment.values.all { !it.isNullOrBlank() }) {
+                storeFile = file(signingEnvironment.getValue("ANDROID_KEYSTORE_PATH")!!)
+                storePassword = signingEnvironment["ANDROID_KEYSTORE_PASSWORD"]
+                keyAlias = signingEnvironment["ANDROID_KEY_ALIAS"]
+                keyPassword = signingEnvironment["ANDROID_KEY_PASSWORD"]
+            }
+        }
+    }
+    buildTypes.getByName("release") { signingConfig = signingConfigs.getByName("release") }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -28,6 +56,8 @@ android {
     sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(validateReleaseSigning) }
 
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 

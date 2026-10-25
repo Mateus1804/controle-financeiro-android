@@ -35,7 +35,7 @@ class PlanningMigrationTest {
             execSQL("INSERT INTO accounts VALUES ('inter pessoal', 'Inter pessoal', 1792800000000)")
             close()
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_2_3).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4).build()
         try {
             val dao = database.financeDao()
             assertEquals(4290L, dao.allRecords().single().amountCents)
@@ -44,7 +44,7 @@ class PlanningMigrationTest {
             assertTrue(dao.allRecurring().isEmpty()); assertTrue(dao.allOccurrences().isEmpty())
             dao.upsertBudget(BudgetEntity("2026-10", Category.FOOD, 10000))
             assertEquals(10000L, dao.allBudgets().single().limitCents)
-            assertEquals(3, database.openHelper.writableDatabase.version)
+            assertEquals(4, database.openHelper.writableDatabase.version)
         } finally { database.close(); context.deleteDatabase(name) }
     }
 }

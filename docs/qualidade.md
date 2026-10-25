@@ -65,3 +65,11 @@ As evidências completas, os APKs e os relatórios permanecem nos artefatos do G
 - A criptografia do backup e o bloqueio da interface não criptografam o banco Room. A senha não é recuperável. Limpar buffers e excluir arquivos não garante apagamento físico. O formato não recebeu auditoria criptográfica independente.
 - Contas com saldo inicial, conciliação, faturas, parcelas, metas, nuvem, OCR e integração oficial com Open Finance continuam fora desta entrega. O resultado mensal não é apresentado como saldo bancário conciliado.
 - Assinatura de produção, informações públicas exigidas pela loja e revisão para publicação permanecem pendentes. A análise técnica não representa aprovação da Google Play.
+
+## Revisão de compatibilidade e consultas — 25/10/2026
+
+A referência inicial mantém a suíte anterior de 102 testes do core e 76 instrumentados. A execução Gradle local ficou impedida antes da compilação pela indisponibilidade de acesso a `services.gradle.org`; isso não foi classificado como teste aprovado.
+
+As verificações Python de procedência (cinco regressões), os 25 casos sintéticos, o checksum do Wrapper, os dez pares de contraste, a geração da base fictícia do esquema 3 e a sintaxe dos scripts foram aprovados localmente. Nenhuma notificação bancária real nem chave definitiva foi fornecida.
+
+A execução completa das alterações — testes Kotlin, Android Lint, compilação, assinatura descartável, APIs 26/33/35, restauração do vetor congelado e atualização instalada — deve ser conferida nos jobs do pull request. Esta anotação não antecipa sucesso de tarefas ainda não concluídas.

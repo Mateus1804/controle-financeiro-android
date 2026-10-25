@@ -22,6 +22,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+data class LedgerRecords(val records: List<Record>, val manualRecords: List<Record>)
+
 data class CaptureResult(val id: String, val isNew: Boolean)
 class DraftChangedException : IllegalStateException("A notificação mudou. Abra a pendência novamente para conferir os dados atuais.")
 
@@ -29,9 +31,22 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     private val dao = database.financeDao()
     private val writes = Mutex()
     val pending = dao.pending()
-    val records = dao.records().map { rows -> rows.map { it.toRecord() } }
-    val manualRecords = dao.records().map { rows -> rows.filter { it.sourceDraftId == null }.map { it.toRecord() } }
-    val accounts = combine(dao.accounts(), records) { saved, history -> AccountCatalog.options(saved.map { it.toOption() }, history) }
+    // Uma emissão mantém o extrato e os candidatos manuais na mesma revisão do banco.
+    val ledger = dao.records().map { rows ->
+        val records = ArrayList<Record>(rows.size)
+        val manual = ArrayList<Record>()
+        rows.forEach { row ->
+            val record = row.toRecord()
+            records.add(record)
+            if (row.sourceDraftId == null) manual.add(record)
+        }
+        LedgerRecords(records, manual)
+    }
+    val records = ledger.map { it.records }
+    val manualRecords = ledger.map { it.manualRecords }
+    val accounts = combine(dao.accounts(), dao.usedAccounts()) { saved, used ->
+        AccountCatalog.merge(saved.map { it.toOption() }, used.map { com.mateuswilliam.financas.core.AccountOption("", it.label, it.lastUsedAt) })
+    }
     val budgets = dao.budgets().map { rows -> rows.map { it.toBudget() } }
     val recurring = dao.recurring().map { rows -> rows.map { it.toPlan() } }
 
