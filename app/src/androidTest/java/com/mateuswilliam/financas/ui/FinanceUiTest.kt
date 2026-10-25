@@ -127,8 +127,7 @@ class FinanceUiTest {
         app.database.financeDao().insertDraft(DraftEntity("pendencia-exemplo", "captura-exemplo", "simulacao.local",
             "Banco de exemplo", "EXEMPLO — compra aprovada", "Compra aprovada de R$ 42,90 no supermercado de exemplo.",
             4290, Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Confira os dados sugeridos antes de confirmar.", now, now - 60_000))
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Últimos lançamentos").fetchSemanticsNodes().isNotEmpty() ||
-            rule.onAllNodesWithText("Vamos conferir?").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(5000) { rule.onAllNodesWithText(Money.format(281160)).fetchSemanticsNodes().isNotEmpty() }
         rule.waitForIdle()
         screenshot("resumo")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
@@ -137,9 +136,20 @@ class FinanceUiTest {
         rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
         rule.waitForIdle()
         screenshot("resumo-claro")
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Últimos lançamentos"))
+        screenshot("recentes-claro")
+        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }; rule.waitForIdle()
+        screenshot("recentes-escuro")
+        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
+        screenshot("extrato-escuro")
+        rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }; rule.waitForIdle()
+        screenshot("extrato-claro")
         rule.onNodeWithText("Revisar").performClick()
         rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
         screenshot("pendencias")
+        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }; rule.waitForIdle()
+        screenshot("pendencias-escuro")
+        rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }; rule.waitForIdle()
         rule.onNodeWithTag("review-pendencia-exemplo").performClick()
         rule.onNodeWithText("Conferir movimentação").assertIsDisplayed()
         screenshot("revisao")
@@ -167,6 +177,7 @@ class FinanceUiTest {
     }
 
     @Test fun closedCaptureNoticeStaysClosedAfterRecreation() {
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasContentDescription("Fechar aviso de captura"))
         rule.onNodeWithContentDescription("Fechar aviso de captura").performClick()
         rule.activityRule.scenario.recreate()
         rule.waitUntil(5000) { app.settings.state.value.captureCondition == "CONSENT" }
@@ -404,6 +415,6 @@ class FinanceUiTest {
         rule.waitForIdle()
         val bitmap = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
             ?: error("Não foi possível capturar a tela do emulador.")
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        try { File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } } finally { bitmap.recycle() }
     }
 }
