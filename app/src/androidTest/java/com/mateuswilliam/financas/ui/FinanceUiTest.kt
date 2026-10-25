@@ -252,7 +252,7 @@ class FinanceUiTest {
 
     @Test fun landscapeLayoutKeepsTheFormUsable() {
         try {
-            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
             rule.onNodeWithContentDescription("Novo lançamento").performClick()
             rule.onNodeWithTag("amount-input").performTextInput("1234")
@@ -261,7 +261,7 @@ class FinanceUiTest {
             confirmEntry()
             assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
         } finally {
-            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
         }
     }
 

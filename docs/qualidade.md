@@ -1,5 +1,29 @@
 # Qualidade e validação
 
+## Resultado consolidado — 25/10/2026
+
+A revisão funcional `395029a078b1052b7aa564e4ee5755eeff786b61` concluiu a execução [40202162302](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40202162302) com todos os jobs aprovados. Os resultados abaixo distinguem testes únicos de repetições da mesma suíte em versões diferentes do Android.
+
+| Verificação | Resultado efetivo |
+| --- | --- |
+| Testes Kotlin do core | 104 aprovados; zero falhas, erros ou testes ignorados. |
+| Procedência das notificações | Cinco regressões Python aprovadas; 25 casos sintéticos conferidos; zero amostras reais. |
+| Android API 26 | 81 testes aprovados; nenhum teste ignorado. |
+| Android API 33 | 81 testes aprovados; nenhum teste ignorado. |
+| Android API 35 | 81 testes aprovados; nenhum teste ignorado. |
+| Android API 36 | 81 testes aprovados; nenhum teste ignorado. |
+| Atualização instalada e backup entre APKs | Duas fases aprovadas: exportação no APK anterior e recuperação no APK atualizado. |
+| Android Lint debug e release | Zero erros ou falhas fatais; 14 avisos existentes em cada variante. |
+| Compilação | APK debug, APK de testes, APK release e AAB concluídos. |
+| Assinatura de teste | Ausência de configuração recusada; certificado, identidade, versões, checksums e ausência de depuração do release conferidos. |
+| Migração e histórico | Esquemas 1/2/3 preservados até o 4, índices conferidos pelo plano SQL e cenário com cinco mil registros aprovado. |
+
+As 81 verificações Android são repetidas em quatro ambientes, e não apresentadas como 324 comportamentos diferentes. Os casos de recuperação utilizam dados fictícios. A chave de CI é descartável; a chave definitiva não foi disponibilizada nesta revisão, e o workflow protegido de preparação não foi executado.
+
+Foram inspecionadas capturas do resumo claro e do planejamento escuro da API 26. A inspeção de imagens e os testes automatizados não equivalem a uso em aparelho físico, TalkBack, autenticação biométrica real ou entrega efetiva de notificações bancárias. A interpretação real de Inter, Nubank, PicPay, Mercado Pago e PagBank continua pendente de amostras anonimizadas e avaliação no aparelho.
+
+A consolidação posterior da infraestrutura de teste usa callbacks de ciclo de vida para a rotação, marcadores de etapa e captura com prazo próprio. O [pull request de confiabilidade](https://github.com/Mateus1804/controle-financeiro-android/pull/4) mantém a execução correspondente a essa revisão, separada da referência funcional acima.
+
 ## Referência e falhas anteriores
 
 A primeira entrega teve 31 testes Kotlin e 13 testes Android aprovados na execução [40100369119](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40100369119). A revisão anterior da interface teve 51 testes Kotlin e 41 testes Android aprovados em [40124797196](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40124797196).
@@ -86,10 +110,12 @@ A matriz final também inclui a API 36, correspondente ao SDK alvo do projeto. O
 
 A segunda passagem, [40197319760](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40197319760), aprovou a preparação de APK/AAB release, identidade, certificado e recusa de assinatura ausente. Na API 26, 80 testes passaram a ser executados, restando duas falhas no teste de interação: os itens da grade do DocumentsUI não anunciavam ancestral clicável e a verificação de alertas ainda pressupunha a permissão runtime da API 33. O ajuste usa toque real no item habilitado da grade e verifica a ação de alertas conforme o modelo efetivo de permissão da versão. A recusa runtime de alertas é exercitada nas APIs 33 e superiores; a API 26 verifica o estado global disponível, sem fingir uma permissão inexistente.
 
-Na terceira passagem, [40198183641](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40198183641), as APIs 26 e 33 aprovaram os 80 testes, sem testes ignorados. A API 35 revelou uma corrida no agendamento nativo: uma solicitação atrasada podia recriar o trabalho após o cancelamento. O agendador foi ajustado para ler a preferência vigente dentro de uma operação sincronizada; uma emissão antiga não determina mais o estado aplicado. Um teste com solicitação deliberadamente atrasada verifica que a desativação continua prevalecendo. Essa correção precisa da nova passagem da suíte.
+Na terceira passagem, [40198183641](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40198183641), as APIs 26 e 33 aprovaram os 80 testes, sem testes ignorados. A API 35 revelou uma corrida no agendamento nativo: uma solicitação atrasada podia recriar o trabalho após o cancelamento. O agendador foi ajustado para ler a preferência vigente dentro de uma operação sincronizada; uma emissão antiga não determina mais o estado aplicado. Um teste com solicitação deliberadamente atrasada verifica que a desativação continua prevalecendo. O resultado consolidado dessa correção está registrado no início deste documento.
 
 A mesma terceira passagem aprovou os 80 testes na API 36. O cenário dedicado comprovou a exportação pelo APK anterior (versão 1, esquema 3), a atualização por instalação preservando dados e a restauração daquele arquivo pelo APK atual (versão 2, esquema 4), com uma execução de teste em cada fase. Esses resultados são separados da falha do agendador encontrada na suíte da API 35.
 
 A quarta passagem, [40199499682](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40199499682), aprovou 81 testes nas APIs 26, 33 e 35 após a correção do agendador. Na API 36, a única falha foi um toque antecipado no cadastro de conta durante o reposicionamento provocado pelo teclado: a hierarquia mostrava que o formulário havia sido fechado. O teste passou a aguardar a estabilidade da geometria antes de rolar e tocar o botão. O toque continua sendo físico, e a preservação do valor, a conta escolhida e a confirmação no banco continuam verificadas; não há repetição automática do teste inteiro nem supressão do caso.
 
-A sincronização utiliza espera limitada por condição, conforme a [orientação de testes Compose](https://developer.android.com/develop/ui/compose/testing/synchronization). O relógio Compose não controla as medições externas do teclado do Android. O resultado consolidado corresponde à passagem seguinte do CI.
+A sincronização utiliza espera limitada por condição, conforme a [orientação de testes Compose](https://developer.android.com/develop/ui/compose/testing/synchronization). O relógio Compose não controla as medições externas do teclado do Android. O resultado consolidado consta na tabela inicial.
+
+A quinta passagem, [40201039082](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40201039082), aprovou as APIs 33 e 35. Na API 26, o cadastro de conta concluiu, e a execução permaneceu no último cenário de fonte ampliada e orientação, sem resumo final, até a substituição da revisão. Esse cenário não foi contado como aprovado. A sincronização de orientação passou a usar `ActivityScenario.onActivity` diretamente a partir da thread do teste, evitando consultar a atividade novamente dentro de `runOnIdle` durante uma recriação. Foram acrescentados marcadores de etapa e limites de execução para distinguir bloqueios de captura, layout e limpeza do ambiente.

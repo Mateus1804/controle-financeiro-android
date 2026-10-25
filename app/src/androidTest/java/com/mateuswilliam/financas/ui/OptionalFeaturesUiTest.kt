@@ -205,27 +205,41 @@ class OptionalFeaturesUiTest {
         app.repository.saveRecurring(forecast())
         try {
             rule.runOnIdle { app.settings.hideAmounts(true); app.settings.setAppearance(Appearance.DARK) }
+            checkpoint("Ajustando fonte ampliada")
             command("settings put system font_scale 1.5")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.4f }
             rule.onNodeWithText("Resumo", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 assertTrue(action(layouts)); assertEquals(1, layouts.single().lineCount); assertFalse(layouts.single().isLineEllipsized(0))
             }
-            rule.runOnIdle { assertFalse(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars) }
+            rule.activityRule.scenario.onActivity { activity ->
+                assertFalse(WindowCompat.getInsetsController(activity.window, activity.window.decorView).isAppearanceLightStatusBars)
+            }
             openPlanning()
             rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Gasto e limite ocultos"))
             rule.onAllNodesWithText(Money.format(123456), substring = true).assertCountEquals(0)
             rule.onAllNodesWithContentDescription(Money.format(123456), substring = true).assertCountEquals(0)
+            checkpoint("Capturando planejamento com fonte ampliada")
             screenshot("planejamento-fonte-ampliada")
-            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            checkpoint("Mudando orientação")
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
             rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Adicionar recorrência"))
             rule.onNodeWithText("Adicionar recorrência").assertIsDisplayed()
+            checkpoint("Capturando planejamento em paisagem")
             screenshot("planejamento-paisagem")
+            checkpoint("Paisagem conferida")
         } finally {
+            checkpoint("Restaurando fonte e orientação")
             command("settings put system font_scale 1.0")
-            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
         }
+    }
+
+    private fun checkpoint(message: String) {
+        InstrumentationRegistry.getInstrumentation().sendStatus(2, android.os.Bundle().apply {
+            putString("stream", "\n[interface] $message\n")
+        })
     }
 
     private fun confirmDescription(description: String) {
@@ -253,7 +267,15 @@ class OptionalFeaturesUiTest {
             !WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars
         }
         val directory = File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: error("Captura do emulador indisponível")
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor { task ->
+            Thread(task, "finance-ui-capture").apply { isDaemon = true }
+        }
+        try {
+            val bitmap = executor.submit<Bitmap> {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: error("Captura do emulador indisponível")
+            }.get(15, java.util.concurrent.TimeUnit.SECONDS)
+            try { File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+            finally { bitmap.recycle() }
+        } finally { executor.shutdownNow() }
     }
 }

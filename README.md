@@ -96,3 +96,7 @@ A preparação de atualizações passou a prever assinatura externa ao repositó
 A validação inclui um backup congelado no formato 1, migração dos esquemas anteriores, histórico fictício de cinco mil registros e um cenário de atualização do APK anterior sobre a instalação existente. A matriz de emuladores cobre APIs 26, 33, 35 e 36. Os resultados efetivamente executados ficam em [Qualidade](docs/qualidade.md).
 
 A [documentação de atualizações](docs/atualizacoes.md) descreve assinatura e limitações. As amostras bancárias reais continuam pendentes; uma tarefa privada foi preparada para conferi-las sem publicar mensagens ou dados pessoais. A preparação não publica APKs nem altera a assinatura de instalações pessoais.
+
+Na [validação funcional de 25/10/2026](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40202162302), passaram 104 testes do core e 81 testes em cada uma das APIs 26, 33, 35 e 36, sem testes ignorados. A atualização sobre o APK anterior e a recuperação de um backup produzido por ele também passaram. O Android Lint terminou sem erros nas variantes debug e release, mantendo 14 avisos anteriores em cada uma.
+
+Os [registros de qualidade](docs/qualidade.md) distinguem validação automatizada, inspeção de capturas e limitações. Notificações bancárias reais e preparação com a chave definitiva continuam pendentes. Não houve publicação ou acesso a dados financeiros pessoais.
