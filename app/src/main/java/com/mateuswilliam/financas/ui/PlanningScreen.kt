@@ -30,6 +30,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -> Unit, busy: Boolean,
     canAlert: Boolean, onBack: () -> Unit, onBudget: (MonthlyBudget, () -> Unit) -> Unit,
@@ -66,7 +67,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
                         Text(if (item.remainingCents >= 0) "Disponível: ${Money.format(item.remainingCents)}" else "Limite excedido em ${Money.format(-item.remainingCents)}",
                             color = if (item.remainingCents < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = { budgetCategory = item.budget.category; budgetEditor = true }, enabled = !busy) { Text("Editar limite") }
                         TextButton(onClick = { onDeleteBudget(item.budget.category) }, enabled = !busy) { Text("Remover limite") }
                     }
@@ -86,7 +87,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
                     Text("${privateDisplayText(plan.bank, hidden)} · ${plan.category.label}", style = MaterialTheme.typography.bodySmall)
                     Amount(plan.amountCents, hidden)
                     OutlinedButton(onClick = { onConfirmRecurring(plan) }, enabled = !busy && plan.active, modifier = Modifier.fillMaxWidth()) { Text("Conferir e registrar") }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = { recurringId = plan.id; recurringEditor = true }, enabled = !busy) { Text("Editar previsão") }
                         TextButton(onClick = { onRecurring(plan.copy(active = !plan.active), {}) }, enabled = !busy) { Text(if (plan.active) "Pausar" else "Retomar") }
                     }

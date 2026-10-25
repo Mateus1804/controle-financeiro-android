@@ -90,6 +90,7 @@ class FinanceUiTest {
         rule.runOnIdle {
             assertEquals(Appearance.DARK, app.settings.state.value.appearance)
             assertFalse(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
+            assertFalse(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightNavigationBars)
         }
         assertStatusBarBackground(dark = true)
         rule.activityRule.scenario.recreate()
@@ -102,6 +103,7 @@ class FinanceUiTest {
         rule.runOnIdle {
             assertEquals(Appearance.LIGHT, app.settings.state.value.appearance)
             assertTrue(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
+            assertTrue(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightNavigationBars)
         }
         assertStatusBarBackground(dark = false)
         screenshot("ajustes-claro")

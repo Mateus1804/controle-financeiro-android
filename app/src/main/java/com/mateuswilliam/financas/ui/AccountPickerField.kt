@@ -2,6 +2,8 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -47,7 +49,7 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
             OutlinedTextField(query, { query = it.take(80) }, label = { Text("Buscar conta") }, leadingIcon = { AppIcon(R.drawable.ic_search) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             val matches = remember(options, query) { options.filter { it.label.contains(AccountNames.clean(query), ignoreCase = true) } }
             Text("Contas recentes primeiro", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 320.dp)) {
                 items(matches, key = { it.key }) { option ->
                     ListItem(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onChange(option.label); choosing = false },
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
@@ -64,7 +66,7 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
     if (adding) AlertDialog(onDismissRequest = { if (!saving) adding = false },
         title = { DialogSystemBars(); Text("Adicionar conta ou banco") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it.take(80); error = null }, label = { Text("Nome da conta") }, singleLine = true, enabled = !saving, modifier = Modifier.testTag("account-name-input"))
                 Text("Ex.: Inter pessoal, Inter trabalho ou Carteira. Não informe número de conta ou senha.", style = MaterialTheme.typography.bodySmall)
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

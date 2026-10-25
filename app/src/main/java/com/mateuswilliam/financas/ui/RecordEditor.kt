@@ -66,7 +66,8 @@ fun RecordEditor(
     val dateDialogTheme = if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
         android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
     val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    val compactHeight = windowHeight < 480.dp
+    // Em fontes ampliadas, o cabeçalho acompanha a rolagem para não consumir a área do teclado.
+    val compactHeight = windowHeight < 480.dp || LocalDensity.current.fontScale >= 1.5f
     val maximumHeight = windowHeight * if (compactHeight) 0.96f else 0.84f
     val compactScroll = rememberScrollState()
     val fieldsScroll = rememberScrollState()

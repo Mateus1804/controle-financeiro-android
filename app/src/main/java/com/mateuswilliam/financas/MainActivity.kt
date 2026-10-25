@@ -71,6 +71,10 @@ class MainActivity : ComponentActivity() {
                     window.setBackgroundDrawable(ColorDrawable(background))
                     val bars = if (dark) SystemBarStyle.dark(background) else SystemBarStyle.light(background, background)
                     enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !dark
+                        isAppearanceLightNavigationBars = !dark
+                    }
                 }
                 val savedUi = rememberSaveableStateHolder()
                 if (settings.lockEnabled && !session.authenticated) LockScreen(session.authenticating, session.message) {

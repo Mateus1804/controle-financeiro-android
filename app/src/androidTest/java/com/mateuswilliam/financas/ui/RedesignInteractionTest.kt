@@ -67,10 +67,13 @@ class RedesignInteractionTest {
     }
 
     @Test fun narrowScreenWithDoubleFontScaleKeepsActionsAndNavigationReachable() {
-        fun command(value: String) {
+        fun command(value: String): String {
             val fd = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(value)
-            android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
+            return android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().use { it.readText() }
         }
+        val previousSize = Regex("Override size: ([0-9]+x[0-9]+)").find(command("wm size"))?.groupValues?.get(1) ?: "reset"
+        val previousDensity = Regex("Override density: ([0-9]+)").find(command("wm density"))?.groupValues?.get(1) ?: "reset"
+        val previousFont = command("settings get system font_scale").trim().takeIf { it.toFloatOrNull() != null } ?: "1.0"
         try {
             command("wm size 640x1280"); command("wm density 320"); command("settings put system font_scale 2.0")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.9f && rule.activity.resources.configuration.screenWidthDp <= 320 }
@@ -91,11 +94,11 @@ class RedesignInteractionTest {
             rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Fonte ampliada fictícia")
             capture("formulario-pequeno-teclado")
             rule.onNodeWithText("Descrição").performImeAction(); waitKeyboard()
-            rule.onNodeWithText("Confirmar", useUnmergedTree = true).assertIsDisplayed().performClick()
+            rule.onNodeWithText("Confirmar", useUnmergedTree = true).performScrollTo().assertIsDisplayed().performClick()
             rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
             assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
         } finally {
-            command("settings put system font_scale 1.0"); command("wm density reset"); command("wm size reset")
+            command("settings put system font_scale $previousFont"); command("wm density $previousDensity"); command("wm size $previousSize")
         }
     }
 
@@ -121,6 +124,20 @@ class RedesignInteractionTest {
             val directory = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
             java.io.File(directory, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         } finally { bitmap.recycle() }
+    }
+
+    @Test fun lastTransactionCanBeReadAboveTheFixedActionWithoutOcclusion() = runBlocking<Unit> {
+        val now = System.currentTimeMillis()
+        repeat(30) { index ->
+            app.repository.save(Record("linha-$index", 10000L + index, Movement.EXPENSE, PaymentMethod.PIX,
+                Category.FOOD, "Conta fictícia", "Lançamento fictício $index", now - index * 1000L), null)
+        }
+        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("30 lançamento(s)").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Lançamento fictício 29"))
+        val record = rule.onNodeWithText("Lançamento fictício 29").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val action = rule.onNodeWithContentDescription("Novo lançamento").fetchSemanticsNode().boundsInRoot
+        assertTrue("A ação fixa não pode cobrir a última linha do histórico", record.bottom <= action.top)
     }
 
     private fun openQuick(type: String) {

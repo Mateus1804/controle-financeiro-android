@@ -175,23 +175,23 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-            Column {
-                Box(Modifier.fillMaxWidth().padding(horizontal = FinanceSpacing.page, vertical = 6.dp)) {
-                    NewRecordAction { openManual() }
+                Column {
+                    Box(Modifier.fillMaxWidth().padding(horizontal = FinanceSpacing.page, vertical = 6.dp)) {
+                        NewRecordAction { openManual() }
+                    }
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest, tonalElevation = 0.dp) {
+                        val labels = listOf("Resumo", "Revisar", "Extrato", "Ajustes")
+                        val icons = listOf(R.drawable.ic_overview, R.drawable.ic_pending, R.drawable.ic_records, R.drawable.ic_settings)
+                        labels.forEachIndexed { index, label ->
+                            NavigationBarItem(selected = tab == index, onClick = { tab = index },
+                                colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.onSurface),
+                                icon = { if (index == 1 && state.pending.isNotEmpty()) BadgedBox(badge = { Badge { Text(state.pending.size.toString()) } }) {
+                                    AppIcon(icons[index])
+                                } else AppIcon(icons[index]) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
+                        }
+                    }
                 }
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest, tonalElevation = 0.dp) {
-                val labels = listOf("Resumo", "Revisar", "Extrato", "Ajustes")
-                val icons = listOf(R.drawable.ic_overview, R.drawable.ic_pending, R.drawable.ic_records, R.drawable.ic_settings)
-                labels.forEachIndexed { index, label ->
-                    NavigationBarItem(selected = tab == index, onClick = { tab = index },
-                        colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.onSurface),
-                        icon = { if (index == 1 && state.pending.isNotEmpty()) BadgedBox(badge = { Badge { Text(state.pending.size.toString()) } }) {
-                            AppIcon(icons[index])
-                        } else AppIcon(icons[index]) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
-                }
-            }
-            }
             }
         },
     ) { padding ->
