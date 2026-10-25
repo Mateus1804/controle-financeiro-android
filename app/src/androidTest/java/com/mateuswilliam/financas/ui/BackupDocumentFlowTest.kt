@@ -124,16 +124,19 @@ class BackupDocumentFlowTest {
     private fun click(node: AccessibilityNodeInfo) {
         var target: AccessibilityNodeInfo? = node
         while (target != null && !target.isClickable) target = target.parent
-        val control = requireNotNull(target) { "Controle sem ancestral clicável no seletor." }
+        // Na grade do DocumentsUI da API 26, o RecyclerView trata o toque sem marcar o texto como clicável.
+        val control = target ?: node
         control.refresh()
         assertTrue("O controle do seletor precisa estar habilitado.", control.isEnabled)
-        if (!control.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+        if (target == null || !control.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
             // O DocumentsUI antigo pode não executar ACTION_CLICK; o toque real continua sujeito ao resultado do fluxo.
             val bounds = android.graphics.Rect().also(control::getBoundsInScreen)
             assertFalse(bounds.isEmpty)
             val time = SystemClock.uptimeMillis()
             val down = android.view.MotionEvent.obtain(time, time, android.view.MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY(), 0)
             val up = android.view.MotionEvent.obtain(time, time + 40, android.view.MotionEvent.ACTION_UP, bounds.exactCenterX(), bounds.exactCenterY(), 0)
+            down.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            up.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
             try { assertTrue(automation.injectInputEvent(down, true)); assertTrue(automation.injectInputEvent(up, true)) }
             finally { down.recycle(); up.recycle() }
         }

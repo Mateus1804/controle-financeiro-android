@@ -274,7 +274,7 @@ class FinanceUiTest {
     }
 
 
-    @Test fun notificationAccessRefreshesAfterResumeAndRevocationWithoutAlertPermission() {
+    @Test fun notificationAccessRefreshesAfterResumeAndRevocationAcrossAlertPermissions() {
         val component = "com.mateuswilliam.financas/com.mateuswilliam.financas.notifications.BankNotificationListener"
         fun command(value: String): String {
             val descriptor = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(value)
@@ -298,7 +298,8 @@ class FinanceUiTest {
         }
         try {
             // A API 26 não possui a permissão runtime da API 33 nem o comando allow_listener.
-            command("appops set " + app.packageName + " POST_NOTIFICATION deny")
+            if (android.os.Build.VERSION.SDK_INT >= 33)
+                command("appops set " + app.packageName + " POST_NOTIFICATION deny")
             rule.runOnIdle {
                 app.settings.acceptDisclosure()
                 app.settings.selectPackages(setOf("banco.exemplo"))
@@ -308,7 +309,15 @@ class FinanceUiTest {
             rule.waitUntil(10000) { app.listenerConnected.value }
             rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
-            rule.onNodeWithText("Permitir alertas de revisão").assertExists()
+            val alertAction = rule.onNodeWithText("Permitir alertas de revisão")
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                assertFalse(androidx.core.content.ContextCompat.checkSelfPermission(app, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+                alertAction.assertExists()
+            } else {
+                // Nessas versões não há POST_NOTIFICATIONS runtime; a ação reflete o bloqueio global efetivo do sistema.
+                if (androidx.core.app.NotificationManagerCompat.from(app).areNotificationsEnabled()) alertAction.assertDoesNotExist()
+                else alertAction.assertExists()
+            }
             listenerAccess(false)
             resume()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Falta autorizar o acesso às notificações no Android.").fetchSemanticsNodes().isNotEmpty() }
@@ -316,7 +325,8 @@ class FinanceUiTest {
             rule.onNodeWithText("Autorizar acesso").assertExists()
         } finally {
             listenerAccess(false)
-            command("appops set " + app.packageName + " POST_NOTIFICATION default")
+            if (android.os.Build.VERSION.SDK_INT >= 33)
+                command("appops set " + app.packageName + " POST_NOTIFICATION default")
             rule.runOnIdle { app.settings.setEnabled(false) }
         }
     }

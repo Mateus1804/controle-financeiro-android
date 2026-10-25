@@ -20,7 +20,7 @@ Uma cópia protegida e recuperável da chave e das senhas é necessária fora do
 
 O CI primeiro confere a recusa explícita da preparação sem assinatura. Depois prepara uma chave descartável de dois dias exclusivamente no runner. A versão anterior fica congelada na revisão `7aec1bd102fcfbfb18eed493ceeb9ca0ac89fefe`, com versão 1 e esquema Room 3. Os APKs anterior, atual e de testes são assinados com a mesma chave de teste; o caminho Gradle release também compila APK e AAB, executa lint e confere assinatura, certificado, versão e ausência de depuração. Essa chave não é incluída nos artefatos e não serve para atualizações definitivas.
 
-A matriz executa a suíte em emuladores das APIs 26, 33 e 35. Um quarto cenário, na API 35, instala o APK anterior, prepara dados fictícios no esquema 3 e preferências, e instala o APK atual com `adb install -r`, sem desinstalar entre essas duas versões. O teste confere valores, identificadores, vínculos, revisão das pendências, contas, orçamento, recorrência, ocorrências, aparência e ocultação de valores após a migração para o esquema 4.
+A matriz executa a suíte em emuladores das APIs 26, 33, 35 e 36. Um cenário adicional, na API 35, instala o APK anterior, prepara dados fictícios no esquema 3 e preferências, e instala o APK atual com `adb install -r`, sem desinstalar entre essas duas versões. O teste confere valores, identificadores, vínculos, revisão das pendências, contas, orçamento, recorrência, ocorrências, aparência e ocultação de valores após a migração para o esquema 4.
 
 Os relatórios recusam execuções vazias, falhas, interrupções e testes ignorados. A suíte só executa em emulador dedicado, pois seus testes limpam bases de desenvolvimento. Não deve ser usada em aparelho com dados pessoais.
 
@@ -33,3 +33,5 @@ A matriz não substitui avaliação de fabricantes, bateria, leitura de tela, se
 - [Índices Room](https://developer.android.com/reference/androidx/room/Index).
 
 Na API 26, a proteção do calendário é conferida diretamente na janela nativa retornada pelo componente, pois `WindowInspector` só existe a partir da API 29. Nas APIs 33 e 35, a verificação percorre as janelas abertas pelo formulário. Nenhuma reflexão em API privada é utilizada.
+
+O cenário dedicado também executa o exportador carregado do APK anterior antes da atualização. Depois da instalação da nova versão, o arquivo produzido é aberto pelo código atual, conferido em base temporária e restaurado após confirmação no teste. Um registro fictício acrescentado após a atualização permanece intacto até a restauração e só então é substituído. Isso complementa o vetor criptográfico independente com um arquivo efetivamente produzido pela versão anterior.

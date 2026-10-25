@@ -86,6 +86,7 @@ jobs:
             core/build/reports/tests/
             core/build/test-results/
             app/build/reports/lint-results-debug.*
+            app/build/reports/lint-results-release.*
             app/schemas/
             qa/release-metadata.json
           retention-days: 14
@@ -101,12 +102,19 @@ jobs:
       matrix:
         include:
           - api: 26
+            target: default
             scenario: suite
           - api: 33
+            target: default
             scenario: suite
           - api: 35
+            target: default
+            scenario: suite
+          - api: 36
+            target: google_apis
             scenario: suite
           - api: 35
+            target: default
             scenario: upgrade
     steps:
       - uses: actions/checkout@v6
@@ -133,7 +141,7 @@ jobs:
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api }}
-          target: default
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
           disable-animations: true

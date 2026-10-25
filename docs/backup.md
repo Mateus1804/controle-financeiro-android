@@ -65,3 +65,5 @@ O formato de dados e do envelope continua na versão 1, separado do esquema Room
 O vetor usa dados fictícios e criptografia gerada independentemente em Python. Não representa uma exportação bancária real. O teste compara todos os registros, vínculos, revisões, contas, orçamentos, recorrências e ocorrências, além da aparência. O cadastro local existente precisa permanecer intacto até a confirmação da restauração. O arquivo congelado não é regenerado durante o teste.
 
 A migração do banco instalado e a compatibilidade do arquivo de backup são verificações diferentes. O CI também executa a atualização do APK anterior sobre a mesma instalação; o procedimento está descrito em `atualizacoes.md`. Formatos futuros desconhecidos continuam recusados sem substituir dados.
+
+O cenário de atualização possui ainda duas fases: exportação pelo código do APK anterior e recuperação pelo APK atualizado. O artefato de teste é inteiramente fictício e usa senha pública exclusiva da suíte. O resultado dessas fases depende dos jobs efetivamente concluídos, registrados em Qualidade.
