@@ -57,13 +57,13 @@ Os valores monetários são armazenados em centavos inteiros. Transferências fi
 
 ## Qualidade
 
-A validação abrange regras Kotlin, persistência e fluxos de interface no Android 15. A cobertura inclui valores monetários, contas, migrações, relatórios, consentimento, confirmação simultânea, criptografia, restauração, planejamento e revisão em sequência. Os casos bancários distinguem procedência sintética de coleta real anonimizada.
+A execução de referência aprovou **102 testes Kotlin e 76 testes instrumentados no Android 15**, sem testes pulados. O Android Lint concluiu com zero erros e 14 avisos documentados. A validação abrange persistência e fluxos de interface. A cobertura inclui valores monetários, contas, migrações, relatórios, consentimento, confirmação simultânea, criptografia, restauração, planejamento e revisão em sequência. Os casos bancários distinguem procedência sintética de coleta real anonimizada.
 
 Os resultados dos comandos, as execuções aprovadas, os avisos e as verificações ainda pendentes estão registrados em [Qualidade e validação](docs/qualidade.md). A validação com bancos reais, a autenticação no aparelho e a recuperação em condições reais de uso exigem avaliação própria.
 
 ## Interface
 
-As capturas utilizam dados fictícios para demonstrar os temas, os relatórios e a revisão de movimentações. Foram registradas antes da revisão editorial dos títulos e textos do aplicativo; a origem das imagens está documentada em [Qualidade e validação](docs/qualidade.md).
+As capturas utilizam dados fictícios para demonstrar os temas, os relatórios, o planejamento e a revisão de movimentações. Foram obtidas no emulador Android 15 durante a validação desta revisão; a origem das imagens está documentada em [Qualidade e validação](docs/qualidade.md).
 
 | Resumo claro | Resumo escuro |
 | --- | --- |
@@ -72,6 +72,14 @@ As capturas utilizam dados fictícios para demonstrar os temas, os relatórios e
 | Relatório por categoria | Revisão da notificação |
 | --- | --- |
 | <img src="docs/imagens/relatorio-categorias.png" alt="Gráfico de despesas brutas por categoria" width="260"> | <img src="docs/imagens/revisao-escuro.png" alt="Formulário de revisão no tema escuro, com exemplo fictício" width="260"> |
+
+| Planejamento claro | Planejamento escuro |
+| --- | --- |
+| <img src="docs/imagens/planejamento-claro.png" alt="Orçamento mensal com dados fictícios no tema claro" width="260"> | <img src="docs/imagens/planejamento-escuro.png" alt="Orçamento mensal com dados fictícios no tema escuro" width="260"> |
+
+| Possível duplicidade | Revisão em sequência |
+| --- | --- |
+| <img src="docs/imagens/possivel-duplicidade.png" alt="Aviso de lançamento manual semelhante, com dados fictícios" width="260"> | <img src="docs/imagens/revisao-em-sequencia.png" alt="Segunda revisão de uma sessão com nova pendência aguardando" width="260"> |
 
 ## Estágio do projeto
 

@@ -117,3 +117,7 @@ Links de notificação passam pela mesma tela de bloqueio. O estado editável da
 O banco Room permanece no armazenamento privado do Android, sem nova camada própria de criptografia. Biometria e proteção de tela não substituem criptografia do banco, proteção do sistema ou avaliação em aparelhos reais. Não há coleta de dados biométricos pelo aplicativo.
 
 A ativação ou desativação do bloqueio só é apresentada como salva após confirmação da persistência. Antes de restaurar ou apagar dados, a pausa da captura e dos lembretes também precisa ser persistida. Na exclusão, a proteção permanece configurada até a transação financeira terminar; falha do banco preserva os registros e o bloqueio. Falha posterior na limpeza das preferências é informada separadamente da exclusão já concluída.
+
+## Navegação com fonte ampliada
+
+Em telas estreitas com fonte ampliada, a barra inferior mantém quatro destinos e o botão de novo lançamento passa para uma área reservada acima dela. O conteúdo recebe espaço próprio para impedir sobreposição de valores e ações. A navegação usual mantém o botão central nas demais configurações. Os rótulos permanecem em uma linha, com texto completo na semântica, e o teste em 150% confere que Resumo não foi quebrado nem abreviado. Os ícones das barras do Android também são sincronizados na retomada e no retorno do foco da janela.

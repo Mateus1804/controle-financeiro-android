@@ -29,6 +29,8 @@ Os casos ficam em [`core/src/test/resources/bank-notifications.tsv`](../core/src
 
 `BankNotificationFixturesTest` executa cada linha contra o interpretador real. O script `scripts/verify-bank-fixtures.py` confere a procedência e os metadados e participa do CI. O filtro de possíveis dados pessoais é complementar e não substitui revisão humana.
 
+O TSV utiliza uma linha por caso. Mensagens com quebras de linha devem ser preservadas integralmente em um teste Kotlin específico, sem achatar o texto apenas para obter reconhecimento. A inclusão de um novo formato depende da evidência correspondente e de uma expectativa revisada.
+
 ## Coleta e anonimização
 
 A avaliação utiliza notificações legítimas do uso normal, sem necessidade de criar operações bancárias apenas para o teste. O registro local deve conter nome e pacote do aplicativo, versão do aplicativo, versão do Android, modelo do aparelho, data de coleta, conexão do serviço, entrega da notificação e resultado da revisão.
