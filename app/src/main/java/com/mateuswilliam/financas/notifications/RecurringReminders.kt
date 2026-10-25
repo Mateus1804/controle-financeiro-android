@@ -32,7 +32,10 @@ object RecurringReminders {
     private const val CHANNEL = "planned_transactions"
     private const val NOTIFICATION_ID = 2302
 
-    fun schedule(context: Context, enabled: Boolean) {
+    @Synchronized
+    fun schedule(context: Context) {
+        // O coletor pode estar atrasado. A preferência atual prevalece sobre qualquer emissão antiga.
+        val enabled = (context.applicationContext as FinanceApplication).settings.snapshot().remindersEnabled
         val scheduler = context.getSystemService(JobScheduler::class.java)
         if (!enabled) { scheduler.cancel(JOB_ID); return }
         if (scheduler.getPendingJob(JOB_ID) != null) return

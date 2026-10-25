@@ -31,7 +31,7 @@ class FinanceApplication : Application() {
         super.onCreate()
         maintenanceReady
         background.launch {
-            settings.state.map { it.remindersEnabled }.distinctUntilChanged().collect { RecurringReminders.schedule(this@FinanceApplication, it) }
+            settings.state.map { it.remindersEnabled }.distinctUntilChanged().collect { RecurringReminders.schedule(this@FinanceApplication) }
         }
     }
 }

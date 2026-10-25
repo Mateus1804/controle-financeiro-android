@@ -131,3 +131,5 @@ O estado da interface recebe o histórico e os candidatos manuais na mesma emiss
 A lista de candidatos à duplicidade continua cobrindo o histórico manual, inclusive quando a proposta é editada. Não foi introduzido um filtro SQL pelo valor original da notificação, pois esse filtro perderia correspondências após edição. Paginação completa e busca por período ficam para uma etapa orientada por medições; as telas e a exportação ainda podem carregar o histórico inteiro.
 
 As transformações do histórico e a normalização do catálogo utilizam `Dispatchers.Default`; as consultas Room continuam fora da thread principal. Essa separação evita executar o agrupamento dos nomes e a conversão do histórico na thread da interface.
+
+O agendamento nativo dos lembretes consulta a preferência vigente dentro da operação sincronizada. O coletor apenas solicita uma atualização; ele não carrega um booleano antigo até o `JobScheduler`. Essa escolha evita recriar um trabalho após desativação, limpeza ou pausa da recuperação, sem alterar a elegibilidade das previsões nem criar lançamentos automaticamente.
