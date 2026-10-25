@@ -12,7 +12,7 @@ sign_apk ci-legacy/app/build/outputs/apk/debug/app-debug.apk ci-apks/legacy-debu
 sign_apk app/build/outputs/apk/debug/app-debug.apk ci-apks/app-debug.apk
 sign_apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk ci-apks/app-debug-androidTest.apk
 # A versão release usa o mesmo caminho Gradle que será usado com a chave definitiva.
-"$signer" verify --verbose app/build/outputs/apk/release/app-release.apk
+python3 scripts/verify-release.py
 python3 - <<'PYTHON'
 import hashlib
 import json

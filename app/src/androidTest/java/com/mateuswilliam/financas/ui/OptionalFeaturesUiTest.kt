@@ -169,20 +169,32 @@ class OptionalFeaturesUiTest {
         assertTrue(app.repository.exportRecords().isEmpty())
     }
 
-    @androidx.test.filters.SdkSuppress(minSdkVersion = 29)
     @Test fun secureScreenAlsoProtectsTheNativeDateDialog() {
         try {
             rule.runOnIdle { app.settings.setSecureScreen(true) }
             rule.waitForIdle()
-            rule.onNodeWithContentDescription("Novo lançamento").performClick()
-            rule.onNodeWithText("Data:", substring = true).performScrollTo().performClick()
-            rule.waitUntil(5000) { android.view.inspector.WindowInspector.getGlobalWindowViews().size >= 3 }
-            rule.runOnIdle {
-                val windows = android.view.inspector.WindowInspector.getGlobalWindowViews()
-                assertTrue(windows.all { (it.layoutParams as WindowManager.LayoutParams).flags and WindowManager.LayoutParams.FLAG_SECURE != 0 })
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                rule.onNodeWithContentDescription("Novo lançamento").performClick()
+                rule.onNodeWithText("Data:", substring = true).performScrollTo().performClick()
+                rule.waitUntil(5000) { android.view.inspector.WindowInspector.getGlobalWindowViews().size >= 3 }
+                rule.runOnIdle {
+                    val windows = android.view.inspector.WindowInspector.getGlobalWindowViews()
+                    assertTrue(windows.all { (it.layoutParams as WindowManager.LayoutParams).flags and WindowManager.LayoutParams.FLAG_SECURE != 0 })
+                }
+            } else {
+                // WindowInspector só existe a partir da API 29. A API 26 verifica a janela real devolvida pelo mesmo componente.
+                rule.runOnIdle {
+                    val dialog = showFinanceDatePicker(rule.activity, android.R.style.Theme_Material_Light_Dialog_Alert, LocalDate.of(2026, 10, 25)) {}
+                    try {
+                        assertTrue(dialog.isShowing)
+                        assertTrue(dialog.window!!.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
+                        assertTrue(rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
+                    } finally { dialog.dismiss() }
+                }
             }
         } finally {
-            InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+            if (android.os.Build.VERSION.SDK_INT >= 29)
+                InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
             rule.runOnIdle { app.settings.setSecureScreen(false) }
         }
     }
@@ -237,14 +249,8 @@ class OptionalFeaturesUiTest {
         rule.waitUntil(8000) { rule.onAllNodesWithText("Limite mensal salvo.").fetchSemanticsNodes().isEmpty() }
         rule.waitForIdle()
         if (app.settings.snapshot().appearance == Appearance.DARK) rule.waitUntil(5000) {
-            val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return@waitUntil false
-            var bright = 0
-            for (x in 20 until minOf(200, bitmap.width)) for (y in 0 until minOf(44, bitmap.height)) {
-                val color = bitmap.getPixel(x, y)
-                if (android.graphics.Color.red(color) > 180 && android.graphics.Color.green(color) > 180 && android.graphics.Color.blue(color) > 180) bright++
-            }
-            bitmap.recycle()
-            bright > 8
+            // Em paisagem, versões antigas podem ocultar os ícones. A configuração de contraste independe de pixels fixos.
+            !WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars
         }
         val directory = File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: error("Captura do emulador indisponível")

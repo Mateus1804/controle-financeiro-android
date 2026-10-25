@@ -16,6 +16,7 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.combine
 import java.util.UUID
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -41,12 +42,12 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             if (row.sourceDraftId == null) manual.add(record)
         }
         LedgerRecords(records, manual)
-    }
+    }.flowOn(Dispatchers.Default)
     val records = ledger.map { it.records }
     val manualRecords = ledger.map { it.manualRecords }
     val accounts = combine(dao.accounts(), dao.usedAccounts()) { saved, used ->
         AccountCatalog.merge(saved.map { it.toOption() }, used.map { com.mateuswilliam.financas.core.AccountOption("", it.label, it.lastUsedAt) })
-    }
+    }.flowOn(Dispatchers.Default)
     val budgets = dao.budgets().map { rows -> rows.map { it.toBudget() } }
     val recurring = dao.recurring().map { rows -> rows.map { it.toPlan() } }
 

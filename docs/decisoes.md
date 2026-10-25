@@ -129,3 +129,5 @@ O esquema 4 utiliza índices compostos que correspondem à ordenação do histó
 O estado da interface recebe o histórico e os candidatos manuais na mesma emissão. Isso elimina uma observação completa independente. O catálogo de contas consulta apenas nomes e datas agregados por SQL e continua normalizando espaços e caixa em Kotlin, sem alterar os nomes históricos ou confundir contas distintas do mesmo banco. As contas cadastradas mantêm preferência de apresentação.
 
 A lista de candidatos à duplicidade continua cobrindo o histórico manual, inclusive quando a proposta é editada. Não foi introduzido um filtro SQL pelo valor original da notificação, pois esse filtro perderia correspondências após edição. Paginação completa e busca por período ficam para uma etapa orientada por medições; as telas e a exportação ainda podem carregar o histórico inteiro.
+
+As transformações do histórico e a normalização do catálogo utilizam `Dispatchers.Default`; as consultas Room continuam fora da thread principal. Essa separação evita executar o agrupamento dos nomes e a conversão do histórico na thread da interface.

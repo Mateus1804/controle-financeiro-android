@@ -178,7 +178,13 @@ class FinanceUiTest {
         rule.onNodeWithContentDescription("Novo lançamento").performClick()
         rule.onNodeWithTag("amount-input").performTextInput("1234")
         rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo().performClick()
-        rule.onNodeWithText("Nome da conta").performTextInput("Inter pessoal")
+        try {
+            rule.waitUntil(5000) { rule.onAllNodesWithTag("account-name-input").fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithTag("account-name-input").performTextInput("Inter pessoal")
+        } catch (failure: Throwable) {
+            val roots = rule.onAllNodes(isRoot()).fetchSemanticsNodes().indices.joinToString("\n") { rule.onAllNodes(isRoot())[it].printToString() }
+            throw AssertionError("O cadastro de conta não ficou disponível. Estado da interface:\n$roots", failure)
+        }
         rule.onNodeWithText("Adicionar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Adicionar conta ou banco").fetchSemanticsNodes().isEmpty() }
         confirmEntry()
@@ -279,25 +285,38 @@ class FinanceUiTest {
             rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
             rule.waitForIdle()
         }
-        assertTrue(command("cmd notification help").contains("allow_listener"))
+        val shellListenerCommand = command("cmd notification help").contains("allow_listener")
+        val previousListeners = command("settings get secure enabled_notification_listeners").trim().takeUnless { it == "null" }.orEmpty()
+        fun listenerAccess(allowed: Boolean) {
+            if (shellListenerCommand) command("cmd notification " + (if (allowed) "allow_listener " else "disallow_listener ") + component)
+            else {
+                val values = previousListeners.split(':').filter { it.isNotBlank() && it != component }.toMutableList()
+                if (allowed) values.add(component)
+                if (values.isEmpty()) command("settings delete secure enabled_notification_listeners")
+                else command("settings put secure enabled_notification_listeners " + values.joinToString(":"))
+            }
+        }
         try {
+            // A API 26 não possui a permissão runtime da API 33 nem o comando allow_listener.
+            command("appops set " + app.packageName + " POST_NOTIFICATION deny")
             rule.runOnIdle {
                 app.settings.acceptDisclosure()
                 app.settings.selectPackages(setOf("banco.exemplo"))
             }
-            command("cmd notification allow_listener " + component)
+            listenerAccess(true)
             resume()
             rule.waitUntil(10000) { app.listenerConnected.value }
             rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithText("Permitir alertas de revisão").assertExists()
-            command("cmd notification disallow_listener " + component)
+            listenerAccess(false)
             resume()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Falta autorizar o acesso às notificações no Android.").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithText("Resumo").performClick()
             rule.onNodeWithText("Autorizar acesso").assertExists()
         } finally {
-            command("cmd notification disallow_listener " + component)
+            listenerAccess(false)
+            command("appops set " + app.packageName + " POST_NOTIFICATION default")
             rule.runOnIdle { app.settings.setEnabled(false) }
         }
     }

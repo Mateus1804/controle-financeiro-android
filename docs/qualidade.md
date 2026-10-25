@@ -27,7 +27,7 @@ O código do commit `72c822d93d5a732236dce0c90517d070d28d35f7` foi validado na e
 
 O resultado consolidado é de **178 testes aprovados**. Os testes instrumentados utilizaram emulador Pixel 2 com 720 × 1600 pixels e densidade 320, aproximadamente 360 × 800 dp. A suíte usa `IsolatedAndroidTestRunner`, que bloqueia aparelhos físicos para impedir a limpeza acidental de uma instalação com dados pessoais.
 
-Os avisos de Lint restantes são um de SDK alvo, dez de atualização de dependências e três `UseKtx` nas gravações verificadas de `CapturePreferences`. Os três avisos `UseKtx` permanecem justificados: a extensão KTX `edit` retorna `Unit` e não expõe o resultado de `commit()`, que precisa ser verificado antes de substituir dados ou afirmar que a proteção foi salva. A API padrão é intencional nesses pontos. Os avisos de coleção mutável em estado Compose e conversão de URI foram corrigidos. Não houve supressão de regras. Entre os avisos de compilação estão duas APIs de compatibilidade obsoletas: a alternativa de credencial para versões anteriores e `isStatusBarContrastEnforced` nas janelas de diálogo. As versões da stack permaneceram fixadas.
+Os avisos de Lint restantes são um de SDK alvo, dez de atualização de dependências e três `UseKtx` nas gravações verificadas de preferências e da atividade. Os três avisos `UseKtx` permanecem justificados: a extensão KTX `edit` retorna `Unit` e não expõe o resultado de `commit()`, que precisa ser verificado antes de substituir dados ou afirmar que a proteção foi salva. A API padrão é intencional nesses pontos. Os avisos de coleção mutável em estado Compose e conversão de URI foram corrigidos. Não houve supressão de regras. Entre os avisos de compilação estão duas APIs de compatibilidade obsoletas: a alternativa de credencial para versões anteriores e `isStatusBarContrastEnforced` nas janelas de diálogo. As versões da stack permaneceram fixadas.
 
 ## Critérios exercitados
 
@@ -73,3 +73,11 @@ A referência inicial mantém a suíte anterior de 102 testes do core e 76 instr
 As verificações Python de procedência (cinco regressões), os 25 casos sintéticos, o checksum do Wrapper, os dez pares de contraste, a geração da base fictícia do esquema 3 e a sintaxe dos scripts foram aprovados localmente. Nenhuma notificação bancária real nem chave definitiva foi fornecida.
 
 A execução completa das alterações — testes Kotlin, Android Lint, compilação, assinatura descartável, APIs 26/33/35, restauração do vetor congelado e atualização instalada — deve ser conferida nos jobs do pull request. Esta anotação não antecipa sucesso de tarefas ainda não concluídas.
+
+### Primeira passagem da matriz ampliada
+
+A execução [40196079192](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40196079192) aprovou 104 testes do core, compilação debug/release, assinatura de teste e lint debug sem erros, conservando os 14 avisos da referência. A API 33 aprovou 80 testes, e o cenário independente de atualização instalada na API 35 aprovou a preservação dos dados.
+
+Na API 26, a primeira passagem executou 79 testes e encontrou quatro falhas: interação com o seletor de documentos, sincronização do cadastro de conta, uso de um comando de acesso às notificações ausente nessa versão e uma espera por pixels de ícones fixos na barra do sistema em paisagem. O calendário tinha ainda um teste restrito a API 29 por depender de `WindowInspector`, portanto não integrava aqueles 79 casos. Esses resultados não foram classificados como aprovação da API 26.
+
+A revisão acrescenta identificação estável e espera pelo campo da conta, interação com controles habilitados no seletor e evidências em caso de falha. O teste de revogação utiliza a configuração disponível no Android antigo e bloqueia alertas separadamente por AppOps. A captura de paisagem aguarda a configuração da barra em vez de presumir ícones em coordenadas fixas. A janela do calendário pode ser conferida diretamente na API 26 pelo componente real, mantendo a inspeção completa das janelas nas versões recentes. A nova passagem do CI determina o resultado final dessas correções.

@@ -18,7 +18,7 @@ Uma cópia protegida e recuperável da chave e das senhas é necessária fora do
 
 ## Compatibilidade automatizada
 
-O CI prepara uma chave descartável de dois dias exclusivamente no runner. A versão anterior fica congelada na revisão `7aec1bd102fcfbfb18eed493ceeb9ca0ac89fefe`, com versão 1 e esquema Room 3. Os APKs anterior, atual e de testes são assinados com a mesma chave de teste; o caminho Gradle release também é compilado e sua assinatura conferida. Essa chave não é incluída nos artefatos e não serve para atualizações definitivas.
+O CI primeiro confere a recusa explícita da preparação sem assinatura. Depois prepara uma chave descartável de dois dias exclusivamente no runner. A versão anterior fica congelada na revisão `7aec1bd102fcfbfb18eed493ceeb9ca0ac89fefe`, com versão 1 e esquema Room 3. Os APKs anterior, atual e de testes são assinados com a mesma chave de teste; o caminho Gradle release também compila APK e AAB, executa lint e confere assinatura, certificado, versão e ausência de depuração. Essa chave não é incluída nos artefatos e não serve para atualizações definitivas.
 
 A matriz executa a suíte em emuladores das APIs 26, 33 e 35. Um quarto cenário, na API 35, instala o APK anterior, prepara dados fictícios no esquema 3 e preferências, e instala o APK atual com `adb install -r`, sem desinstalar entre essas duas versões. O teste confere valores, identificadores, vínculos, revisão das pendências, contas, orçamento, recorrência, ocorrências, aparência e ocultação de valores após a migração para o esquema 4.
 
@@ -31,3 +31,5 @@ A matriz não substitui avaliação de fabricantes, bateria, leitura de tela, se
 - [Assinatura de aplicativos](https://developer.android.com/studio/publish/app-signing).
 - [Versionamento de aplicativos](https://developer.android.com/studio/publish/versioning).
 - [Índices Room](https://developer.android.com/reference/androidx/room/Index).
+
+Na API 26, a proteção do calendário é conferida diretamente na janela nativa retornada pelo componente, pois `WindowInspector` só existe a partir da API 29. Nas APIs 33 e 35, a verificação percorre as janelas abertas pelo formulário. Nenhuma reflexão em API privada é utilizada.
