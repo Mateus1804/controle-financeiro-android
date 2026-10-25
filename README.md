@@ -61,7 +61,7 @@ Os valores monetários são armazenados em centavos inteiros. Transferências fi
 
 A validação combina testes Kotlin, persistência Room, migrações, fluxos de interface e atualização sobre a versão anterior. A validação atual está concentrada na API 35; as execuções anteriores em outras APIs permanecem documentadas. Os resultados e as limitações de cada execução ficam registrados em [Qualidade e validação](docs/qualidade.md). As novas interações e o sistema de temas são descritos em [Revisão visual](docs/redesign.md).
 
-Os resultados dos comandos, as execuções aprovadas, os avisos e as verificações ainda pendentes estão registrados em [Qualidade e validação](docs/qualidade.md). A validação com bancos reais, a autenticação no aparelho e a recuperação em condições reais de uso exigem avaliação própria.
+A [execução da revisão visual](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40209636647) aprovou 104 testes do core, 95 testes instrumentados na API 35 e as duas fases de atualização e recuperação. O lint debug e release concluiu sem erros, com 14 avisos anteriores por variante. TalkBack manual, biometria no aparelho e notificações bancárias reais permanecem fora dessa validação.
 
 ## Interface
 
@@ -93,7 +93,7 @@ Os resultados efetivamente executados estão registrados em [Qualidade e valida�
 
 A preparação de atualizações passou a prever assinatura externa ao repositório, conferência de certificado e versionamento crescente. O esquema Room 4 acrescenta índices e conserva os dados existentes. O histórico e os candidatos manuais compartilham a mesma emissão, enquanto o catálogo utiliza uma consulta reduzida de nomes e datas.
 
-A validação inclui um backup congelado no formato 1, migração dos esquemas anteriores, histórico fictício de cinco mil registros e um cenário de atualização do APK anterior sobre a instalação existente. A matriz de emuladores cobre APIs 26, 33, 35 e 36. Os resultados efetivamente executados ficam em [Qualidade](docs/qualidade.md).
+A validação inclui um backup congelado no formato 1, migração dos esquemas anteriores, histórico fictício de cinco mil registros e um cenário de atualização do APK anterior sobre a instalação existente. A revisão funcional anterior cobriu as APIs 26, 33, 35 e 36; o CI atual concentra os cenários na API 35. Os resultados efetivamente executados ficam em [Qualidade](docs/qualidade.md).
 
 A [documentação de atualizações](docs/atualizacoes.md) descreve assinatura e limitações. As amostras bancárias reais continuam pendentes; uma tarefa privada foi preparada para conferi-las sem publicar mensagens ou dados pessoais. A preparação não publica APKs nem altera a assinatura de instalações pessoais.
 

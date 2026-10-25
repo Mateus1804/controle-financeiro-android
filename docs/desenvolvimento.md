@@ -59,7 +59,7 @@ Os resultados da integração contínua são registrados separadamente dos teste
 
 ## APK de desenvolvimento e dados locais
 
-O APK de depuração fica disponível no artefato `controle-financeiro-debug` da execução correspondente do GitHub Actions, com retenção de 14 dias. Esse pacote serve aos testes de desenvolvimento. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
+Os APKs ficam no artefato `apks-compatibilidade`, com retenção de sete dias. Relatórios e capturas têm retenção de 14 dias. Os pacotes de CI usam chave descartável e dados fictícios; servem à validação em ambiente isolado. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
 
 Bases reais, exportações, arquivos de assinatura e configurações locais devem permanecer fora do repositório. A recuperação está disponível por backup criptografado, senha original e conferência da prévia. A desinstalação remove os dados locais do aplicativo.
 
