@@ -19,7 +19,7 @@ import com.mateuswilliam.financas.notifications.RecurringReminders
 class FinanceApplication : Application() {
     val settings by lazy { CapturePreferences(this) }
     val database by lazy { Room.databaseBuilder(this, FinanceDatabase::class.java, "financas.db")
-        .addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3).build() }
+        .addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4).build() }
     val repository by lazy { FinanceRepository(database, settings) }
     val backups by lazy { BackupStore(this, repository) }
     val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -31,7 +31,7 @@ class FinanceApplication : Application() {
         super.onCreate()
         maintenanceReady
         background.launch {
-            settings.state.map { it.remindersEnabled }.distinctUntilChanged().collect { RecurringReminders.schedule(this@FinanceApplication, it) }
+            settings.state.map { it.remindersEnabled }.distinctUntilChanged().collect { RecurringReminders.schedule(this@FinanceApplication) }
         }
     }
 }

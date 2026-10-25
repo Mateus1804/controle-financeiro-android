@@ -36,13 +36,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-fun showFinanceDatePicker(context: Context, theme: Int, selected: LocalDate, onSelected: (LocalDate) -> Unit) {
-    DatePickerDialog(context, theme, { _, year, month, day -> onSelected(LocalDate.of(year, month + 1, day)) },
+fun showFinanceDatePicker(context: Context, theme: Int, selected: LocalDate, onSelected: (LocalDate) -> Unit): DatePickerDialog {
+    return DatePickerDialog(context, theme, { _, year, month, day -> onSelected(LocalDate.of(year, month + 1, day)) },
         selected.year, selected.monthValue - 1, selected.dayOfMonth).apply {
         // Diálogos nativos têm janela própria e precisam respeitar a proteção da tela.
         if ((context.applicationContext as? FinanceApplication)?.settings?.snapshot()?.secureScreen == true)
             window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-    }.show()
+        show()
+    }
 }
 
 @Composable

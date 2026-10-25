@@ -48,7 +48,7 @@ class BackupDocumentFlowTest {
             assertTrue(name.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, fileName)
             }))
-            click(awaitSystemNode { it.viewIdResourceName?.endsWith(":id/button_save") == true || it.text?.toString() in setOf("Save", "SAVE", "Salvar", "SALVAR") })
+            click(awaitSystemNode { it.isEnabled && (it.viewIdResourceName?.endsWith(":id/button_save") == true || it.text?.toString() in setOf("Save", "SAVE", "Salvar", "SALVAR")) })
             awaitApplication()
             rule.waitUntil(15000) { rule.onAllNodesWithText("Backup salvo.", substring = true).fetchSemanticsNodes().isNotEmpty() }
             app.repository.clear()
@@ -73,6 +73,19 @@ class BackupDocumentFlowTest {
             rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().size == 1 } }
             assertEquals(expected, app.repository.exportRecords().single())
             assertFalse(app.settings.snapshot().enabled)
+        } catch (failure: Throwable) {
+            val directory = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            val bitmap = automation.takeScreenshot()
+            if (bitmap != null) java.io.File(directory, "falha-seletor.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it); bitmap.recycle() }
+            fun describe(node: AccessibilityNodeInfo, depth: Int): String = if (depth > 16) "" else buildString {
+                append("  ".repeat(depth)).append(node.className).append(" id=").append(node.viewIdResourceName)
+                append(" text=").append(node.text).append(" description=").append(node.contentDescription)
+                append(" enabled=").append(node.isEnabled).append(" clickable=").append(node.isClickable).append('\n')
+                for (i in 0 until node.childCount) node.getChild(i)?.let { append(describe(it, depth + 1)) }
+            }
+            val tree = automation.rootInActiveWindow?.let { describe(it, 0) }.orEmpty()
+            java.io.File(directory, "falha-seletor.txt").writeText(tree)
+            throw AssertionError("Falha no seletor de arquivos do emulador. Hierarquia fictícia:\n$tree", failure)
         } finally {
             repeat(3) {
                 if (automation.rootInActiveWindow?.packageName?.toString() != app.packageName) {
@@ -111,7 +124,22 @@ class BackupDocumentFlowTest {
     private fun click(node: AccessibilityNodeInfo) {
         var target: AccessibilityNodeInfo? = node
         while (target != null && !target.isClickable) target = target.parent
-        assertTrue("O controle do seletor precisa aceitar a ação de clique.", target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true)
+        // Na grade do DocumentsUI da API 26, o RecyclerView trata o toque sem marcar o texto como clicável.
+        val control = target ?: node
+        control.refresh()
+        assertTrue("O controle do seletor precisa estar habilitado.", control.isEnabled)
+        if (target == null || !control.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            // O DocumentsUI antigo pode não executar ACTION_CLICK; o toque real continua sujeito ao resultado do fluxo.
+            val bounds = android.graphics.Rect().also(control::getBoundsInScreen)
+            assertFalse(bounds.isEmpty)
+            val time = SystemClock.uptimeMillis()
+            val down = android.view.MotionEvent.obtain(time, time, android.view.MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY(), 0)
+            val up = android.view.MotionEvent.obtain(time, time + 40, android.view.MotionEvent.ACTION_UP, bounds.exactCenterX(), bounds.exactCenterY(), 0)
+            down.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            up.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            try { assertTrue(automation.injectInputEvent(down, true)); assertTrue(automation.injectInputEvent(up, true)) }
+            finally { down.recycle(); up.recycle() }
+        }
     }
     private fun waitForKeyboard() {
         rule.waitUntil(5000) {

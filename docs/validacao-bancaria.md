@@ -60,3 +60,17 @@ A interpretação e a entrega são avaliações distintas. Um caso de texto reco
 - Diferenças de perfis do Android, otimizações de bateria e conteúdo restrito pelo sistema ou fabricante.
 
 O nome da origem permanece separado da conta escolhida. Uma notificação do banco pode corresponder a mais de uma conta do usuário. Situações ambíguas ficam para revisão, e nenhuma indicação de possível duplicidade remove ou une lançamentos automaticamente.
+
+## Execução privada contra o interpretador
+
+A tarefa abaixo utiliza arquivos externos ao conjunto público de recursos:
+
+    ./gradlew :core:validateBankEvidence -PbankEvidenceDirectory=casos-locais
+
+O diretório precisa conter `notificacoes.tsv` e `evidencias.json`. A conferência exige procedência `REAL_ANONYMIZED`, identificação única, anonimização revisada, banco, pacote, versões, aparelho, data, estado da conexão, entrega observada e resultado da revisão. Casos sintéticos, metadados incompletos e possíveis documentos ou e-mails são recusados. A indicação de entrega pode ser falsa: esse resultado deve permanecer registrado como limitação observada, sem ser transformado em sucesso pelo teste do texto.
+
+Depois da conferência de metadados, o interpretador Kotlin real compara valor, movimentação, meio, categoria e filtro sensível com as expectativas revisadas. As mensagens não são incluídas no console, no APK nem em relatórios JUnit públicos. O caminho fica fora do Git; a revisão humana de nomes, contas, chaves Pix e outros dados livres permanece necessária.
+
+A ausência de arquivos ou de evidência real faz a tarefa falhar explicitamente. A tarefa privada não é executada pelo CI público com dados artificiais apresentados como reais. Os cinco testes Python conferem apenas as regras de procedência com metadados e textos fictícios.
+
+**Situação desta revisão:** nenhuma amostra real foi recebida. Portanto, a compatibilidade com Inter, Nubank, PicPay, Mercado Pago e PagBank no aparelho permanece pendente; somente a infraestrutura de avaliação e os casos sintéticos podem ser verificados nesta entrega.

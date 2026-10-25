@@ -57,3 +57,13 @@ A portabilidade do envelope tem um vetor fixo com texto e senha fictícios, prod
 Uma recuperação de teste utiliza emulador dedicado e dados fictícios. A instalação original com dados reais deve permanecer preservada. A substituição de APK exige o mesmo identificador e a mesma chave de assinatura; desinstalar para contornar uma assinatura diferente apaga a base local.
 
 Os resultados efetivamente executados ficam em [Qualidade e validação](qualidade.md), e os comandos do ambiente ficam em [Desenvolvimento](desenvolvimento.md).
+
+## Compatibilidade entre versões
+
+O formato de dados e do envelope continua na versão 1, separado do esquema Room. O esquema 4 acrescenta índices sem reescrever o conteúdo financeiro. Um vetor congelado em `app/src/androidTest/assets/compatibility/` conserva todos os conjuntos de dados do esquema 3 e é restaurado pelo código atual numa base temporária antes de qualquer substituição.
+
+O vetor usa dados fictícios e criptografia gerada independentemente em Python. Não representa uma exportação bancária real. O teste compara todos os registros, vínculos, revisões, contas, orçamentos, recorrências e ocorrências, além da aparência. O cadastro local existente precisa permanecer intacto até a confirmação da restauração. O arquivo congelado não é regenerado durante o teste.
+
+A migração do banco instalado e a compatibilidade do arquivo de backup são verificações diferentes. O CI também executa a atualização do APK anterior sobre a mesma instalação; o procedimento está descrito em `atualizacoes.md`. Formatos futuros desconhecidos continuam recusados sem substituir dados.
+
+O cenário de atualização possui ainda duas fases: exportação pelo código do APK anterior e recuperação pelo APK atualizado. O artefato de teste é inteiramente fictício e usa senha pública exclusiva da suíte. O resultado dessas fases depende dos jobs efetivamente concluídos, registrados em Qualidade.

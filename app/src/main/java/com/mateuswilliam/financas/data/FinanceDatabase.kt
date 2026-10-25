@@ -24,7 +24,10 @@ import com.mateuswilliam.financas.core.MonthlyBudget
 import com.mateuswilliam.financas.core.RecurringPlan
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "drafts", indices = [Index(value = ["sourceKey"], unique = true)])
+@Entity(tableName = "drafts", indices = [
+    Index(value = ["sourceKey"], unique = true),
+    Index(value = ["status", "capturedAt", "id"], orders = [Index.Order.ASC, Index.Order.DESC, Index.Order.ASC]),
+])
 data class DraftEntity(
     @PrimaryKey val id: String,
     val sourceKey: String,
@@ -43,7 +46,10 @@ data class DraftEntity(
     val revision: Int = 1,
 )
 
-@Entity(tableName = "records", indices = [Index(value = ["sourceDraftId"], unique = true)])
+@Entity(tableName = "records", indices = [
+    Index(value = ["sourceDraftId"], unique = true),
+    Index(value = ["occurredAt", "id"], orders = [Index.Order.DESC, Index.Order.ASC]),
+])
 data class RecordEntity(
     @PrimaryKey val id: String,
     val sourceDraftId: String?,
@@ -100,6 +106,8 @@ data class RecurringEntity(
 @Entity(tableName = "occurrences", primaryKeys = ["recurringId", "dueDate"], indices = [Index(value = ["recordId"], unique = true)])
 data class OccurrenceEntity(val recurringId: String, val dueDate: String, val status: String, val recordId: String?)
 
+data class UsedAccount(val label: String, val lastUsedAt: Long)
+
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM budgets ORDER BY month, category") fun budgets(): Flow<List<BudgetEntity>>
@@ -129,11 +137,19 @@ interface FinanceDao {
     @Query("UPDATE accounts SET lastUsedAt = MAX(lastUsedAt, :time) WHERE nameKey = :key")
     suspend fun touchAccount(key: String, time: Long)
     @Query("DELETE FROM accounts") suspend fun clearAccounts()
-    @Query("SELECT * FROM drafts WHERE status = 'PENDING' ORDER BY capturedAt DESC")
+    // Só nomes e datas atravessam a consulta do catálogo; descrições e demais campos ficam fora dela.
+    @Query("""
+        SELECT label, MAX(occurredAt) AS lastUsedAt FROM (
+            SELECT bank AS label, occurredAt FROM records
+            UNION ALL SELECT destination AS label, occurredAt FROM records
+        ) WHERE label != '' GROUP BY label ORDER BY lastUsedAt DESC, label ASC
+    """)
+    fun usedAccounts(): Flow<List<UsedAccount>>
+    @Query("SELECT * FROM drafts WHERE status = 'PENDING' ORDER BY capturedAt DESC, id ASC")
     fun pending(): Flow<List<DraftEntity>>
-    @Query("SELECT * FROM records ORDER BY occurredAt DESC")
+    @Query("SELECT * FROM records ORDER BY occurredAt DESC, id ASC")
     fun records(): Flow<List<RecordEntity>>
-    @Query("SELECT * FROM records ORDER BY occurredAt DESC")
+    @Query("SELECT * FROM records ORDER BY occurredAt DESC, id ASC")
     suspend fun allRecords(): List<RecordEntity>
     @Query("SELECT * FROM drafts ORDER BY capturedAt DESC, id") suspend fun allDrafts(): List<DraftEntity>
     @Query("SELECT * FROM drafts WHERE sourceKey = :key LIMIT 1")
@@ -153,11 +169,17 @@ interface FinanceDao {
     @Query("DELETE FROM records") suspend fun clearRecords()
 }
 
-@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class], version = 3, exportSchema = true)
+@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class], version = 4, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_records_occurredAt_id` ON `records` (`occurredAt` DESC, `id` ASC)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_drafts_status_capturedAt_id` ON `drafts` (`status` ASC, `capturedAt` DESC, `id` ASC)")
+            }
+        }
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `accounts` (`nameKey` TEXT NOT NULL, `label` TEXT NOT NULL, `lastUsedAt` INTEGER NOT NULL, PRIMARY KEY(`nameKey`))")

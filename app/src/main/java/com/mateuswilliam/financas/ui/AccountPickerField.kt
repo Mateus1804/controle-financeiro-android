@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.R
 import com.mateuswilliam.financas.core.AccountNames
@@ -57,7 +58,7 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
         title = { DialogSystemBars(); Text("Adicionar conta ou banco") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it.take(80); error = null }, label = { Text("Nome da conta") }, singleLine = true, enabled = !saving)
+                OutlinedTextField(name, { name = it.take(80); error = null }, label = { Text("Nome da conta") }, singleLine = true, enabled = !saving, modifier = Modifier.testTag("account-name-input"))
                 Text("Ex.: Inter pessoal, Inter trabalho ou Carteira. Não informe número de conta ou senha.", style = MaterialTheme.typography.bodySmall)
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }

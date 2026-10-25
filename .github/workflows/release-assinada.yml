@@ -1,0 +1,74 @@
+name: Preparar versão assinada
+on:
+  workflow_dispatch:
+    inputs:
+      versionCode:
+        description: Código inteiro maior que o da última versão distribuída
+        required: true
+        default: '2'
+      versionName:
+        description: Versão apresentada no aplicativo
+        required: true
+        default: '0.2.0'
+permissions:
+  contents: read
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    environment: assinatura
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
+      RELEASE_VERSION_CODE: ${{ inputs.versionCode }}
+      RELEASE_VERSION_NAME: ${{ inputs.versionName }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Carregar a chave protegida
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          required = ('ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD', 'ANDROID_SIGNING_CERT_SHA256')
+          if not all(os.environ.get(key) for key in required):
+              raise SystemExit('Configure os segredos de assinatura e a impressão digital pública no ambiente assinatura. Nenhuma chave de teste será usada como alternativa.')
+          path = Path(os.environ['RUNNER_TEMP']) / 'release-signing.jks'
+          with path.open('xb') as output:
+              output.write(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
+          path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'ANDROID_KEYSTORE_PATH={path}\n')
+          PY
+      - name: Conferir, testar e preparar APK e AAB
+        run: |
+          python3 scripts/verify-wrapper.py
+          ./gradlew --no-daemon --max-workers=2 :core:test :app:lintRelease :app:assembleRelease :app:bundleRelease "-PappVersionCode=$RELEASE_VERSION_CODE" "-PappVersionName=$RELEASE_VERSION_NAME"
+          python3 scripts/verify-release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: versao-assinada-${{ inputs.versionCode }}
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+            qa/release-metadata.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remover o keystore temporário
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release-signing.jks"

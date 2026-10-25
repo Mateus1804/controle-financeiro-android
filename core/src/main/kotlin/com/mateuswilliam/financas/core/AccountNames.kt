@@ -12,6 +12,10 @@ data class AccountOption(val key: String, val label: String, val lastUsedAt: Lon
 
 object AccountCatalog {
     fun options(saved: List<AccountOption>, records: List<Record>): List<AccountOption> {
+        return merge(saved, records.flatMap { listOf(AccountOption("", it.bank, it.occurredAt), AccountOption("", it.destination, it.occurredAt)) })
+    }
+
+    fun merge(saved: List<AccountOption>, used: List<AccountOption>): List<AccountOption> {
         val options = linkedMapOf<String, AccountOption>()
         fun include(name: String, time: Long) {
             val key = AccountNames.key(name)
@@ -20,7 +24,7 @@ object AccountCatalog {
             options[key] = AccountOption(key, previous?.label ?: AccountNames.clean(name), maxOf(previous?.lastUsedAt ?: 0, time))
         }
         saved.forEach { include(it.label, it.lastUsedAt) }
-        records.forEach { include(it.bank, it.occurredAt); include(it.destination, it.occurredAt) }
+        used.forEach { include(it.label, it.lastUsedAt) }
         return options.values.sortedWith(compareByDescending<AccountOption> { it.lastUsedAt }.thenBy { it.key })
     }
 }

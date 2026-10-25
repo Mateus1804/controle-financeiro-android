@@ -34,7 +34,7 @@ class AccountMigrationTest {
             close()
         }
         val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name)
-            .addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3).build()
+            .addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4).build()
         try {
             val dao = database.financeDao()
             assertEquals(4290L, dao.allRecords().single().amountCents)

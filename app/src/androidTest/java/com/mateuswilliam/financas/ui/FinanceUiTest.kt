@@ -177,8 +177,18 @@ class FinanceUiTest {
     @Test fun accountCanBeAddedWithoutLosingTheAmount() {
         rule.onNodeWithContentDescription("Novo lançamento").performClick()
         rule.onNodeWithTag("amount-input").performTextInput("1234")
-        rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo().performClick()
-        rule.onNodeWithText("Nome da conta").performTextInput("Inter pessoal")
+        // O teclado mede a janela fora do relógio Compose; o toque só ocorre após estabilizar a geometria.
+        waitForStableBounds(rule.onNodeWithTag("amount-input"))
+        val addAccount = rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo()
+        waitForStableBounds(addAccount)
+        addAccount.performClick()
+        try {
+            rule.waitUntil(5000) { rule.onAllNodesWithTag("account-name-input").fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithTag("account-name-input").performTextInput("Inter pessoal")
+        } catch (failure: Throwable) {
+            val roots = rule.onAllNodes(isRoot()).fetchSemanticsNodes().indices.joinToString("\n") { rule.onAllNodes(isRoot())[it].printToString() }
+            throw AssertionError("O cadastro de conta não ficou disponível. Estado da interface:\n$roots", failure)
+        }
         rule.onNodeWithText("Adicionar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Adicionar conta ou banco").fetchSemanticsNodes().isEmpty() }
         confirmEntry()
@@ -242,7 +252,7 @@ class FinanceUiTest {
 
     @Test fun landscapeLayoutKeepsTheFormUsable() {
         try {
-            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
             rule.onNodeWithContentDescription("Novo lançamento").performClick()
             rule.onNodeWithTag("amount-input").performTextInput("1234")
@@ -251,7 +261,7 @@ class FinanceUiTest {
             confirmEntry()
             assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
         } finally {
-            rule.runOnIdle { rule.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
         }
     }
 
@@ -268,7 +278,7 @@ class FinanceUiTest {
     }
 
 
-    @Test fun notificationAccessRefreshesAfterResumeAndRevocationWithoutAlertPermission() {
+    @Test fun notificationAccessRefreshesAfterResumeAndRevocationAcrossAlertPermissions() {
         val component = "com.mateuswilliam.financas/com.mateuswilliam.financas.notifications.BankNotificationListener"
         fun command(value: String): String {
             val descriptor = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(value)
@@ -279,25 +289,48 @@ class FinanceUiTest {
             rule.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
             rule.waitForIdle()
         }
-        assertTrue(command("cmd notification help").contains("allow_listener"))
+        val shellListenerCommand = command("cmd notification help").contains("allow_listener")
+        val previousListeners = command("settings get secure enabled_notification_listeners").trim().takeUnless { it == "null" }.orEmpty()
+        fun listenerAccess(allowed: Boolean) {
+            if (shellListenerCommand) command("cmd notification " + (if (allowed) "allow_listener " else "disallow_listener ") + component)
+            else {
+                val values = previousListeners.split(':').filter { it.isNotBlank() && it != component }.toMutableList()
+                if (allowed) values.add(component)
+                if (values.isEmpty()) command("settings delete secure enabled_notification_listeners")
+                else command("settings put secure enabled_notification_listeners " + values.joinToString(":"))
+            }
+        }
         try {
+            // A API 26 não possui a permissão runtime da API 33 nem o comando allow_listener.
+            if (android.os.Build.VERSION.SDK_INT >= 33)
+                command("appops set " + app.packageName + " POST_NOTIFICATION deny")
             rule.runOnIdle {
                 app.settings.acceptDisclosure()
                 app.settings.selectPackages(setOf("banco.exemplo"))
             }
-            command("cmd notification allow_listener " + component)
+            listenerAccess(true)
             resume()
             rule.waitUntil(10000) { app.listenerConnected.value }
             rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
-            rule.onNodeWithText("Permitir alertas de revisão").assertExists()
-            command("cmd notification disallow_listener " + component)
+            val alertAction = rule.onNodeWithText("Permitir alertas de revisão")
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                assertFalse(androidx.core.content.ContextCompat.checkSelfPermission(app, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+                alertAction.assertExists()
+            } else {
+                // Nessas versões não há POST_NOTIFICATIONS runtime; a ação reflete o bloqueio global efetivo do sistema.
+                if (androidx.core.app.NotificationManagerCompat.from(app).areNotificationsEnabled()) alertAction.assertDoesNotExist()
+                else alertAction.assertExists()
+            }
+            listenerAccess(false)
             resume()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Falta autorizar o acesso às notificações no Android.").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithText("Resumo").performClick()
             rule.onNodeWithText("Autorizar acesso").assertExists()
         } finally {
-            command("cmd notification disallow_listener " + component)
+            listenerAccess(false)
+            if (android.os.Build.VERSION.SDK_INT >= 33)
+                command("appops set " + app.packageName + " POST_NOTIFICATION default")
             rule.runOnIdle { app.settings.setEnabled(false) }
         }
     }
@@ -316,6 +349,20 @@ class FinanceUiTest {
             assertFalse(app.settings.state.value.enabled)
             assertTrue(app.settings.state.value.introSeen)
         }
+    }
+
+    private fun waitForStableBounds(node: SemanticsNodeInteraction) {
+        var previous: androidx.compose.ui.geometry.Rect? = null
+        var stableSince = android.os.SystemClock.uptimeMillis()
+        rule.waitUntil(5000) {
+            val bounds = node.fetchSemanticsNode().boundsInWindow
+            val now = android.os.SystemClock.uptimeMillis()
+            if (bounds != previous) {
+                previous = bounds; stableSince = now
+                false
+            } else now - stableSince >= 300
+        }
+        node.assertIsDisplayed()
     }
 
     private fun confirmEntry() {
