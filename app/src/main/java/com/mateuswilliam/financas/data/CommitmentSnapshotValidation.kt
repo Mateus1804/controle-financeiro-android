@@ -34,6 +34,7 @@ internal object CommitmentSnapshotValidation {
             val schedule = CommitmentPlanning.schedule(p.toPurchase())
             require(p.nextDueDate == p.toPurchase().nextDueDate.toString())
             require(p.sourceDraftId == null || drafts[p.sourceDraftId]?.status == "SAVED") { "Origem de compra inválida." }
+            require(p.revision >= 0 && (!p.openCancelled || p.revision > 0)) { "Revisão ou cancelamento de compra inválido." }
             CommitmentReports.fromInstallments(p.id, p.title, schedule).forEach { expected[it.id] = it }
         }
         require(snapshot.commitments.count { it.purchaseId != null } == expected.size) { "Parcelas incompletas no backup." }
@@ -45,12 +46,14 @@ internal object CommitmentSnapshotValidation {
             require(date.toString() == c.dueDate && date.year in 1..9999 && c.amountCents in 1..Money.MAX_CENTS)
             require((c.purchaseId != null) != (c.recurringId != null)) { "O compromisso precisa ter uma única origem." }
             if (c.purchaseId != null) {
-                require(c.purchaseId in purchases && c.installmentNumber != null)
+                val purchase = purchases[c.purchaseId] ?: throw IllegalArgumentException("Compra ausente no backup.")
+                require(c.installmentNumber != null)
                 val plan = expected[c.id] ?: throw IllegalArgumentException("Parcela não prevista na compra.")
-                require(c.id == "installment:${c.purchaseId}:${c.installmentNumber}" && c.toCommitment() == plan) { "Valor ou vencimento de parcela inconsistente." }
+                require(c.id == "installment:${c.purchaseId}:${c.installmentNumber}" && c.label == plan.label)
+                require(if (c.adjusted) purchase.revision > 0 else c.toCommitment() == plan) { "Valor ou vencimento de parcela inconsistente." }
                 require(c.recordId !in occurrenceByRecord) { "Uma despesa não pode confirmar parcela e recorrência diferentes." }
             } else {
-                require(c.recurringId in recurring && c.installmentNumber == null)
+                require(c.recurringId in recurring && c.installmentNumber == null && !c.adjusted)
                 require(c.id == CommitmentPlanning.recurringId(c.recurringId!!, date))
                 val occurrence = occurrences[c.recurringId to c.dueDate] ?: throw IllegalArgumentException("Vencimento recorrente ausente.")
                 require(occurrence.status in setOf("RECORDED", "REMOVED"))

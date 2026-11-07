@@ -111,7 +111,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         val saved = database.withTransaction {
             if (editing) {
                 val previous = dao.recordById(record.id) ?: return@withTransaction false
-                if (record.movement != Movement.EXPENSE) dao.unlinkCommitment(record.id)
+                if (record.movement != Movement.EXPENSE) unlinkCommitment(record.id)
                 val updated = dao.updateRecord(RecordEntity.from(record, previous.sourceDraftId)) == 1
                 if (updated) {
                     if (record.movement == Movement.EXPENSE) reconcileRecurringCommitment(record)
@@ -152,7 +152,23 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     suspend fun dismiss(id: String) = writes.withLock { dao.reviewDraft(id, "DISMISSED") }
-    suspend fun deleteRecord(id: String) = writes.withLock { database.withTransaction { dao.unlinkCommitment(id); dao.unlinkOccurrence(id); dao.deleteRecord(id) } }
+    suspend fun deleteRecord(id: String) = writes.withLock {
+        database.withTransaction {
+            unlinkCommitment(id)
+            dao.unlinkOccurrence(id)
+            dao.deleteRecord(id)
+        }
+    }
+
+    private suspend fun unlinkCommitment(recordId: String) {
+        val purchaseId = dao.commitmentByRecord(recordId)?.purchaseId
+        dao.unlinkCommitment(recordId)
+        if (purchaseId != null) {
+            val purchase = checkNotNull(dao.purchaseById(purchaseId))
+            saveNextPurchaseRevision(purchase)
+        }
+    }
+
     suspend fun exportRecords(): List<Record> = dao.allRecords().map { it.toRecord() }
 
     suspend fun saveMonthlyPlan(plan: MonthlyIncomePlan) = writes.withLock {
@@ -171,24 +187,89 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
                 if (draft.revision != expectedRevision) throw DraftChangedException()
             }
             dao.insertPurchase(PurchaseEntity.from(purchase, draftId))
-            CommitmentReports.fromInstallments(purchase.id, purchase.title, schedule).zip(schedule.pending).forEach { (item, part) ->
-                dao.insertCommitment(CommitmentEntity(item.id, item.label, item.amountCents, item.dueDate.toString(),
-                    purchase.id, part.number, null, null))
-            }
+            insertPurchaseSchedule(purchase, schedule)
             rememberAccount(purchase.bank)
             if (draftId != null) dao.reviewDraft(draftId, "SAVED")
             true
         }
     }
 
-    suspend fun confirmInstallment(id: String, record: Record): Boolean = writes.withLock {
+    private suspend fun insertPurchaseSchedule(purchase: InstallmentPurchase, schedule: InstallmentSchedule) {
+        CommitmentReports.fromInstallments(purchase.id, purchase.title, schedule).zip(schedule.pending).forEach { (item, part) ->
+            dao.insertCommitment(CommitmentEntity(item.id, item.label, item.amountCents, item.dueDate.toString(),
+                purchase.id, part.number, null, null))
+        }
+    }
+
+    suspend fun purchaseManagement(installmentId: String): PurchaseManagement? = database.withTransaction {
+        val item = dao.commitmentById(installmentId) ?: return@withTransaction null
+        val purchaseId = item.purchaseId ?: return@withTransaction null
+        val number = item.installmentNumber ?: return@withTransaction null
+        val purchase = dao.purchaseById(purchaseId) ?: return@withTransaction null
+        if (purchase.openCancelled || item.recordId != null) return@withTransaction null
+        val installments = dao.installmentsForPurchase(purchaseId)
+        PurchaseManagement(purchase.toPurchase(), purchase.revision, item.id,
+            Installment(number, LocalDate.parse(item.dueDate), item.amountCents),
+            installments.count { it.recordId == null }, installments.none { it.recordId != null || it.adjusted })
+    }
+
+    suspend fun editPurchase(expectedRevision: Long, purchase: InstallmentPurchase): Boolean = writes.withLock {
+        val schedule = CommitmentPlanning.schedule(purchase)
+        database.withTransaction {
+            val previous = dao.purchaseById(purchase.id) ?: return@withTransaction false
+            if (previous.openCancelled || previous.revision != expectedRevision) return@withTransaction false
+            val installments = dao.installmentsForPurchase(purchase.id)
+            if (installments.isEmpty() || installments.any { it.recordId != null || it.adjusted }) return@withTransaction false
+            val edited = PurchaseEntity.from(purchase, previous.sourceDraftId).copy(revision = previous.revision)
+            if (edited == previous) return@withTransaction true
+            check(dao.deleteReplaceableInstallments(purchase.id) == installments.size)
+            saveNextPurchaseRevision(edited)
+            insertPurchaseSchedule(purchase, schedule)
+            rememberAccount(purchase.bank)
+            true
+        }
+    }
+
+    suspend fun adjustInstallment(id: String, expectedRevision: Long, adjustment: InstallmentAdjustment): Boolean = writes.withLock {
+        database.withTransaction {
+            val item = dao.commitmentById(id) ?: return@withTransaction false
+            val purchase = item.purchaseId?.let { dao.purchaseById(it) } ?: return@withTransaction false
+            if (purchase.openCancelled || purchase.revision != expectedRevision || item.recordId != null) return@withTransaction false
+            val date = adjustment.dueDate.toString()
+            if (item.amountCents == adjustment.amountCents && item.dueDate == date) return@withTransaction true
+            check(dao.adjustOpenInstallment(id, adjustment.amountCents, date) == 1)
+            saveNextPurchaseRevision(purchase)
+            true
+        }
+    }
+
+    suspend fun cancelOpenInstallments(id: String, expectedRevision: Long, expectedOpenCount: Int): Int = writes.withLock {
+        database.withTransaction {
+            val purchase = dao.purchaseById(id) ?: return@withTransaction 0
+            if (purchase.openCancelled || purchase.revision != expectedRevision) return@withTransaction 0
+            val count = dao.installmentsForPurchase(id).count { it.recordId == null }
+            if (count == 0 || count != expectedOpenCount) return@withTransaction 0
+            saveNextPurchaseRevision(purchase.copy(openCancelled = true))
+            count
+        }
+    }
+
+    private suspend fun saveNextPurchaseRevision(purchase: PurchaseEntity) {
+        check(dao.updatePurchase(purchase.copy(revision = Math.addExact(purchase.revision, 1L))) == 1)
+    }
+
+    suspend fun confirmInstallment(id: String, record: Record, expectedPurchaseRevision: Long? = null): Boolean = writes.withLock {
         RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
         require(record.movement == Movement.EXPENSE) { "A parcela precisa ser confirmada como despesa." }
         val saved = database.withTransaction {
             val item = dao.commitmentById(id) ?: return@withTransaction false
-            if (item.purchaseId == null || item.recordId != null) return@withTransaction false
+            val purchase = item.purchaseId?.let { dao.purchaseById(it) } ?: return@withTransaction false
+            if (item.recordId != null || purchase.openCancelled ||
+                (expectedPurchaseRevision != null && purchase.revision != expectedPurchaseRevision)
+            ) return@withTransaction false
             dao.insertRecord(RecordEntity.from(record, null))
             check(dao.linkCommitment(id, record.id) == 1)
+            saveNextPurchaseRevision(purchase)
             rememberAccount(record.bank)
             true
         }
@@ -217,7 +298,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     fun observeCommitmentReport(month: YearMonth) = database.invalidationTracker.createFlow(
-        "monthly_plans", "commitments", "records", "occurrences", "recurring", "fixed_recurring",
+        "monthly_plans", "commitments", "purchases", "records", "occurrences", "recurring", "fixed_recurring",
     ).conflate().map { commitmentReport(month) }.distinctUntilChanged()
 
     suspend fun commitmentReport(month: YearMonth): CommitmentReport = withContext(Dispatchers.Default) {

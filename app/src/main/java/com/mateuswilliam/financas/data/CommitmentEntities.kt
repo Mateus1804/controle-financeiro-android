@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas.data
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -20,6 +21,8 @@ data class PurchaseEntity(
     @PrimaryKey val id: String, val title: String, val bank: String, val category: Category,
     val method: PaymentMethod, val totalCents: Long, val installmentCount: Int, val paidInstallments: Int,
     val nextDueDate: String, val dayOfMonth: Int, val sourceDraftId: String?,
+    @ColumnInfo(defaultValue = "0") val revision: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val openCancelled: Boolean = false,
 ) {
     fun toPurchase() = InstallmentPurchase(id, title, bank, category, totalCents, installmentCount,
         LocalDate.parse(nextDueDate), paidInstallments, dayOfMonth, method)
@@ -46,6 +49,7 @@ data class FixedRecurringEntity(@PrimaryKey val recurringId: String, val fromMon
 data class CommitmentEntity(
     @PrimaryKey val id: String, val label: String, val amountCents: Long, val dueDate: String,
     val purchaseId: String?, val installmentNumber: Int?, val recurringId: String?, val recordId: String?,
+    @ColumnInfo(defaultValue = "0") val adjusted: Boolean = false,
 ) {
     fun toCommitment() = FixedCommitment(id, label, amountCents, LocalDate.parse(dueDate))
 }
@@ -53,4 +57,10 @@ data class CommitmentEntity(
 data class InstallmentDue(
     val id: String, val title: String, val bank: String, val category: Category, val method: PaymentMethod,
     val amountCents: Long, val dueDate: String, val number: Int, val installmentCount: Int, val recordId: String?,
+    val purchaseRevision: Long,
+)
+
+data class PurchaseManagement(
+    val purchase: InstallmentPurchase, val revision: Long, val installmentId: String,
+    val installment: Installment, val openCount: Int, val canReplacePurchase: Boolean,
 )

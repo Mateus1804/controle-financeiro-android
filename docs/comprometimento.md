@@ -116,4 +116,14 @@ A rosca usa os ângulos calculados pelo core. O traço indica o limite escolhido
 
 Sem renda positiva, o card mantém o valor dos compromissos e oferece o cadastro de renda e limite. A rosca e os percentuais ficam indisponíveis nesse estado. Ao ocultar valores, o card esconde os montantes, percentuais, fatias, posição do limite, estado e legenda, inclusive nas descrições de acessibilidade.
 
-O relatório é recalculado ao trocar de mês ou quando o banco muda as informações usadas no cálculo. A consulta usa a mesma transação que reúne previsões e lançamentos vinculados, sem contar uma obrigação duas vezes. O esquema Room e o formato de backup permanecem os mesmos.
+O relatório é recalculado ao trocar de mês ou quando o banco muda as informações usadas no cálculo. A consulta usa a mesma transação que reúne previsões e lançamentos vinculados, sem contar uma obrigação duas vezes. A quinta fase não alterou o esquema Room nem o formato de backup.
+
+## Sexta fase — correção e cancelamento de compras
+
+Em **Planejamento → Parcelas do mês**, use **Editar** em uma parcela aberta. Enquanto a compra não tiver parcela registrada no app nem ajuste individual, é possível corrigir descrição, conta, categoria, valor, quantidade e vencimento. O app recalcula as previsões e conserva a origem da compra. O número de parcelas já pagas informado no cadastro continua sendo uma indicação: nenhuma despesa retroativa é criada.
+
+Quando já houver pagamento registrado ou ajuste individual, **Editar** corrige somente o valor ou o vencimento daquela parcela aberta. A numeração e os demais compromissos são preservados. Uma parcela registrada mantém o vínculo, a data efetiva e o valor no extrato.
+
+**Cancelar parcelas em aberto** pede confirmação e retira todas as previsões restantes daquela compra do Planejamento, inclusive nos outros meses. Os pagamentos registrados continuam no extrato e no comprometimento do mês de vencimento. O cancelamento é local ao aplicativo. Se um lançamento confirmado for removido posteriormente, uma compra com previsões canceladas não volta a criar compromisso.
+
+A migração Room 5→6 acrescenta o estado de cancelamento, a revisão da compra e o marcador de ajuste individual sem reescrever os dados anteriores. Revisões e vínculos são conferidos na mesma transação da edição, do cancelamento ou da confirmação. O [backup de dados versão 3](backup.md) conserva essas informações e continua lendo os formatos 1 e 2.

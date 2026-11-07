@@ -22,7 +22,7 @@ O Controle Financeiro Android permite acompanhar receitas e despesas com menos d
 - Revisão em sequência com progresso e oferta de acesso ao próximo item, preservando a edição quando chegam novas notificações.
 - Orçamentos mensais por categoria e previsões recorrentes, com confirmação manual de cada vencimento.
 - Renda líquida prevista e limite de comprometimento por mês, com card e gráfico de rosca para parcelas e despesas recorrentes marcadas como fixas.
-- Compras parceladas no cadastro manual e na revisão de notificações, com prévia dos valores e vencimentos e registro separado de cada parcela.
+- Compras parceladas no cadastro manual e na revisão de notificações, com prévia, registro separado, edição e cancelamento de parcelas em aberto.
 - Lembretes opcionais de vencimentos e proteção opcional por biometria ou credencial do aparelho.
 
 ## Captura e revisão de notificações
@@ -41,7 +41,7 @@ Os casos reproduzíveis e a situação de Inter, Nubank, PicPay, Mercado Pago e 
 
 Os limites mensais acompanham despesas líquidas confirmadas por categoria. Previsões recorrentes permanecem separadas dos lançamentos: cada vencimento pode ser conferido, registrado ou pulado. Os lembretes dependem da autorização de alertas e das condições de execução do Android, sem garantia de horário exato.
 
-O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 2, mantendo a leitura dos arquivos de versão 1. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
+O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 3, mantendo a leitura dos arquivos de versões 1 e 2. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
 
 ## Privacidade
 
@@ -91,7 +91,7 @@ A captura não equivale a uma integração oficial com os bancos ou ao acesso ao
 
 Os resultados efetivamente executados estão registrados em [Qualidade e validação](docs/qualidade.md), junto às [decisões técnicas](docs/decisoes.md) e às [referências de estudo](docs/referencias.md). As instruções do ambiente e os comandos ficam no [guia de desenvolvimento](docs/desenvolvimento.md).
 
-As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. A terceira fase acrescenta a persistência no esquema Room 5, a vinculação das confirmações e a recuperação por backup. A quarta fase disponibiliza os cadastros de renda, limite e compras parceladas no app, além da consulta das parcelas por mês. A quinta fase apresenta o indicador, a rosca e a legenda em Planejamento. A renda líquida prevista continua sendo informada manualmente por mês.
+As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. A terceira fase acrescenta a persistência no esquema Room 5, a vinculação das confirmações e a recuperação por backup. A quarta fase disponibiliza os cadastros de renda, limite e compras parceladas no app, além da consulta das parcelas por mês. A quinta fase apresenta o indicador, a rosca e a legenda em Planejamento. A sexta permite corrigir a compra ou as parcelas em aberto e cancelar previsões sem apagar pagamentos confirmados. A renda líquida prevista continua sendo informada manualmente por mês.
 
 ## Atualizações e preservação do histórico
 
