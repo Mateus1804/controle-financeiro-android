@@ -89,7 +89,7 @@ A captura não equivale a uma integração oficial com os bancos ou ao acesso ao
 
 Os resultados efetivamente executados estão registrados em [Qualidade e validação](docs/qualidade.md), junto às [decisões técnicas](docs/decisoes.md) e às [referências de estudo](docs/referencias.md). As instruções do ambiente e os comandos ficam no [guia de desenvolvimento](docs/desenvolvimento.md).
 
-A primeira fase do parcelamento reúne [regras testáveis no core](docs/parcelamento.md) para distribuir centavos, calcular vencimentos e representar compras com parcelas já pagas. O cadastro na interface, a persistência e o indicador de comprometimento da renda ficam para as etapas seguintes.
+As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. Cadastro na interface, persistência e apresentação do indicador ficam para as etapas seguintes.
 
 ## Atualizações e preservação do histórico
 
