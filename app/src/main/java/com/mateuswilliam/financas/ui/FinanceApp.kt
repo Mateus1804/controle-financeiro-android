@@ -68,6 +68,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var planningReturn by rememberSaveable { mutableIntStateOf(0) }
     var selectedRecurringId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedInstallmentId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedPurchaseRevision by rememberSaveable { mutableLongStateOf(0L) }
+    var managedInstallmentId by rememberSaveable { mutableStateOf<String?>(null) }
+    var cancellingPurchase by rememberSaveable { mutableStateOf(false) }
     var recurringDue by rememberSaveable { mutableStateOf("") }
     var plannedRecordId by rememberSaveable { mutableStateOf("") }
     var plannedRecordAt by rememberSaveable { mutableLongStateOf(0L) }
@@ -81,7 +84,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         val report by remember { model.commitmentReport(month) }.collectAsStateWithLifecycle(initialValue = null)
         report
     } else null
-    val installmentPreset = commitments?.installments?.find { it.id == selectedInstallmentId && it.recordId == null }?.let {
+    val installmentPreset = commitments?.installments?.find {
+        it.id == selectedInstallmentId && it.recordId == null && it.purchaseRevision == selectedPurchaseRevision
+    }?.let {
         Record(plannedRecordId, it.amountCents, Movement.EXPENSE, it.method, it.category, it.bank, it.title, plannedRecordAt)
     }
     val duplicateIndex = remember(state.manualRecords) { DuplicateCandidates(state.manualRecords) }
@@ -152,7 +157,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         plannedRecordAt = System.currentTimeMillis()
         selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true
     }
-    BackHandler(tab == 4 && !editing) { tab = planningReturn }
+    BackHandler(tab == 4 && !editing && managedInstallmentId == null) { tab = planningReturn }
 
     val captureIssue = CaptureIssue.evaluate(state.settings.consented, state.settings.enabled, state.settings.packages.isNotEmpty(), hasAccess, connected)
     LaunchedEffect(state.loaded, captureIssue) { if (state.loaded) model.preferences.observeCaptureCondition(captureIssue.name) }
@@ -253,10 +258,20 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         commitments = commitments, commitmentReport = commitmentReport,
                         onIncome = model::saveMonthlyIncome, onFixedRecurring = model::setFixedRecurring,
                         onConfirmInstallment = {
-                            selectedInstallmentId = it.id; selectedRecurringId = null
+                            selectedInstallmentId = it.id; selectedPurchaseRevision = it.purchaseRevision; selectedRecurringId = null
                             openPlannedRecord()
-                        })
+                        },
+                        onEditPurchase = { managedInstallmentId = it; cancellingPurchase = false },
+                        onCancelPurchase = { managedInstallmentId = it; cancellingPurchase = true })
                 }
+            }
+        }
+    }
+
+    if (tab == 4) managedInstallmentId?.let { id ->
+        key(id, cancellingPurchase) {
+            PurchaseManagementDialog(model, id, cancellingPurchase, busy, state.settings.hideAmounts, state.accounts) {
+                managedInstallmentId = null
             }
         }
     }
@@ -270,7 +285,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                 val installmentId = selectedInstallmentId
                 when {
                     recurringId != null -> model.confirmRecurring(recurringId, recurringDue, value) { editing = false }
-                    installmentId != null -> model.confirmInstallment(installmentId, value) { editing = false }
+                    installmentId != null -> model.confirmInstallment(installmentId, value, selectedPurchaseRevision) { editing = false }
                     else -> {
                         val currentDraftId = selectedDraftId
                         model.save(value, currentDraftId, editing = selectedRecordId != null, expectedRevision = expectedRevision) {

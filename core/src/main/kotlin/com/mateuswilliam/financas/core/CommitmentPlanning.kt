@@ -12,6 +12,13 @@ data class InstallmentPurchase(
 
 data class MonthlyIncomePlan(val month: YearMonth, val incomeCents: Long, val healthyLimitBasisPoints: Int = 3000)
 
+data class InstallmentAdjustment(val amountCents: Long, val dueDate: LocalDate) {
+    init {
+        require(amountCents in 1..Money.MAX_CENTS) { "Informe um valor válido para a parcela." }
+        require(dueDate.year in 1..9999) { "Use vencimento com ano entre 1 e 9999." }
+    }
+}
+
 object CommitmentPlanning {
     fun schedule(purchase: InstallmentPurchase): InstallmentSchedule {
         require(purchase.id.isNotBlank() && purchase.id.length <= 128 && '\u0000' !in purchase.id) { "Identificador de compra inválido." }

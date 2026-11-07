@@ -65,8 +65,48 @@ class CommitmentBackupTest {
         repository.restore(legacy)
         assertEquals(0L, repository.commitmentReport(month).committedCents)
         val encoded = BackupSnapshot.encode(repository.snapshot())
-        assertEquals(2, JSONObject(encoded.toString(Charsets.UTF_8)).getInt("version"))
+        assertEquals(3, JSONObject(encoded.toString(Charsets.UTF_8)).getInt("version"))
         assertEquals(legacy.records.toSet(), BackupSnapshot.decode(encoded).records.toSet())
+    }
+    @Test fun versionTwoDefaultsToAnActiveUnchangedPurchaseAndRejectsDisguisedManagementFields() = runBlocking<Unit> {
+        repository.createPurchase(purchase("compra-v2"))
+        val before = repository.snapshot()
+        val previous = JSONObject(BackupSnapshot.encode(before).toString(Charsets.UTF_8)).put("version", 2)
+        assertTrue(runCatching { BackupSnapshot.decode(previous.toString().toByteArray()) }.isFailure)
+        previous.getJSONArray("purchases").getJSONObject(0).apply { remove("revision"); remove("openCancelled") }
+        val commitments = previous.getJSONArray("commitments")
+        repeat(commitments.length()) { commitments.getJSONObject(it).remove("adjusted") }
+        val restored = BackupSnapshot.decode(previous.toString().toByteArray())
+        assertEquals(before, restored)
+        repository.clear()
+        repository.restore(restored)
+        assertEquals(3334L, repository.commitmentReport(month).committedCents)
+        assertFalse(repository.snapshot().purchases.single().openCancelled)
+    }
+    @Test fun encryptedBackupKeepsAnAdjustmentAndNeverRecreatesCancelledForecasts() = runBlocking<Unit> {
+        repository.createPurchase(purchase("ajustada"))
+        repository.createPurchase(purchase("cancelada"))
+        val paid = Record("pagamento-cancelada", 3400, Movement.EXPENSE, PaymentMethod.CARD,
+            Category.HOME, "Conta fictícia", "Parcela registrada", 1_792_800_000_000L)
+        assertTrue(repository.confirmInstallment("installment:cancelada:1", paid))
+        assertTrue(repository.adjustInstallment("installment:ajustada:1", 0,
+            InstallmentAdjustment(4444, month.plusMonths(1).atDay(22))))
+        assertEquals(2, repository.cancelOpenInstallments("cancelada", 0, 2))
+        val before = repository.snapshot()
+        assertTrue(runCatching { BackupSnapshot.validate(before.copy(commitments = before.commitments.drop(1))) }.isFailure)
+        val envelope = store.create(password())
+        repository.clear()
+        val preview = store.stage(ByteArrayInputStream(envelope), password())
+        assertEquals(2, preview.purchases)
+        store.restore(preview)
+        val after = repository.snapshot()
+        assertEquals(before.purchases, after.purchases)
+        assertEquals(before.commitments, after.commitments)
+        assertEquals(listOf(paid), repository.exportRecords())
+        assertEquals(3400L, repository.commitmentReport(month).committedCents)
+        assertEquals(7777L, repository.commitmentReport(month.plusMonths(1)).committedCents)
+        assertEquals(3333L, repository.commitmentReport(month.plusMonths(2)).committedCents)
+        assertFalse(repository.confirmInstallment("installment:cancelada:2", paid.copy(id = "pagamento-indevido")))
     }
     @Test fun incompleteSchedulesDanglingLinksAndDuplicateSourcesAreRejected() = runBlocking<Unit> {
         repository.createPurchase(purchase("compra"))

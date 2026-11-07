@@ -16,7 +16,7 @@ data class FinanceSnapshot(
 
 /** JSON de dados, sem desserialização de classes arbitrárias ou SQL recebido do arquivo. */
 object BackupSnapshot {
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
     private const val MAX_ROWS = 50_000
     private fun json(vararg fields: Pair<String, Any?>) = JSONObject().apply { fields.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
     private fun <T> array(rows: List<T>, convert: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(convert(it)) } }
@@ -42,11 +42,13 @@ object BackupSnapshot {
             "purchases" to array(snapshot.purchases) { p -> json("id" to p.id, "title" to p.title, "bank" to p.bank,
                 "category" to p.category.name, "method" to p.method.name, "totalCents" to p.totalCents,
                 "installmentCount" to p.installmentCount, "paidInstallments" to p.paidInstallments,
-                "nextDueDate" to p.nextDueDate, "dayOfMonth" to p.dayOfMonth, "sourceDraftId" to p.sourceDraftId) },
+                "nextDueDate" to p.nextDueDate, "dayOfMonth" to p.dayOfMonth, "sourceDraftId" to p.sourceDraftId,
+                "revision" to p.revision, "openCancelled" to p.openCancelled) },
             "fixedRecurring" to array(snapshot.fixedRecurring) { p -> json("recurringId" to p.recurringId, "fromMonth" to p.fromMonth) },
             "commitments" to array(snapshot.commitments) { c -> json("id" to c.id, "label" to c.label,
                 "amountCents" to c.amountCents, "dueDate" to c.dueDate, "purchaseId" to c.purchaseId,
-                "installmentNumber" to c.installmentNumber, "recurringId" to c.recurringId, "recordId" to c.recordId) },
+                "installmentNumber" to c.installmentNumber, "recurringId" to c.recurringId, "recordId" to c.recordId,
+                "adjusted" to c.adjusted) },
             "occurrences" to array(snapshot.occurrences) { o -> json("recurringId" to o.recurringId, "dueDate" to o.dueDate, "status" to o.status, "recordId" to o.recordId) },
         ).toString().toByteArray(Charsets.UTF_8).also {
             require(it.size <= BackupCrypto.MAX_PAYLOAD_BYTES) { "O backup excede o limite de 16 MiB." }
@@ -78,14 +80,21 @@ object BackupSnapshot {
             j.rows("occurrences") { o -> OccurrenceEntity(o.text("recurringId", 128), o.text("dueDate", 20), o.text("status", 30), o.nullableText("recordId", 128)) },
             BackupDisplay(Appearance.valueOf(display.text("appearance", 20)), display.bool("hideAmounts"), display.text("lastOrigin", 80)),
             if (version >= 2) j.rows("monthlyPlans") { p -> MonthlyPlanEntity(p.text("month", 12), p.long("incomeCents"), p.integer("healthyLimitBasisPoints", 0, 10000)) } else emptyList(),
-            if (version >= 2) j.rows("purchases") { p -> PurchaseEntity(p.text("id", 128), p.text("title", 200), p.text("bank", 80),
-                Category.valueOf(p.text("category", 30)), PaymentMethod.valueOf(p.text("method", 30)), p.long("totalCents"),
-                p.integer("installmentCount", 1, Installments.MAX_INSTALLMENTS), p.integer("paidInstallments", 0, Installments.MAX_INSTALLMENTS - 1),
-                p.text("nextDueDate", 20), p.integer("dayOfMonth", 1, 31), p.nullableText("sourceDraftId", 128)) } else emptyList(),
+            if (version >= 2) j.rows("purchases") { p ->
+                require(version >= 3 || (!p.has("revision") && !p.has("openCancelled"))) { "Gestão de parcelas exige a versão 3 do backup." }
+                PurchaseEntity(p.text("id", 128), p.text("title", 200), p.text("bank", 80),
+                    Category.valueOf(p.text("category", 30)), PaymentMethod.valueOf(p.text("method", 30)), p.long("totalCents"),
+                    p.integer("installmentCount", 1, Installments.MAX_INSTALLMENTS), p.integer("paidInstallments", 0, Installments.MAX_INSTALLMENTS - 1),
+                    p.text("nextDueDate", 20), p.integer("dayOfMonth", 1, 31), p.nullableText("sourceDraftId", 128),
+                    revision = if (version >= 3) p.long("revision") else 0L, openCancelled = version >= 3 && p.bool("openCancelled"))
+            } else emptyList(),
             if (version >= 2) j.rows("fixedRecurring") { p -> FixedRecurringEntity(p.text("recurringId", 128), p.text("fromMonth", 12)) } else emptyList(),
-            if (version >= 2) j.rows("commitments") { c -> CommitmentEntity(c.text("id", 256), c.text("label", 256), c.long("amountCents"),
-                c.text("dueDate", 20), c.nullableText("purchaseId", 128), if (c.isNull("installmentNumber")) null else c.integer("installmentNumber", 1, Installments.MAX_INSTALLMENTS),
-                c.nullableText("recurringId", 128), c.nullableText("recordId", 128)) } else emptyList(),
+            if (version >= 2) j.rows("commitments") { c ->
+                require(version >= 3 || !c.has("adjusted")) { "Ajustes de parcelas exigem a versão 3 do backup." }
+                CommitmentEntity(c.text("id", 256), c.text("label", 256), c.long("amountCents"),
+                    c.text("dueDate", 20), c.nullableText("purchaseId", 128), if (c.isNull("installmentNumber")) null else c.integer("installmentNumber", 1, Installments.MAX_INSTALLMENTS),
+                    c.nullableText("recurringId", 128), c.nullableText("recordId", 128), adjusted = version >= 3 && c.bool("adjusted"))
+            } else emptyList(),
         )
         validate(snapshot)
         return snapshot

@@ -60,8 +60,12 @@ internal fun MonthlyIncomeEditor(
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") } })
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun InstallmentDueCard(item: InstallmentDue, busy: Boolean, hidden: Boolean, onConfirm: () -> Unit) {
+internal fun InstallmentDueCard(
+    item: InstallmentDue, busy: Boolean, hidden: Boolean,
+    onConfirm: () -> Unit, onEdit: () -> Unit, onCancel: () -> Unit,
+) {
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier.fillMaxWidth().testTag("installment-${item.id}")) {
         Column(Modifier.padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -73,6 +77,12 @@ internal fun InstallmentDueCard(item: InstallmentDue, busy: Boolean, hidden: Boo
             if (item.recordId == null) {
                 OutlinedButton(onClick = onConfirm, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().testTag("confirm-installment-${item.id}")) { Text("Conferir e registrar parcela") }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onEdit, enabled = !busy, modifier = Modifier.testTag("edit-${item.id}")) { Text("Editar") }
+                    TextButton(onClick = onCancel, enabled = !busy, modifier = Modifier.testTag("cancel-${item.id}")) {
+                        Text("Cancelar parcelas em aberto")
+                    }
+                }
             } else Text("Registrada no extrato", style = MaterialTheme.typography.labelMedium)
         }
     }

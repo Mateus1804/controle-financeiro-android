@@ -41,6 +41,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     onReminders: (Boolean) -> Unit, onAlerts: () -> Unit, onAddAccount: suspend (String) -> String,
     commitments: CommitmentSetup?, commitmentReport: Result<CommitmentReport>?, onIncome: (MonthlyIncomePlan, () -> Unit) -> Unit,
     onFixedRecurring: (String, YearMonth?) -> Unit, onConfirmInstallment: (InstallmentDue) -> Unit,
+    onEditPurchase: (String) -> Unit, onCancelPurchase: (String) -> Unit,
 ) {
     var budgetEditor by rememberSaveable { mutableStateOf(false) }
     var budgetCategory by rememberSaveable { mutableStateOf<Category?>(null) }
@@ -93,7 +94,8 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
         commitments?.let { setup ->
             if (setup.installments.isEmpty()) item { EmptyCard("Sem parcelas neste mês", "Para planejar parcelas, ative Compra parcelada ao registrar uma despesa.") }
             items(setup.installments, key = { "due:${it.id}" }) { installment ->
-                InstallmentDueCard(installment, busy, hidden) { onConfirmInstallment(installment) }
+                InstallmentDueCard(installment, busy, hidden, onConfirm = { onConfirmInstallment(installment) },
+                    onEdit = { onEditPurchase(installment.id) }, onCancel = { onCancelPurchase(installment.id) })
             }
         }
         item {

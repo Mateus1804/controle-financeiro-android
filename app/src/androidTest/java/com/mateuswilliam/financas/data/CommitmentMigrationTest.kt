@@ -21,12 +21,10 @@ class CommitmentMigrationTest {
         val snapshot = JSONObject(CompatibilityFixtures.bytes("snapshot-v1.json").toString(Charsets.UTF_8))
         val file = context.getDatabasePath(name); file.parentFile!!.mkdirs()
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            createTables(db, schema)
             val entities = schema.getJSONArray("entities")
             for (i in 0 until entities.length()) {
                 val entity = entities.getJSONObject(i); val table = entity.getString("tableName")
-                db.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
-                val indices = entity.optJSONArray("indices") ?: org.json.JSONArray()
-                for (n in 0 until indices.length()) db.execSQL(indices.getJSONObject(n).getString("createSql").replace("\${TABLE_NAME}", table))
                 val fields = entity.getJSONArray("fields")
                 val columns = List(fields.length()) { fields.getJSONObject(it).getString("columnName") }
                 val rows = snapshot.getJSONArray(table)
@@ -38,11 +36,9 @@ class CommitmentMigrationTest {
                     db.execSQL("INSERT INTO $table (${columns.joinToString()}) VALUES (${columns.joinToString { "?" }})", values)
                 }
             }
-            val setup = schema.getJSONArray("setupQueries")
-            for (i in 0 until setup.length()) db.execSQL(setup.getString(i))
-            db.version = 4
+            finishFixture(db, schema, 4)
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_4_5).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6).build()
         val preferences = CapturePreferences(context)
         try {
             val dao = database.financeDao(); val expected = CompatibilityFixtures.snapshot()
@@ -58,8 +54,63 @@ class CommitmentMigrationTest {
             repo.saveMonthlyPlan(MonthlyIncomePlan(YearMonth.of(2026, 11), 300000))
             assertEquals(300000L, repo.commitmentReport(YearMonth.of(2026, 11)).incomeCents)
             assertEquals(0L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
-            assertEquals(5, database.openHelper.writableDatabase.version)
+            assertEquals(6, database.openHelper.writableDatabase.version)
             database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         } finally { database.close(); context.deleteDatabase(name) }
+    }
+
+    @Test fun schemaFivePreservesAnExistingPurchaseAndItsConfirmedInstallment() = runBlocking<Unit> {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val name = "migration-purchase-management-test"
+        context.deleteDatabase(name)
+        val schema = instrumentation.context.assets.open("com.mateuswilliam.financas.data.FinanceDatabase/5.json")
+            .bufferedReader().use { JSONObject(it.readText()).getJSONObject("database") }
+        val file = context.getDatabasePath(name); file.parentFile!!.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            createTables(db, schema)
+            db.execSQL("INSERT INTO purchases (id,title,bank,category,method,totalCents,installmentCount,paidInstallments,nextDueDate,dayOfMonth,sourceDraftId) VALUES ('compra-v5','Compra fictícia','Carteira','OTHER','CARD',6800,2,0,'2026-11-10',10,NULL)")
+            db.execSQL("INSERT INTO records (id,sourceDraftId,amountCents,movement,method,category,bank,description,occurredAt,destination) VALUES ('pago-v5',NULL,3500,'EXPENSE','CARD','OTHER','Carteira','Pagamento fictício',1792800000000,'')")
+            db.execSQL("INSERT INTO commitments (id,label,amountCents,dueDate,purchaseId,installmentNumber,recurringId,recordId) VALUES ('installment:compra-v5:1','Compra fictícia · 1/2',3400,'2026-11-10','compra-v5',1,NULL,'pago-v5')")
+            db.execSQL("INSERT INTO commitments (id,label,amountCents,dueDate,purchaseId,installmentNumber,recurringId,recordId) VALUES ('installment:compra-v5:2','Compra fictícia · 2/2',3400,'2026-12-10','compra-v5',2,NULL,NULL)")
+            finishFixture(db, schema, 5)
+        }
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_5_6).build()
+        try {
+            val dao = database.financeDao()
+            val purchase = dao.allPurchases().single()
+            assertEquals("compra-v5", purchase.id)
+            assertEquals(6800L, purchase.totalCents)
+            assertEquals(0L, purchase.revision)
+            assertFalse(purchase.openCancelled)
+            assertEquals(listOf("pago-v5", null), dao.allCommitments().map { it.recordId })
+            assertTrue(dao.allCommitments().none { it.adjusted })
+            assertEquals(3500L, dao.allRecords().single().amountCents)
+            val repo = FinanceRepository(database, CapturePreferences(context))
+            assertEquals(3500L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
+            assertEquals(3400L, repo.commitmentReport(YearMonth.of(2026, 12)).committedCents)
+            BackupSnapshot.validate(repo.snapshot())
+            assertEquals(6, database.openHelper.writableDatabase.version)
+            database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+        } finally { database.close(); context.deleteDatabase(name) }
+    }
+
+    private fun createTables(db: SQLiteDatabase, schema: JSONObject) {
+        val entities = schema.getJSONArray("entities")
+        repeat(entities.length()) { i ->
+            val entity = entities.getJSONObject(i)
+            val table = entity.getString("tableName")
+            db.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
+            val indices = entity.optJSONArray("indices") ?: org.json.JSONArray()
+            repeat(indices.length()) { n ->
+                db.execSQL(indices.getJSONObject(n).getString("createSql").replace("\${TABLE_NAME}", table))
+            }
+        }
+    }
+
+    private fun finishFixture(db: SQLiteDatabase, schema: JSONObject, version: Int) {
+        val setup = schema.getJSONArray("setupQueries")
+        repeat(setup.length()) { db.execSQL(setup.getString(it)) }
+        db.version = version
     }
 }

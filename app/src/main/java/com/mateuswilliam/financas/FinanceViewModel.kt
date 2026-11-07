@@ -12,6 +12,7 @@ import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.core.MonthlyBudget
 import com.mateuswilliam.financas.core.MonthlyIncomePlan
 import com.mateuswilliam.financas.core.InstallmentPurchase
+import com.mateuswilliam.financas.core.InstallmentAdjustment
 import com.mateuswilliam.financas.core.RecurringPlan
 import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.core.CommitmentReport
@@ -19,6 +20,7 @@ import com.mateuswilliam.financas.data.StagedRestore
 import com.mateuswilliam.financas.data.CaptureSettings
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.data.DraftChangedException
+import com.mateuswilliam.financas.data.PurchaseManagement
 import com.mateuswilliam.financas.notifications.ReviewNotifications
 import com.mateuswilliam.financas.notifications.RecurringReminders
 import java.time.ZoneId
@@ -110,11 +112,27 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             "Compra salva. As parcelas em aberto estão no Planejamento."
         } else "A compra já foi salva ou a notificação não está mais pendente."
     }
-    fun confirmInstallment(id: String, record: Record, onSaved: () -> Unit) = action {
-        if (repository.confirmInstallment(id, record)) {
+    suspend fun purchaseManagement(installmentId: String) = repository.purchaseManagement(installmentId)
+    fun editPurchase(current: PurchaseManagement, purchase: InstallmentPurchase, onFinished: () -> Unit) = action {
+        val saved = repository.editPurchase(current.revision, purchase)
+        onFinished()
+        if (saved) "Compra corrigida no Planejamento." else "A compra mudou. Abra novamente para conferir as parcelas."
+    }
+    fun adjustInstallment(current: PurchaseManagement, adjustment: InstallmentAdjustment, onFinished: () -> Unit) = action {
+        val saved = repository.adjustInstallment(current.installmentId, current.revision, adjustment)
+        onFinished()
+        if (saved) "Parcela corrigida no Planejamento." else "A parcela mudou. Abra novamente para conferir."
+    }
+    fun cancelOpenInstallments(current: PurchaseManagement, onFinished: () -> Unit) = action {
+        val count = repository.cancelOpenInstallments(current.purchase.id, current.revision, current.openCount)
+        onFinished()
+        if (count > 0) "Parcelas em aberto canceladas no Planejamento." else "A compra mudou. Confira as parcelas em aberto antes de cancelar."
+    }
+    fun confirmInstallment(id: String, record: Record, expectedPurchaseRevision: Long, onSaved: () -> Unit) = action {
+        if (repository.confirmInstallment(id, record, expectedPurchaseRevision)) {
             onSaved()
             "Parcela registrada no extrato."
-        } else "A parcela já foi registrada ou removida."
+        } else "A parcela mudou, foi registrada ou cancelada. Confira o Planejamento."
     }
     fun setFixedRecurring(id: String, fromMonth: YearMonth?) = action {
         repository.setFixedRecurring(id, fromMonth)
