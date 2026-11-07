@@ -118,6 +118,7 @@ class CommitmentJourneyTest {
         val preview = app.backups.stage(ByteArrayInputStream(encrypted), testPassword())
         assertEquals(2, preview.purchases)
         assertEquals(200000L, repository.commitmentReport(next).incomeCents)
+        assertChart("7,5%", "Compra em andamento · 3/4", 185000)
         app.backups.restore(preview)
         assertChart("15%", "Compra em andamento · 3/4", 85000)
         val restored = repository.snapshot()
@@ -160,7 +161,9 @@ class CommitmentJourneyTest {
         val description = "$percentage da renda comprometidos; maior gasto: $largest."
         rule.waitUntil(5000) { rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("commitment-donut").assertContentDescriptionEquals(description)
+        scrollTo("commitment-legend-free")
         rule.onNodeWithTag("commitment-legend-free").assertTextContains(Money.format(freeCents))
+        scrollTo("commitment-card")
     }
 
     private fun tapPlanning(tag: String) {
