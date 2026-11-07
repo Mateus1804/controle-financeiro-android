@@ -25,7 +25,7 @@ class CommitmentMigrationTest {
             for (i in 0 until entities.length()) {
                 val entity = entities.getJSONObject(i); val table = entity.getString("tableName")
                 db.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
-                val indices = entity.getJSONArray("indices")
+                val indices = entity.optJSONArray("indices") ?: org.json.JSONArray()
                 for (n in 0 until indices.length()) db.execSQL(indices.getJSONObject(n).getString("createSql").replace("\${TABLE_NAME}", table))
                 val fields = entity.getJSONArray("fields")
                 val columns = List(fields.length()) { fields.getJSONObject(it).getString("columnName") }
