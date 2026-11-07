@@ -55,7 +55,7 @@ class OptionalFeaturesUiTest {
         rule.waitUntil(5000) { runBlocking { app.repository.budgets.first().isNotEmpty() } }
         assertEquals(10000L, app.repository.budgets.first().single().limitCents)
         rule.activityRule.scenario.recreate()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Editar limite").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Editar limite"))
         rule.onNodeWithText("Editar limite").assertIsDisplayed()
         assertEquals(YearMonth.now().toString(), app.repository.budgets.first().single().month)
         screenshot("planejamento-claro")

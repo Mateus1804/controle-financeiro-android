@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mateuswilliam.financas.core.CommitmentForms
 import com.mateuswilliam.financas.core.CommitmentReport
 import com.mateuswilliam.financas.core.CommitmentReports
@@ -96,16 +99,17 @@ private fun CommitmentStatus(state: CommitmentState) {
 }
 
 @Composable
-private fun CommitmentMetric(label: String, cents: Long, valueModifier: Modifier = Modifier) {
+private fun CommitmentMetric(label: String, cents: Long, modifier: Modifier = Modifier) {
+    val layout = modifier.fillMaxWidth().semantics(mergeDescendants = true) { }
     if (LocalDensity.current.fontScale > 1.25f) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(layout, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
-            Amount(cents, false, valueModifier, size = 16)
+            Amount(cents, false, size = 16)
         }
-    } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+    } else Row(layout, verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Amount(cents, false, valueModifier.widthIn(max = 146.dp), size = 16)
+        Amount(cents, false, Modifier.widthIn(max = 146.dp), size = 16)
     }
 }
 
@@ -158,7 +162,9 @@ private fun CommitmentDonut(report: CommitmentReport, percentage: String) {
 private fun CommitmentHeadline(percentage: String, cents: Long, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("Comprometido", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
-        Text(percentage, Modifier.testTag("commitment-percentage"), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        BasicText(percentage, Modifier.fillMaxWidth().testTag("commitment-percentage"),
+            style = MaterialTheme.typography.headlineSmall.copy(color = LocalContentColor.current, textAlign = TextAlign.Center),
+            maxLines = 2, autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = 24.sp, stepSize = 1.sp))
         Amount(cents, false, size = 16)
     }
 }

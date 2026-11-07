@@ -102,7 +102,7 @@ class CommitmentReportUiTest {
         purchase("sem-renda", "Conta fictícia", 9500)
         openPlanning()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Renda ainda não informada").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("committed-value").assertTextEquals(Money.format(9500))
+        rule.onNodeWithTag("committed-value").assertTextContains("Valor comprometido").assertTextContains(Money.format(9500))
         rule.onNodeWithTag("commitment-donut").assertDoesNotExist()
         rule.onNodeWithTag("edit-monthly-income").performScrollTo().performClick()
         rule.onNodeWithText("Renda e limite ·", substring = true).assertIsDisplayed()
@@ -119,13 +119,14 @@ class CommitmentReportUiTest {
             openPlanning()
             assertChart("100,0000000001%", "Compra fictícia · 1/1")
             scrollToTag("commitment-percentage")
+            capture("comprometimento-fonte-ampliada")
             rule.onNodeWithTag("commitment-percentage").assertIsDisplayed()
                 .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                     val layouts = mutableListOf<TextLayoutResult>()
                     assertTrue(action(layouts))
-                    assertFalse(layouts.single().hasVisualOverflow)
+                    val layout = layouts.single()
+                    assertFalse("Percentual cortado nas restrições ${layout.layoutInput.constraints}", layout.hasVisualOverflow)
                 }
-            capture("comprometimento-fonte-ampliada")
         } finally {
             if (original != null) shell("settings put system font_scale $original")
             else shell("settings delete system font_scale")
