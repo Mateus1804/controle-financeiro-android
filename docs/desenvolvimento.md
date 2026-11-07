@@ -61,11 +61,13 @@ Os resultados da integração contínua são registrados separadamente dos teste
 
 Os APKs ficam no artefato `apks-compatibilidade`, com retenção de sete dias. Relatórios e capturas têm retenção de 14 dias. Os pacotes de CI usam chave descartável e dados fictícios; servem à validação em ambiente isolado. A publicação na Google Play, a assinatura definitiva e as atualizações pela loja são etapas posteriores.
 
+O arquivo `controle-financeiro-teste.apk` desse artefato é o único destinado ao [roteiro manual no celular](teste-no-celular.md). Ele instala **Controle Financeiro (teste)** com identificador próprio. O equivalente local é gerado por `./gradlew :app:assemblePreview`, em `app/build/outputs/apk/preview/app-preview.apk`.
+
 Bases reais, exportações, arquivos de assinatura e configurações locais devem permanecer fora do repositório. A recuperação está disponível por backup criptografado, senha original e conferência da prévia. A desinstalação remove os dados locais do aplicativo.
 
 ## Atualizações dos dados e da interface
 
-O esquema Room fica em `app/schemas`, e as migrações 1→2, 2→3, 3→4 e 4→5, em `FinanceDatabase.kt`. Os testes de migração reconstroem uma base isolada a partir do esquema 1 exportado e abrem essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
+O esquema Room 6 fica em `app/schemas`, e as migrações de 1 a 6 estão em `FinanceDatabase.kt`. Os testes abrem bases isoladas reconstruídas dos esquemas anteriores e conferem os dados, inclusive compras parceladas e pagamentos vinculados no esquema 5.
 
 O comando `python3 scripts/verify-contrast.py` confere os 16 pares principais das paletas de fallback de texto e fundo. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
 
@@ -73,7 +75,7 @@ A instalação de uma atualização sobre uma base que deve ser preservada exige
 
 ## Backup e planejamento
 
-O esquema atual é Room 4, com migrações aditivas 1→2, 2→3 e 3→4. Os testes de migração abrem bases isoladas reconstruídas dos esquemas anteriores exportados e conferem os dados existentes antes de utilizar as novas tabelas. `BackupStoreTest` cobre o envelope criptográfico no Android, a base temporária, o cancelamento, entradas inválidas e o rollback de uma restauração com falha simulada.
+O [backup criptografado](backup.md) usa o formato de dados V3 e restaura também V1 e V2. `BackupStoreTest` cobre o envelope criptográfico no Android, a base temporária, o cancelamento, entradas inválidas e o rollback de uma restauração com falha simulada.
 
 A recuperação usa **Ajustes → Restaurar backup**, senha original e confirmação da prévia. Um teste manual utiliza emulador dedicado e arquivo com dados fictícios; a instalação de uso pessoal permanece preservada. Os arquivos `.cfbackup` e a pasta `casos-locais/` ficam fora do Git. O formato e os limites estão descritos em [Backup e recuperação](backup.md).
 

@@ -11,6 +11,10 @@ sign_apk() {
 sign_apk ci-legacy/app/build/outputs/apk/debug/app-debug.apk ci-apks/legacy-debug.apk
 sign_apk app/build/outputs/apk/debug/app-debug.apk ci-apks/app-debug.apk
 sign_apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk ci-apks/app-debug-androidTest.apk
+sign_apk app/build/outputs/apk/preview/app-preview.apk ci-apks/controle-financeiro-teste.apk
+badging=$("$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging ci-apks/controle-financeiro-teste.apk)
+grep -F "package: name='com.mateuswilliam.financas.teste'" <<<"$badging"
+grep -Fx "application-label:'Controle Financeiro (teste)'" <<<"$badging"
 # A versão release usa o mesmo caminho Gradle que será usado com a chave definitiva.
 python3 scripts/verify-release.py
 python3 - <<'PYTHON'

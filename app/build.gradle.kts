@@ -46,6 +46,11 @@ android {
         }
     }
     buildTypes.getByName("release") { signingConfig = signingConfigs.getByName("release") }
+    buildTypes.create("preview") {
+        initWith(buildTypes.getByName("debug"))
+        applicationIdSuffix = ".teste"
+        versionNameSuffix = "-teste"
+    }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -127,3 +127,9 @@ Quando já houver pagamento registrado ou ajuste individual, **Editar** corrige 
 **Cancelar parcelas em aberto** pede confirmação e retira todas as previsões restantes daquela compra do Planejamento, inclusive nos outros meses. Os pagamentos registrados continuam no extrato e no comprometimento do mês de vencimento. O cancelamento é local ao aplicativo. Se um lançamento confirmado for removido posteriormente, uma compra com previsões canceladas não volta a criar compromisso.
 
 A migração Room 5→6 acrescenta o estado de cancelamento, a revisão da compra e o marcador de ajuste individual sem reescrever os dados anteriores. Revisões e vínculos são conferidos na mesma transação da edição, do cancelamento ou da confirmação. O [backup de dados versão 3](backup.md) conserva essas informações e continua lendo os formatos 1 e 2.
+
+## Sétima fase — validação de ponta a ponta
+
+`CommitmentJourneyTest` reúne, na mesma base fictícia, compra em andamento, revisão de compra por notificação, renda e limite por mês, registro de parcela, ajuste de valor, cancelamento e restauração. O teste confere o texto acessível do gráfico, a parte livre, a ocultação dos percentuais e a permanência do pagamento após a recuperação. A entrega da notificação pelo Android e a leitura pelo TalkBack ficam para o aparelho físico.
+
+O [roteiro de teste no celular](teste-no-celular.md) descreve os passos e resultados esperados com o APK de teste, cuja instalação é independente da versão de uso pessoal.
