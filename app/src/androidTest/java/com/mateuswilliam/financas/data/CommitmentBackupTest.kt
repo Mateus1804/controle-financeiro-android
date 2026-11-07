@@ -91,7 +91,8 @@ class CommitmentBackupTest {
         assertTrue(repository.confirmInstallment("installment:cancelada:1", paid))
         assertTrue(repository.adjustInstallment("installment:ajustada:1", 0,
             InstallmentAdjustment(4444, month.plusMonths(1).atDay(22))))
-        assertEquals(2, repository.cancelOpenInstallments("cancelada", 0, 2))
+        val cancellation = repository.purchaseManagement("installment:cancelada:2")!!
+        assertEquals(2, repository.cancelOpenInstallments("cancelada", cancellation.revision, cancellation.openCount))
         val before = repository.snapshot()
         assertTrue(runCatching { BackupSnapshot.validate(before.copy(commitments = before.commitments.drop(1))) }.isFailure)
         val envelope = store.create(password())
