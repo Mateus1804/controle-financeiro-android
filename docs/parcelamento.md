@@ -4,7 +4,7 @@
 
 O módulo `core` calcula as parcelas abertas de uma compra, a partir do valor total ou do valor de cada parcela. O cálculo contempla compras novas e compras iniciadas antes do uso do aplicativo.
 
-A entrega desta fase é uma API Kotlin sem dependência de Android. Cadastro na interface, revisão de notificações, persistência, renda mensal, indicador de comprometimento, gráfico e importação de contracheque permanecem nas etapas seguintes. Os esquemas Room, o formato do backup e os lançamentos existentes foram preservados.
+A primeira fase entregou uma API Kotlin sem dependência de Android. A persistência e os formulários foram conectados nas fases seguintes, descritas em [Comprometimento mensal](comprometimento.md).
 
 ## Entradas e resultado
 
@@ -30,7 +30,7 @@ Na divisão pelo total, os centavos restantes são distribuídos pelas primeiras
 
 Na entrada por valor da parcela, o total é esse valor multiplicado pela quantidade total, incluindo as parcelas informadas como já pagas. O produto é validado antes da multiplicação para respeitar o limite monetário e evitar estouro aritmético.
 
-As duas bases de cálculo têm significados diferentes: três parcelas iguais de 3.333 centavos totalizam 9.999 centavos; uma compra de 10.000 centavos exige o ajuste acima. A integração do formulário deverá preservar a base escolhida e apresentar a distribuição antes da confirmação. Não são inferidos juros, tarifas ou condições de uma fatura bancária.
+As duas bases de cálculo têm significados diferentes: três parcelas iguais de 3.333 centavos totalizam 9.999 centavos; uma compra de 10.000 centavos exige o ajuste acima. O formulário preserva a base escolhida e apresenta os valores das parcelas em aberto antes da confirmação. Não são inferidos juros, tarifas ou condições de uma fatura bancária.
 
 ## Compras em andamento e vencimentos
 
@@ -59,8 +59,8 @@ A verificação pelo ambiente padrão do projeto utiliza:
 ./gradlew --no-daemon --max-workers=2 :core:test
 ```
 
-Esta fase não comprova a integração do parcelamento com a interface, o banco ou o backup, que ainda não foi implementada. Os resultados de execução e as limitações do ambiente ficam no pull request correspondente.
+Os testes do core não substituem a validação da interface, do banco e do backup. Os resultados de execução e as limitações de cada fase ficam no pull request correspondente.
 
 ## Integração com o comprometimento mensal
 
-A [segunda fase no core](comprometimento.md) adapta as parcelas abertas para compromissos por mês. O adaptador conserva identidades, valores e vencimentos; a inclusão dos compromissos já confirmados dependerá da integração com a persistência. A montagem do relatório deve manter uma única entrada por obrigação do mês.
+A [segunda fase no core](comprometimento.md) adapta as parcelas abertas para compromissos por mês. O adaptador conserva identidades, valores e vencimentos; a persistência inclui os compromissos já confirmados no mês de vencimento. A montagem do relatório deve manter uma única entrada por obrigação do mês.

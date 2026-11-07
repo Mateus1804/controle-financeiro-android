@@ -31,6 +31,7 @@ import com.mateuswilliam.financas.core.ExpenseFilter
 import com.mateuswilliam.financas.core.ExpenseDimension
 import com.mateuswilliam.financas.core.DuplicateCandidates
 import com.mateuswilliam.financas.core.ReviewQueue
+import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.notifications.BankNotificationListener
 import com.mateuswilliam.financas.notifications.hasCaptureAccess
@@ -66,11 +67,19 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var reviewAfter by rememberSaveable { mutableStateOf<String?>(null) }
     var planningReturn by rememberSaveable { mutableIntStateOf(0) }
     var selectedRecurringId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedInstallmentId by rememberSaveable { mutableStateOf<String?>(null) }
     var recurringDue by rememberSaveable { mutableStateOf("") }
-    var recurringRecordId by rememberSaveable { mutableStateOf("") }
-    var recurringRecordAt by rememberSaveable { mutableLongStateOf(0L) }
+    var plannedRecordId by rememberSaveable { mutableStateOf("") }
+    var plannedRecordAt by rememberSaveable { mutableLongStateOf(0L) }
     val recurringPlan = state.recurring.find { it.id == selectedRecurringId }
-    val recurringPreset = recurringPlan?.copy(nextDate = recurringDue)?.proposedRecord(recurringRecordId, ZoneId.systemDefault())?.copy(occurredAt = recurringRecordAt)
+    val recurringPreset = recurringPlan?.copy(nextDate = recurringDue)?.proposedRecord(plannedRecordId, ZoneId.systemDefault())?.copy(occurredAt = plannedRecordAt)
+    val commitments = if (tab == 4) {
+        val setup by remember(month) { model.commitmentSetup(month) }.collectAsStateWithLifecycle(initialValue = null)
+        setup?.takeIf { it.month == month }
+    } else null
+    val installmentPreset = commitments?.installments?.find { it.id == selectedInstallmentId && it.recordId == null }?.let {
+        Record(plannedRecordId, it.amountCents, Movement.EXPENSE, it.method, it.category, it.bank, it.title, plannedRecordAt)
+    }
     val duplicateIndex = remember(state.manualRecords) { DuplicateCandidates(state.manualRecords) }
     var backupDialog by rememberSaveable { mutableIntStateOf(0) }
     var restoreUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -123,7 +132,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             .onFailure { model.message.value = "Abra as configurações de notificações do aplicativo no Android." }
     }
     fun showDraft(value: DraftEntity) {
-        seen.add(value.id); selectedDraftId = value.id; selectedRecordId = null; selectedRecurringId = null
+        seen.add(value.id); selectedDraftId = value.id; selectedRecordId = null; selectedRecurringId = null; selectedInstallmentId = null
         expectedRevision = value.revision; editing = true; reviewAfter = null
     }
     fun openDraft(value: DraftEntity) {
@@ -133,13 +142,21 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     fun finishReview(id: String) { reviewCompleted++; editing = false; reviewAfter = id }
     fun finishSession() { reviewAfter = null; seen.addAll(state.pending.map { it.id }); reviewIds = emptyList(); tab = 1 }
     fun openPlanning() { if (tab != 4) planningReturn = tab; tab = 4 }
-    fun openManual(movement: Movement = Movement.EXPENSE) { manualMovement = movement; selectedDraftId = null; selectedRecordId = null; selectedRecurringId = null; expectedRevision = null; reviewAfter = null; editing = true }
+    fun openManual(movement: Movement = Movement.EXPENSE) { manualMovement = movement; selectedDraftId = null; selectedRecordId = null; selectedRecurringId = null; selectedInstallmentId = null; expectedRevision = null; reviewAfter = null; editing = true }
+    fun openPlannedRecord() {
+        plannedRecordId = UUID.randomUUID().toString()
+        plannedRecordAt = System.currentTimeMillis()
+        selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true
+    }
     BackHandler(tab == 4 && !editing) { tab = planningReturn }
 
     val captureIssue = CaptureIssue.evaluate(state.settings.consented, state.settings.enabled, state.settings.packages.isNotEmpty(), hasAccess, connected)
     LaunchedEffect(state.loaded, captureIssue) { if (state.loaded) model.preferences.observeCaptureCondition(captureIssue.name) }
     LaunchedEffect(state.loaded, selectedDraftId, selectedRecordId, draft, record) {
         if (state.loaded && editing && ((selectedDraftId != null && draft == null) || (selectedRecordId != null && record == null))) editing = false
+    }
+    LaunchedEffect(commitments, selectedInstallmentId, installmentPreset) {
+        if (editing && commitments != null && selectedInstallmentId != null && installmentPreset == null) editing = false
     }
     fun resolveCapture() {
         when (captureIssue) {
@@ -207,7 +224,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         } else null, onPlanning = ::openPlanning, onNew = ::openManual)
                     1 -> PendingScreen(state.pending, state.settings.hideAmounts, ::openDraft, { model.dismiss(it) }, busy)
                     2 -> RecordsScreen(state.records, month, { monthString = it.toString() }, state.settings.hideAmounts,
-                        categoryFilter, { categoryFilter = it }, { selectedRecordId = it.id; selectedDraftId = null; selectedRecurringId = null; expectedRevision = null; editing = true },
+                        categoryFilter, { categoryFilter = it }, { selectedRecordId = it.id; selectedDraftId = null; selectedRecurringId = null; selectedInstallmentId = null; expectedRevision = null; editing = true },
                         expenseFilter = expenseFilter, onClearExpenseFilter = { expenseDimension = null })
                     3 -> SettingsScreen(state.settings, connected, hasAccess, canAlert, captureError,
                         onToggle = { enabled -> if (enabled && !state.settings.consented) disclosure = true else model.preferences.setEnabled(enabled) },
@@ -224,32 +241,53 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         onBack = { tab = planningReturn }, onBudget = model::saveBudget,
                         onDeleteBudget = { model.deleteBudget(month.toString(), it) }, onRecurring = model::saveRecurring,
                         onConfirmRecurring = {
-                            selectedRecurringId = it.id; recurringDue = it.nextDate; recurringRecordId = UUID.randomUUID().toString(); recurringRecordAt = System.currentTimeMillis()
-                            selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true
+                            selectedRecurringId = it.id; recurringDue = it.nextDate; selectedInstallmentId = null
+                            openPlannedRecord()
                         }, onSkip = model::skipRecurring,
                         onReminders = { model.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
-                        onAlerts = ::requestAlerts, onAddAccount = model::addAccount)
+                        onAlerts = ::requestAlerts, onAddAccount = model::addAccount,
+                        commitments = commitments, onIncome = model::saveMonthlyIncome, onFixedRecurring = model::setFixedRecurring,
+                        onConfirmInstallment = {
+                            selectedInstallmentId = it.id; selectedRecurringId = null
+                            openPlannedRecord()
+                        })
                 }
             }
         }
     }
 
-    if (editing && (selectedDraftId == null || draft != null) && (selectedRecordId == null || record != null) && (selectedRecurringId == null || recurringPreset != null)) key(selectedDraftId, selectedRecordId, selectedRecurringId) {
+    if (editing && (selectedDraftId == null || draft != null) && (selectedRecordId == null || record != null) &&
+        (selectedRecurringId == null || recurringPreset != null) && (selectedInstallmentId == null || installmentPreset != null)
+    ) key(selectedDraftId, selectedRecordId, selectedRecurringId, selectedInstallmentId) {
         RecordEditor(draft, record, busy, onDismiss = { editing = false },
             onSave = { value ->
-                if (selectedRecurringId != null) model.confirmRecurring(selectedRecurringId!!, recurringDue, value) { editing = false }
-                else { val currentDraftId = selectedDraftId; model.save(value, currentDraftId, editing = selectedRecordId != null, expectedRevision = expectedRevision) {
-                    if (currentDraftId != null) finishReview(currentDraftId) else editing = false
-                } }
+                val recurringId = selectedRecurringId
+                val installmentId = selectedInstallmentId
+                when {
+                    recurringId != null -> model.confirmRecurring(recurringId, recurringDue, value) { editing = false }
+                    installmentId != null -> model.confirmInstallment(installmentId, value) { editing = false }
+                    else -> {
+                        val currentDraftId = selectedDraftId
+                        model.save(value, currentDraftId, editing = selectedRecordId != null, expectedRevision = expectedRevision) {
+                            if (currentDraftId != null) finishReview(currentDraftId) else editing = false
+                        }
+                    }
+                }
             },
             onIgnore = draft?.let { current -> { model.dismiss(current.id) { finishReview(current.id) } } },
             onDelete = record?.let { current -> { model.delete(current.id) } },
             accounts = state.accounts, lastOrigin = state.settings.lastOrigin.ifBlank { state.records.firstOrNull()?.bank.orEmpty() }, onAddAccount = model::addAccount,
-            preset = recurringPreset, initialMovement = manualMovement, duplicateIndex = duplicateIndex, hideAmounts = state.settings.hideAmounts,
+            preset = recurringPreset ?: installmentPreset, initialMovement = manualMovement, duplicateIndex = duplicateIndex, hideAmounts = state.settings.hideAmounts,
             reviewProgress = if (draft != null) "Revisão ${reviewIds.indexOf(draft.id) + 1} de ${reviewIds.size}" else null,
             newPendingCount = if (draft != null) newPendingCount else 0,
             notificationChanged = draft != null && expectedRevision != draft.revision,
-            onAcceptUpdate = { expectedRevision = draft?.revision })
+            onAcceptUpdate = { expectedRevision = draft?.revision },
+            onSavePurchase = { purchase ->
+                val currentDraftId = selectedDraftId
+                model.savePurchase(purchase, currentDraftId, expectedRevision) {
+                    if (currentDraftId != null) finishReview(currentDraftId) else editing = false
+                }
+            }, installmentConfirmation = selectedInstallmentId != null)
     }
     if (reviewAfter != null && !editing) {
         val next = ReviewQueue.next(reviewIds, reviewAfter!!, pendingById.keys)?.let { pendingById[it] }

@@ -52,20 +52,24 @@ private val CurrencyOutputTransformation = OutputTransformation {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MoneyAmountField(state: TextFieldState, attempted: Boolean, enabled: Boolean, onInvalidInput: (Boolean) -> Unit) {
+fun MoneyAmountField(
+    state: TextFieldState, attempted: Boolean, enabled: Boolean,
+    label: String = "Valor (R$)", tag: String = "amount-input", allowZero: Boolean = false,
+    onInvalidInput: (Boolean) -> Unit,
+) {
     val feedback = remember { MutableSharedFlow<Boolean>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST) }
     var rejected by rememberSaveable { mutableStateOf(false) }
     val notifyParent by rememberUpdatedState(onInvalidInput)
     val transformation = remember(feedback) { centInputTransformation { feedback.tryEmit(it) } }
     LaunchedEffect(feedback) { feedback.collect { rejected = it; notifyParent(it) } }
     val cents = MoneyInput.cents(state.text.toString())
-    val invalid = (attempted || state.text.isNotEmpty()) && (cents == null || cents <= 0)
+    val invalid = (attempted || state.text.isNotEmpty()) && (cents == null || (!allowZero && cents == 0L))
     OutlinedTextField(
         state = state,
-        label = { Text("Valor (R$)") },
+        label = { Text(label) },
         prefix = { Text("R$") },
         placeholder = { Text("0,00") },
-        modifier = Modifier.fillMaxWidth().testTag("amount-input"),
+        modifier = Modifier.fillMaxWidth().testTag(tag),
         enabled = enabled,
         lineLimits = TextFieldLineLimits.SingleLine,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -74,7 +78,7 @@ fun MoneyAmountField(state: TextFieldState, attempted: Boolean, enabled: Boolean
         isError = invalid || rejected,
         supportingText = {
             Text(if (rejected) "Entrada inválida ou acima do limite. Digite números ou cole um valor como 1.234,56."
-                else if (invalid) "Informe um valor maior que zero."
+                else if (invalid) if (allowZero) "Informe um valor ou digite zero." else "Informe um valor maior que zero."
                 else "Digite só números: 1234 vira 12,34. Valores em reais também podem ser colados.")
         },
     )

@@ -49,3 +49,8 @@ data class CommitmentEntity(
 ) {
     fun toCommitment() = FixedCommitment(id, label, amountCents, LocalDate.parse(dueDate))
 }
+/** Parcela do mês, com o valor efetivo quando vinculada a um lançamento. */
+data class InstallmentDue(
+    val id: String, val title: String, val bank: String, val category: Category, val method: PaymentMethod,
+    val amountCents: Long, val dueDate: String, val number: Int, val installmentCount: Int, val recordId: String?,
+)

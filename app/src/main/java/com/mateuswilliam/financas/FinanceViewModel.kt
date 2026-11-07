@@ -10,6 +10,8 @@ import com.mateuswilliam.financas.core.NotificationInput
 import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.core.MonthlyBudget
+import com.mateuswilliam.financas.core.MonthlyIncomePlan
+import com.mateuswilliam.financas.core.InstallmentPurchase
 import com.mateuswilliam.financas.core.RecurringPlan
 import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.data.StagedRestore
@@ -19,6 +21,7 @@ import com.mateuswilliam.financas.data.DraftChangedException
 import com.mateuswilliam.financas.notifications.ReviewNotifications
 import com.mateuswilliam.financas.notifications.RecurringReminders
 import java.time.ZoneId
+import java.time.YearMonth
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +89,32 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveBudget(budget: MonthlyBudget, onSaved: () -> Unit) = action { repository.saveBudget(budget); onSaved(); "Limite mensal salvo." }
     fun deleteBudget(month: String, category: Category) = action { repository.deleteBudget(month, category); "Limite mensal removido." }
+    fun commitmentSetup(month: YearMonth) = repository.commitmentSetup(month)
+    fun saveMonthlyIncome(plan: MonthlyIncomePlan, onSaved: () -> Unit) = action {
+        repository.saveMonthlyPlan(plan)
+        onSaved()
+        "Renda prevista e limite salvos para o mês."
+    }
+    fun savePurchase(purchase: InstallmentPurchase, draftId: String?, expectedRevision: Int?, onSaved: () -> Unit) = action {
+        val saved = try { repository.createPurchase(purchase, draftId, expectedRevision) }
+        catch (exception: DraftChangedException) { return@action exception.message.orEmpty() }
+        if (saved) {
+            if (draftId != null) ReviewNotifications.cancel(app, draftId)
+            onSaved()
+            "Compra salva. As parcelas em aberto estão no Planejamento."
+        } else "A compra já foi salva ou a notificação não está mais pendente."
+    }
+    fun confirmInstallment(id: String, record: Record, onSaved: () -> Unit) = action {
+        if (repository.confirmInstallment(id, record)) {
+            onSaved()
+            "Parcela registrada no extrato."
+        } else "A parcela já foi registrada ou removida."
+    }
+    fun setFixedRecurring(id: String, fromMonth: YearMonth?) = action {
+        repository.setFixedRecurring(id, fromMonth)
+        if (fromMonth != null) "Despesa fixa incluída no planejamento."
+        else "A recorrência saiu das previsões de despesas fixas. O histórico foi mantido."
+    }
     fun saveRecurring(plan: RecurringPlan, onSaved: () -> Unit) = action {
         val old = state.value.recurring.find { it.id == plan.id }
         repository.saveRecurring(plan)

@@ -4,7 +4,7 @@
 
 O módulo `core` calcula quanto da renda líquida mensal prevista está comprometido com obrigações de despesa fornecidas ao relatório. A renda é uma entrada explícita por mês; não é inferida de notificações nem somada automaticamente a partir das receitas confirmadas.
 
-A segunda fase reuniu cálculos e contratos Kotlin puros. A terceira acrescenta a persistência descrita abaixo. Formulários, card, desenho da rosca e importação de PDF permanecem nas próximas fases; consentimento e segurança do aparelho são preservados.
+A segunda fase reuniu cálculos e contratos Kotlin puros. A terceira acrescentou a persistência e a quarta conectou os cadastros à interface. A apresentação do indicador, o desenho da rosca e a importação de PDF são etapas separadas.
 
 ## Entradas e resultado
 
@@ -76,7 +76,7 @@ O comando padrão é:
 ./gradlew --no-daemon --max-workers=2 :core:test
 ```
 
-As regras não produzem telas nem escrevem dados. Os testes de core não comprovam migração, restauração, TalkBack, aparência do gráfico ou edição de preferências. Migração e restauração da terceira fase possuem testes instrumentados próprios; as interfaces novas ainda não foram implementadas. Resultados executados, limitações do ambiente e estado do CI ficam registrados no pull request da fase.
+Os testes de core verificam cálculos e regras de entrada. Migração, restauração e interação com os cadastros possuem testes instrumentados próprios. Resultados executados, limitações do ambiente e estado do CI ficam registrados no pull request de cada fase.
 
 
 ## Terceira fase — persistência e recuperação
@@ -95,6 +95,15 @@ Os contratos persistidos usam anos de 1 a 9999, mantendo datas civis canônicas 
 
 O [backup de dados versão 2](backup.md) inclui todas as estruturas e vínculos novos, aceita o formato anterior e confere o conteúdo em banco temporário antes da substituição. A migração do banco instalado e a leitura de backups são verificações separadas. Os testes `CommitmentMigrationTest`, `CommitmentRepositoryTest` e `CommitmentBackupTest` utilizam somente dados fictícios, na API de teste configurada no CI.
 
-A terceira fase fornece a API de persistência. O cadastro visual das compras e da renda ainda depende das fases de formulário e apresentação; o único ajuste visual desta etapa acrescenta as contagens novas à prévia protegida de restauração.
+Na terceira fase, o ajuste visual ficou restrito às contagens novas da prévia protegida de restauração. A quarta fase utiliza as tabelas e o formato de backup já existentes.
 
 Datas legadas de recorrência são preservadas no mês de `nextDate`, mesmo quando seu dia difere do dia mensal configurado; os meses seguintes usam o dia configurado. A correção de uma movimentação recorrente de receita para despesa recompõe seu vínculo financeiro na mesma transação, mantendo o relatório e o backup consistentes.
+
+## Quarta fase — cadastros no aplicativo
+
+- Em **Planejamento**, selecione o mês e use **Informar renda e limite**. O valor corresponde à renda líquida esperada após descontos. O limite de 30% é apenas a referência inicial, aceita ajuste com até duas casas decimais e fica salvo naquele mês. Informar a renda não registra uma receita no extrato.
+- No editor de uma despesa nova ou na revisão de uma notificação, ative **Compra parcelada no cartão de crédito**. A revisão começa pelo valor total sugerido, que é editável. A base de cálculo pode ser o total original ou o valor de cada parcela. Para uma compra em andamento, informe a quantidade já paga e confira o próximo vencimento; em meses curtos, o dia habitual pode ser preservado. A prévia mostra os valores e o intervalo das parcelas em aberto.
+- Em **Parcelas do mês**, confira os vencimentos da competência selecionada. **Conferir e registrar parcela** permite revisar o valor e a data efetiva e criar uma despesa vinculada. Salvar a compra cria apenas as previsões; não cria pagamentos retroativos nem soma valores ao extrato.
+- Nas recorrências de despesa, **Incluir como despesa fixa** usa o mês selecionado como início. Desmarcar interrompe as projeções e conserva o que já foi confirmado. Se a previsão mudar para receita, a marcação é retirada; uma futura volta a despesa exige nova inclusão explícita.
+
+A ocultação de valores alcança renda, limite e valores das parcelas. É possível revelar os campos temporariamente para edição. Nenhuma sugestão é consumida se a revisão estiver desatualizada ou for cancelada. Edição e cancelamento de compras já cadastradas, faturas bancárias, card de comprometimento, rosca e leitura de contracheque em PDF ficam fora desta etapa.
