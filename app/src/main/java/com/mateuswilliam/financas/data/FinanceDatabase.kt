@@ -1,5 +1,6 @@
 package com.mateuswilliam.financas.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -95,6 +96,7 @@ data class RecurringEntity(
     @PrimaryKey val id: String, val title: String, val amountCents: Long, val movement: Movement,
     val method: PaymentMethod, val category: Category, val bank: String, val nextDate: String,
     val dayOfMonth: Int, val active: Boolean = true, val lastRemindedDate: String = "",
+    @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
 ) {
     fun toPlan() = RecurringPlan(id, title, amountCents, movement, method, category, bank, nextDate, dayOfMonth, active, lastRemindedDate)
     companion object {
@@ -130,8 +132,11 @@ interface FinanceDao {
     @Query("""
         SELECT c.* FROM commitments AS c
         LEFT JOIN purchases AS p ON p.id = c.purchaseId
+        LEFT JOIN recurring AS r ON r.id = c.recurringId
         WHERE c.dueDate BETWEEN :start AND :end
           AND (p.id IS NULL OR p.openCancelled = 0 OR c.recordId IS NOT NULL)
+          AND c.excluded = 0
+          AND (r.id IS NULL OR r.archived = 0 OR c.recordId IS NOT NULL)
         ORDER BY c.dueDate, c.id
     """)
     suspend fun commitmentsInPeriod(start: String, end: String): List<CommitmentEntity>
@@ -143,19 +148,22 @@ interface FinanceDao {
         LEFT JOIN records AS r ON r.id = c.recordId
         WHERE c.dueDate BETWEEN :start AND :end AND c.installmentNumber IS NOT NULL
           AND (p.openCancelled = 0 OR c.recordId IS NOT NULL)
+          AND c.excluded = 0
         ORDER BY c.dueDate, c.id
     """)
     fun observeInstallmentDues(start: String, end: String): Flow<List<InstallmentDue>>
     @Query("SELECT * FROM commitments WHERE id = :id") suspend fun commitmentById(id: String): CommitmentEntity?
     @Query("SELECT * FROM commitments WHERE purchaseId = :id ORDER BY installmentNumber")
     suspend fun installmentsForPurchase(id: String): List<CommitmentEntity>
-    @Query("DELETE FROM commitments WHERE purchaseId = :id AND recordId IS NULL AND adjusted = 0")
+    @Query("DELETE FROM commitments WHERE purchaseId = :id AND recordId IS NULL AND adjusted = 0 AND excluded = 0")
     suspend fun deleteReplaceableInstallments(id: String): Int
-    @Query("UPDATE commitments SET amountCents = :amount, dueDate = :date, adjusted = 1 WHERE id = :id AND purchaseId IS NOT NULL AND recordId IS NULL")
+    @Query("UPDATE commitments SET amountCents = :amount, dueDate = :date, adjusted = 1 WHERE id = :id AND purchaseId IS NOT NULL AND recordId IS NULL AND excluded = 0")
     suspend fun adjustOpenInstallment(id: String, amount: Long, date: String): Int
+    @Query("UPDATE commitments SET excluded = 1 WHERE id = :id AND purchaseId IS NOT NULL AND recordId IS NULL AND excluded = 0")
+    suspend fun excludeOpenInstallment(id: String): Int
     @Query("SELECT * FROM commitments WHERE recordId = :id") suspend fun commitmentByRecord(id: String): CommitmentEntity?
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertCommitment(commitment: CommitmentEntity)
-    @Query("UPDATE commitments SET recordId = :recordId WHERE id = :id AND recordId IS NULL")
+    @Query("UPDATE commitments SET recordId = :recordId WHERE id = :id AND recordId IS NULL AND excluded = 0")
     suspend fun linkCommitment(id: String, recordId: String): Int
     @Query("UPDATE commitments SET recordId = NULL WHERE recordId = :id") suspend fun unlinkCommitment(id: String)
     @Query("DELETE FROM commitments") suspend fun clearCommitments()
@@ -164,13 +172,14 @@ interface FinanceDao {
     @Upsert suspend fun upsertBudget(budget: BudgetEntity)
     @Query("DELETE FROM budgets WHERE month = :month AND category = :category") suspend fun deleteBudget(month: String, category: Category)
     @Query("DELETE FROM budgets") suspend fun clearBudgets()
-    @Query("SELECT * FROM recurring ORDER BY nextDate, id") fun recurring(): Flow<List<RecurringEntity>>
+    @Query("SELECT * FROM recurring WHERE archived = 0 ORDER BY nextDate, id") fun recurring(): Flow<List<RecurringEntity>>
     @Query("SELECT * FROM recurring ORDER BY nextDate, id") suspend fun allRecurring(): List<RecurringEntity>
     @Query("SELECT * FROM recurring WHERE id = :id LIMIT 1") suspend fun recurringById(id: String): RecurringEntity?
     @Upsert suspend fun upsertRecurring(plan: RecurringEntity)
     @Query("UPDATE recurring SET nextDate = :next, lastRemindedDate = '' WHERE id = :id AND nextDate = :expected")
     suspend fun advanceRecurring(id: String, expected: String, next: String): Int
-    @Query("UPDATE recurring SET lastRemindedDate = :due WHERE id = :id AND nextDate = :due") suspend fun markReminded(id: String, due: String)
+    @Query("UPDATE recurring SET lastRemindedDate = :due WHERE id = :id AND nextDate = :due AND active = 1 AND archived = 0")
+    suspend fun markReminded(id: String, due: String)
     @Query("DELETE FROM recurring") suspend fun clearRecurring()
     @Query("SELECT * FROM occurrences ORDER BY recurringId, dueDate") suspend fun allOccurrences(): List<OccurrenceEntity>
     @Query("SELECT * FROM occurrences WHERE recurringId = :id ORDER BY dueDate") suspend fun occurrencesForRecurring(id: String): List<OccurrenceEntity>
@@ -222,11 +231,17 @@ interface FinanceDao {
     @Query("DELETE FROM records") suspend fun clearRecords()
 }
 
-@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class], version = 6, exportSchema = true)
+@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class], version = 7, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `recurring` ADD COLUMN `archived` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `commitments` ADD COLUMN `excluded` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `purchases` ADD COLUMN `revision` INTEGER NOT NULL DEFAULT 0")

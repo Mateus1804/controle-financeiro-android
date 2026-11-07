@@ -42,6 +42,6 @@ internal object CompatibilityFixtures {
             db.version = 3
         }
         return Room.databaseBuilder(context, FinanceDatabase::class.java, name)
-            .addMigrations(FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6).build()
+            .addMigrations(FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7).build()
     }
 }

@@ -25,3 +25,9 @@ Em **Ajustes**, crie um **backup criptografado** com senha de teste e salve como
 Por fim, amplie a fonte e confira os botões e rótulos. Se usar TalkBack, confira a descrição da rosca, que indica o percentual e a maior despesa. Ao ocultar os valores no **Resumo**, o Planejamento deve esconder a rosca, os montantes e os percentuais, inclusive nas descrições de acessibilidade.
 
 O teste com notificações fictícias funciona sem conceder acesso às notificações. O [roteiro bancário](validacao-bancaria.md) trata separadamente da entrega real, sujeita ao Android, ao aparelho e aos aplicativos selecionados.
+
+## Exclusão individual
+
+- Em uma compra fictícia de **R$ 600,00 em três parcelas**, exclua só a parcela 2. Ela deve desaparecer do mês correspondente; as parcelas 1 e 3 mantêm os vencimentos e o valor de **R$ 200,00** cada.
+- Adicione uma conta recorrente de **R$ 80,00** e inclua como despesa fixa. Registre o primeiro vencimento e use **Excluir previsão**. O próximo vencimento deixa de aparecer, e o pagamento confirmado continua no extrato.
+- Crie um backup de teste e restaure. Confira que as previsões excluídas continuam fora do Planejamento.

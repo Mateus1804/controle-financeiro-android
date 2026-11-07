@@ -133,3 +133,9 @@ A migração Room 5→6 acrescenta o estado de cancelamento, a revisão da compr
 `CommitmentJourneyTest` reúne, na mesma base fictícia, compra em andamento, revisão de compra por notificação, renda e limite por mês, registro de parcela, ajuste de valor, cancelamento e restauração. O teste confere o texto acessível do gráfico, a parte livre, a ocultação dos percentuais e a permanência do pagamento após a recuperação. A entrega da notificação pelo Android e a leitura pelo TalkBack ficam para o aparelho físico.
 
 O [roteiro de teste no celular](teste-no-celular.md) descreve os passos e resultados esperados com o APK de teste, cuja instalação é independente da versão de uso pessoal.
+
+## Exclusão de previsões
+
+Em **Parcelas do mês → Excluir só esta parcela**, a confirmação retira apenas aquela previsão do gráfico e da lista. As outras parcelas mantêm o número, o valor e o vencimento. Depois de excluir uma parcela, as demais continuam ajustáveis individualmente; o recálculo da compra inteira fica indisponível para não recriar a previsão excluída. **Cancelar parcelas em aberto** continua removendo as previsões restantes daquela compra.
+
+Em **Contas e receitas recorrentes → Excluir previsão**, a recorrência sai da lista, da projeção de despesas fixas e dos lembretes. **Pular este vencimento** continua disponível para deixar apenas o próximo vencimento de fora. A exclusão conserva os lançamentos e os compromissos históricos vinculados. Os dois tipos de exclusão são preservados no [backup criptografado](backup.md).
