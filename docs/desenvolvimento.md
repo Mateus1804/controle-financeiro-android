@@ -65,7 +65,7 @@ Bases reais, exportações, arquivos de assinatura e configurações locais deve
 
 ## Atualizações dos dados e da interface
 
-O esquema Room fica em `app/schemas`, e as migrações 1→2, 2→3 e 3→4, em `FinanceDatabase.kt`. Os testes de migração reconstroem uma base isolada a partir do esquema 1 exportado e abrem essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
+O esquema Room fica em `app/schemas`, e as migrações 1→2, 2→3, 3→4 e 4→5, em `FinanceDatabase.kt`. Os testes de migração reconstroem uma base isolada a partir do esquema 1 exportado e abrem essa base pelo Room atual, verificando registros, pendências e o novo cadastro de contas.
 
 O comando `python3 scripts/verify-contrast.py` confere os 16 pares principais das paletas de fallback de texto e fundo. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
 

@@ -110,6 +110,29 @@ data class UsedAccount(val label: String, val lastUsedAt: Long)
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM monthly_plans ORDER BY month") suspend fun allMonthlyPlans(): List<MonthlyPlanEntity>
+    @Query("SELECT * FROM monthly_plans WHERE month = :month") suspend fun monthlyPlan(month: String): MonthlyPlanEntity?
+    @Upsert suspend fun upsertMonthlyPlan(plan: MonthlyPlanEntity)
+    @Query("DELETE FROM monthly_plans") suspend fun clearMonthlyPlans()
+    @Query("SELECT * FROM purchases ORDER BY id") suspend fun allPurchases(): List<PurchaseEntity>
+    @Query("SELECT * FROM purchases WHERE id = :id") suspend fun purchaseById(id: String): PurchaseEntity?
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertPurchase(purchase: PurchaseEntity)
+    @Query("DELETE FROM purchases") suspend fun clearPurchases()
+    @Query("SELECT * FROM fixed_recurring ORDER BY recurringId") suspend fun allFixedRecurring(): List<FixedRecurringEntity>
+    @Query("SELECT * FROM fixed_recurring WHERE recurringId = :id") suspend fun fixedRecurringById(id: String): FixedRecurringEntity?
+    @Upsert suspend fun upsertFixedRecurring(plan: FixedRecurringEntity)
+    @Query("DELETE FROM fixed_recurring WHERE recurringId = :id") suspend fun removeFixedRecurring(id: String)
+    @Query("DELETE FROM fixed_recurring") suspend fun clearFixedRecurring()
+    @Query("SELECT * FROM commitments ORDER BY dueDate, id") suspend fun allCommitments(): List<CommitmentEntity>
+    @Query("SELECT * FROM commitments WHERE dueDate BETWEEN :start AND :end ORDER BY dueDate, id")
+    suspend fun commitmentsInPeriod(start: String, end: String): List<CommitmentEntity>
+    @Query("SELECT * FROM commitments WHERE id = :id") suspend fun commitmentById(id: String): CommitmentEntity?
+    @Query("SELECT * FROM commitments WHERE recordId = :id") suspend fun commitmentByRecord(id: String): CommitmentEntity?
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertCommitment(commitment: CommitmentEntity)
+    @Query("UPDATE commitments SET recordId = :recordId WHERE id = :id AND recordId IS NULL")
+    suspend fun linkCommitment(id: String, recordId: String): Int
+    @Query("UPDATE commitments SET recordId = NULL WHERE recordId = :id") suspend fun unlinkCommitment(id: String)
+    @Query("DELETE FROM commitments") suspend fun clearCommitments()
     @Query("SELECT * FROM budgets ORDER BY month, category") fun budgets(): Flow<List<BudgetEntity>>
     @Query("SELECT * FROM budgets ORDER BY month, category") suspend fun allBudgets(): List<BudgetEntity>
     @Upsert suspend fun upsertBudget(budget: BudgetEntity)
@@ -124,6 +147,9 @@ interface FinanceDao {
     @Query("UPDATE recurring SET lastRemindedDate = :due WHERE id = :id AND nextDate = :due") suspend fun markReminded(id: String, due: String)
     @Query("DELETE FROM recurring") suspend fun clearRecurring()
     @Query("SELECT * FROM occurrences ORDER BY recurringId, dueDate") suspend fun allOccurrences(): List<OccurrenceEntity>
+    @Query("SELECT * FROM occurrences WHERE recurringId = :id ORDER BY dueDate") suspend fun occurrencesForRecurring(id: String): List<OccurrenceEntity>
+    @Query("SELECT * FROM occurrences WHERE dueDate BETWEEN :start AND :end") suspend fun occurrencesInPeriod(start: String, end: String): List<OccurrenceEntity>
+    @Query("SELECT * FROM occurrences WHERE recordId = :id LIMIT 1") suspend fun occurrenceByRecord(id: String): OccurrenceEntity?
     @Query("SELECT * FROM occurrences WHERE recurringId = :id AND dueDate = :due LIMIT 1") suspend fun occurrence(id: String, due: String): OccurrenceEntity?
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertOccurrence(occurrence: OccurrenceEntity)
     @Query("UPDATE occurrences SET recordId = NULL, status = 'REMOVED' WHERE recordId = :id") suspend fun unlinkOccurrence(id: String)
@@ -161,6 +187,7 @@ interface FinanceDao {
     suspend fun updateDraft(id: String, title: String, body: String, amount: Long?, movement: Movement, method: PaymentMethod, category: Category, explanation: String)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertRecord(record: RecordEntity)
     @Update suspend fun updateRecord(record: RecordEntity): Int
+    @Query("SELECT * FROM records WHERE id IN (:ids)") suspend fun recordsByIds(ids: List<String>): List<RecordEntity>
     @Query("SELECT * FROM records WHERE id = :id LIMIT 1") suspend fun recordById(id: String): RecordEntity?
     @Query("UPDATE drafts SET status = :status, sourceTitle = '', sourceBody = '' WHERE id = :id AND status = 'PENDING'")
     suspend fun reviewDraft(id: String, status: String)
@@ -169,11 +196,24 @@ interface FinanceDao {
     @Query("DELETE FROM records") suspend fun clearRecords()
 }
 
-@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class], version = 4, exportSchema = true)
+@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class], version = 5, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `monthly_plans` (`month` TEXT NOT NULL, `incomeCents` INTEGER NOT NULL, `healthyLimitBasisPoints` INTEGER NOT NULL, PRIMARY KEY(`month`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `purchases` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `bank` TEXT NOT NULL, `category` TEXT NOT NULL, `method` TEXT NOT NULL, `totalCents` INTEGER NOT NULL, `installmentCount` INTEGER NOT NULL, `paidInstallments` INTEGER NOT NULL, `nextDueDate` TEXT NOT NULL, `dayOfMonth` INTEGER NOT NULL, `sourceDraftId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`sourceDraftId`) REFERENCES `drafts`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_purchases_sourceDraftId` ON `purchases` (`sourceDraftId`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `fixed_recurring` (`recurringId` TEXT NOT NULL, `fromMonth` TEXT NOT NULL, PRIMARY KEY(`recurringId`), FOREIGN KEY(`recurringId`) REFERENCES `recurring`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `commitments` (`id` TEXT NOT NULL, `label` TEXT NOT NULL, `amountCents` INTEGER NOT NULL, `dueDate` TEXT NOT NULL, `purchaseId` TEXT, `installmentNumber` INTEGER, `recurringId` TEXT, `recordId` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`purchaseId`) REFERENCES `purchases`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION, FOREIGN KEY(`recurringId`) REFERENCES `recurring`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION, FOREIGN KEY(`recordId`) REFERENCES `records`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_commitments_purchaseId_installmentNumber` ON `commitments` (`purchaseId`, `installmentNumber`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_commitments_recurringId_dueDate` ON `commitments` (`recurringId`, `dueDate`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_commitments_recordId` ON `commitments` (`recordId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_commitments_dueDate_id` ON `commitments` (`dueDate`, `id`)")
+            }
+        }
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_records_occurredAt_id` ON `records` (`occurredAt` DESC, `id` ASC)")

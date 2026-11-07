@@ -41,7 +41,7 @@ class InstalledUpdateTest {
                 return@runBlocking
             }
             assertTrue(installedVersion >= 2)
-            assertEquals(4, database.openHelper.writableDatabase.version)
+            assertEquals(5, database.openHelper.writableDatabase.version)
             if (installed) {
                 assertEquals(Appearance.DARK, app.settings.snapshot().appearance)
                 assertTrue(app.settings.snapshot().hideAmounts)

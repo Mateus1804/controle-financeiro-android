@@ -10,11 +10,13 @@ data class FinanceSnapshot(
     val createdAt: Long, val records: List<RecordEntity>, val drafts: List<DraftEntity>,
     val accounts: List<AccountEntity>, val budgets: List<BudgetEntity>, val recurring: List<RecurringEntity>,
     val occurrences: List<OccurrenceEntity>, val display: BackupDisplay,
+    val monthlyPlans: List<MonthlyPlanEntity> = emptyList(), val purchases: List<PurchaseEntity> = emptyList(),
+    val fixedRecurring: List<FixedRecurringEntity> = emptyList(), val commitments: List<CommitmentEntity> = emptyList(),
 )
 
 /** JSON de dados, sem desserialização de classes arbitrárias ou SQL recebido do arquivo. */
 object BackupSnapshot {
-    const val FORMAT_VERSION = 1
+    const val FORMAT_VERSION = 2
     private const val MAX_ROWS = 50_000
     private fun json(vararg fields: Pair<String, Any?>) = JSONObject().apply { fields.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
     private fun <T> array(rows: List<T>, convert: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(convert(it)) } }
@@ -36,6 +38,15 @@ object BackupSnapshot {
             "recurring" to array(snapshot.recurring) { r -> json("id" to r.id, "title" to r.title, "amountCents" to r.amountCents,
                 "movement" to r.movement.name, "method" to r.method.name, "category" to r.category.name, "bank" to r.bank,
                 "nextDate" to r.nextDate, "dayOfMonth" to r.dayOfMonth, "active" to r.active, "lastRemindedDate" to r.lastRemindedDate) },
+            "monthlyPlans" to array(snapshot.monthlyPlans) { p -> json("month" to p.month, "incomeCents" to p.incomeCents, "healthyLimitBasisPoints" to p.healthyLimitBasisPoints) },
+            "purchases" to array(snapshot.purchases) { p -> json("id" to p.id, "title" to p.title, "bank" to p.bank,
+                "category" to p.category.name, "method" to p.method.name, "totalCents" to p.totalCents,
+                "installmentCount" to p.installmentCount, "paidInstallments" to p.paidInstallments,
+                "nextDueDate" to p.nextDueDate, "dayOfMonth" to p.dayOfMonth, "sourceDraftId" to p.sourceDraftId) },
+            "fixedRecurring" to array(snapshot.fixedRecurring) { p -> json("recurringId" to p.recurringId, "fromMonth" to p.fromMonth) },
+            "commitments" to array(snapshot.commitments) { c -> json("id" to c.id, "label" to c.label,
+                "amountCents" to c.amountCents, "dueDate" to c.dueDate, "purchaseId" to c.purchaseId,
+                "installmentNumber" to c.installmentNumber, "recurringId" to c.recurringId, "recordId" to c.recordId) },
             "occurrences" to array(snapshot.occurrences) { o -> json("recurringId" to o.recurringId, "dueDate" to o.dueDate, "status" to o.status, "recordId" to o.recordId) },
         ).toString().toByteArray(Charsets.UTF_8).also {
             require(it.size <= BackupCrypto.MAX_PAYLOAD_BYTES) { "O backup excede o limite de 16 MiB." }
@@ -45,7 +56,11 @@ object BackupSnapshot {
     fun decode(bytes: ByteArray): FinanceSnapshot {
         require(bytes.size <= BackupCrypto.MAX_PAYLOAD_BYTES) { "Backup maior que o limite permitido." }
         val j = try { JSONObject(bytes.toString(Charsets.UTF_8)) } catch (_: Exception) { throw IllegalArgumentException("Conteúdo de backup inválido.") }
-        require(j.text("format", 40) == "controle-financeiro" && j.long("version") == FORMAT_VERSION.toLong()) { "Formato ou versão de dados não suportado." }
+        val version = j.long("version")
+        require(j.text("format", 40) == "controle-financeiro" && version in 1L..FORMAT_VERSION.toLong()) { "Formato ou versão de dados não suportado." }
+        if (version == 1L) require(listOf("monthlyPlans", "purchases", "fixedRecurring", "commitments").none { j.has(it) }) {
+            "Dados de comprometimento exigem a versão 2 do backup."
+        }
         val display = j.getJSONObject("display")
         val snapshot = FinanceSnapshot(j.long("createdAt"),
             j.rows("records") { r -> RecordEntity(r.text("id", 128), r.nullableText("sourceDraftId", 128), r.long("amountCents"),
@@ -62,6 +77,15 @@ object BackupSnapshot {
                 r.text("bank", 80), r.text("nextDate", 20), r.long("dayOfMonth").also { require(it in 1L..31L) }.toInt(), r.bool("active"), r.text("lastRemindedDate", 20)) },
             j.rows("occurrences") { o -> OccurrenceEntity(o.text("recurringId", 128), o.text("dueDate", 20), o.text("status", 30), o.nullableText("recordId", 128)) },
             BackupDisplay(Appearance.valueOf(display.text("appearance", 20)), display.bool("hideAmounts"), display.text("lastOrigin", 80)),
+            if (version >= 2) j.rows("monthlyPlans") { p -> MonthlyPlanEntity(p.text("month", 12), p.long("incomeCents"), p.integer("healthyLimitBasisPoints", 0, 10000)) } else emptyList(),
+            if (version >= 2) j.rows("purchases") { p -> PurchaseEntity(p.text("id", 128), p.text("title", 200), p.text("bank", 80),
+                Category.valueOf(p.text("category", 30)), PaymentMethod.valueOf(p.text("method", 30)), p.long("totalCents"),
+                p.integer("installmentCount", 1, Installments.MAX_INSTALLMENTS), p.integer("paidInstallments", 0, Installments.MAX_INSTALLMENTS - 1),
+                p.text("nextDueDate", 20), p.integer("dayOfMonth", 1, 31), p.nullableText("sourceDraftId", 128)) } else emptyList(),
+            if (version >= 2) j.rows("fixedRecurring") { p -> FixedRecurringEntity(p.text("recurringId", 128), p.text("fromMonth", 12)) } else emptyList(),
+            if (version >= 2) j.rows("commitments") { c -> CommitmentEntity(c.text("id", 256), c.text("label", 256), c.long("amountCents"),
+                c.text("dueDate", 20), c.nullableText("purchaseId", 128), if (c.isNull("installmentNumber")) null else c.integer("installmentNumber", 1, Installments.MAX_INSTALLMENTS),
+                c.nullableText("recurringId", 128), c.nullableText("recordId", 128)) } else emptyList(),
         )
         validate(snapshot)
         return snapshot
@@ -69,7 +93,7 @@ object BackupSnapshot {
 
     fun validate(snapshot: FinanceSnapshot) {
         require(snapshot.createdAt > 0) { "Data de backup inválida." }
-        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size).sum()
+        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size, snapshot.monthlyPlans.size, snapshot.purchases.size, snapshot.fixedRecurring.size, snapshot.commitments.size).sum()
         require(total <= MAX_ROWS) { "O backup excede o limite de 50 mil itens." }
         fun unique(values: List<String>) { require(values.all { it.isNotBlank() } && values.distinct().size == values.size) { "Identificadores repetidos ou vazios no backup." } }
         unique(snapshot.records.map { it.id }); unique(snapshot.drafts.map { it.id }); unique(snapshot.drafts.map { it.sourceKey })
@@ -100,9 +124,13 @@ object BackupSnapshot {
             require(o.status in setOf("RECORDED", "SKIPPED", "REMOVED")) { "Estado de vencimento inválido." }
             require(if (o.status == "RECORDED") o.recordId in recordIds else o.recordId == null) { "Vínculo de lançamento recorrente inválido." }
         }
+        CommitmentSnapshotValidation.validate(snapshot)
         require(snapshot.display.lastOrigin.length <= 80) { "Preferência de origem inválida." }
     }
 
+    private fun JSONObject.integer(key: String, min: Int, max: Int): Int = long(key).also {
+        require(it in min.toLong()..max.toLong()) { "Inteiro fora do limite em $key." }
+    }.toInt()
     private fun JSONObject.long(key: String): Long {
         val value = get(key)
         require(value is Int || value is Long) { "Número inteiro inválido em $key." }

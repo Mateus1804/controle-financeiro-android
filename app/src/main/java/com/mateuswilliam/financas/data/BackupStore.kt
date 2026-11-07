@@ -11,7 +11,7 @@ import java.io.InputStream
 import java.util.UUID
 
 class StagedRestore internal constructor(val databaseName: String, val createdAt: Long, val records: Int,
-    val pending: Int, val accounts: Int, val budgets: Int, val recurring: Int, internal val display: BackupDisplay)
+    val pending: Int, val accounts: Int, val budgets: Int, val recurring: Int, internal val display: BackupDisplay, val monthlyPlans: Int = 0, val purchases: Int = 0, val commitments: Int = 0, val fixedRecurring: Int = 0)
 
 class BackupStore(private val context: Context, private val repository: FinanceRepository) {
     suspend fun create(password: CharArray): ByteArray = withContext(Dispatchers.IO) {
@@ -40,7 +40,7 @@ class BackupStore(private val context: Context, private val repository: FinanceR
             }
             val plaintext = try { BackupCrypto.decrypt(file, password) } finally { file.fill(0) }
             val snapshot = try { BackupSnapshot.decode(plaintext) } finally { plaintext.fill(0) }
-            val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4).build()
+            val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5).build()
             database = temporary
             temporary.withTransaction { insertSnapshot(temporary.financeDao(), snapshot) }
             verify(temporary)
@@ -49,9 +49,11 @@ class BackupStore(private val context: Context, private val repository: FinanceR
             require(copy.records.associateBy { it.id } == snapshot.records.associateBy { it.id } &&
                 copy.drafts.associateBy { it.id } == snapshot.drafts.associateBy { it.id } &&
                 copy.accounts.toSet() == snapshot.accounts.toSet() && copy.budgets.toSet() == snapshot.budgets.toSet() &&
-                copy.recurring.toSet() == snapshot.recurring.toSet() && copy.occurrences.toSet() == snapshot.occurrences.toSet()) { "A conferência da base temporária falhou." }
+                copy.recurring.toSet() == snapshot.recurring.toSet() && copy.occurrences.toSet() == snapshot.occurrences.toSet() &&
+                copy.monthlyPlans.toSet() == snapshot.monthlyPlans.toSet() && copy.purchases.toSet() == snapshot.purchases.toSet() &&
+                copy.fixedRecurring.toSet() == snapshot.fixedRecurring.toSet() && copy.commitments.toSet() == snapshot.commitments.toSet()) { "A conferência da base temporária falhou." }
             StagedRestore(name, snapshot.createdAt, copy.records.size, copy.drafts.count { it.status == "PENDING" },
-                copy.accounts.size, copy.budgets.size, copy.recurring.size, copy.display)
+                copy.accounts.size, copy.budgets.size, copy.recurring.size, copy.display, copy.monthlyPlans.size, copy.purchases.size, copy.commitments.size, copy.fixedRecurring.size)
         } catch (exception: Exception) {
             database?.close(); context.deleteDatabase(name); throw exception
         } finally { database?.close(); password.fill('\u0000') }
@@ -59,7 +61,7 @@ class BackupStore(private val context: Context, private val repository: FinanceR
 
     suspend fun restore(staged: StagedRestore) = withContext(Dispatchers.IO) {
         require(staged.databaseName.startsWith("restore-stage-") && context.getDatabasePath(staged.databaseName).exists()) { "A prévia expirou. Selecione o backup novamente." }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5).build()
         try {
             verify(database)
             val snapshot = readSnapshot(database.financeDao(), staged.createdAt, staged.display)
@@ -76,6 +78,9 @@ class BackupStore(private val context: Context, private val repository: FinanceR
     }
 
     private fun verify(database: FinanceDatabase) {
+        database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { cursor ->
+            require(!cursor.moveToFirst()) { "A base temporária contém vínculos inválidos." }
+        }
         database.openHelper.writableDatabase.query("PRAGMA integrity_check").use { cursor ->
             require(cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext()) { "A integridade da base temporária não foi confirmada." }
         }
@@ -83,7 +88,8 @@ class BackupStore(private val context: Context, private val repository: FinanceR
 }
 
 internal suspend fun readSnapshot(dao: FinanceDao, createdAt: Long, display: BackupDisplay) = FinanceSnapshot(createdAt,
-    dao.allRecords(), dao.allDrafts(), dao.allAccounts(), dao.allBudgets(), dao.allRecurring(), dao.allOccurrences(), display)
+    dao.allRecords(), dao.allDrafts(), dao.allAccounts(), dao.allBudgets(), dao.allRecurring(), dao.allOccurrences(), display,
+    dao.allMonthlyPlans(), dao.allPurchases(), dao.allFixedRecurring(), dao.allCommitments())
 
 internal suspend fun insertSnapshot(dao: FinanceDao, snapshot: FinanceSnapshot) {
     snapshot.accounts.forEach { dao.insertAccount(it) }
@@ -92,4 +98,8 @@ internal suspend fun insertSnapshot(dao: FinanceDao, snapshot: FinanceSnapshot) 
     snapshot.budgets.forEach { dao.upsertBudget(it) }
     snapshot.recurring.forEach { dao.upsertRecurring(it) }
     snapshot.occurrences.forEach { dao.insertOccurrence(it) }
+    snapshot.monthlyPlans.forEach { dao.upsertMonthlyPlan(it) }
+    snapshot.purchases.forEach { dao.insertPurchase(it) }
+    snapshot.fixedRecurring.forEach { dao.upsertFixedRecurring(it) }
+    snapshot.commitments.forEach { dao.insertCommitment(it) }
 }
