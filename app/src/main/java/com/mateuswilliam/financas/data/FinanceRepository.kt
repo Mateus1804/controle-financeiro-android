@@ -111,7 +111,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         val saved = database.withTransaction {
             if (editing) {
                 val previous = dao.recordById(record.id) ?: return@withTransaction false
-                if (record.movement != Movement.EXPENSE) dao.unlinkCommitment(record.id)
+                if (record.movement != Movement.EXPENSE) unlinkCommitment(record.id)
                 val updated = dao.updateRecord(RecordEntity.from(record, previous.sourceDraftId)) == 1
                 if (updated) {
                     if (record.movement == Movement.EXPENSE) reconcileRecurringCommitment(record)
@@ -152,7 +152,23 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     suspend fun dismiss(id: String) = writes.withLock { dao.reviewDraft(id, "DISMISSED") }
-    suspend fun deleteRecord(id: String) = writes.withLock { database.withTransaction { dao.unlinkCommitment(id); dao.unlinkOccurrence(id); dao.deleteRecord(id) } }
+    suspend fun deleteRecord(id: String) = writes.withLock {
+        database.withTransaction {
+            unlinkCommitment(id)
+            dao.unlinkOccurrence(id)
+            dao.deleteRecord(id)
+        }
+    }
+
+    private suspend fun unlinkCommitment(recordId: String) {
+        val purchaseId = dao.commitmentByRecord(recordId)?.purchaseId
+        dao.unlinkCommitment(recordId)
+        if (purchaseId != null) {
+            val purchase = checkNotNull(dao.purchaseById(purchaseId))
+            saveNextPurchaseRevision(purchase)
+        }
+    }
+
     suspend fun exportRecords(): List<Record> = dao.allRecords().map { it.toRecord() }
 
     suspend fun saveMonthlyPlan(plan: MonthlyIncomePlan) = writes.withLock {
@@ -207,7 +223,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val edited = PurchaseEntity.from(purchase, previous.sourceDraftId).copy(revision = previous.revision)
             if (edited == previous) return@withTransaction true
             check(dao.deleteReplaceableInstallments(purchase.id) == installments.size)
-            check(dao.updatePurchase(edited.copy(revision = Math.addExact(previous.revision, 1L))) == 1)
+            saveNextPurchaseRevision(edited)
             insertPurchaseSchedule(purchase, schedule)
             rememberAccount(purchase.bank)
             true
@@ -222,7 +238,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val date = adjustment.dueDate.toString()
             if (item.amountCents == adjustment.amountCents && item.dueDate == date) return@withTransaction true
             check(dao.adjustOpenInstallment(id, adjustment.amountCents, date) == 1)
-            check(dao.updatePurchase(purchase.copy(revision = Math.addExact(purchase.revision, 1L))) == 1)
+            saveNextPurchaseRevision(purchase)
             true
         }
     }
@@ -233,9 +249,13 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             if (purchase.openCancelled || purchase.revision != expectedRevision) return@withTransaction 0
             val count = dao.installmentsForPurchase(id).count { it.recordId == null }
             if (count == 0 || count != expectedOpenCount) return@withTransaction 0
-            check(dao.updatePurchase(purchase.copy(openCancelled = true, revision = Math.addExact(purchase.revision, 1L))) == 1)
+            saveNextPurchaseRevision(purchase.copy(openCancelled = true))
             count
         }
+    }
+
+    private suspend fun saveNextPurchaseRevision(purchase: PurchaseEntity) {
+        check(dao.updatePurchase(purchase.copy(revision = Math.addExact(purchase.revision, 1L))) == 1)
     }
 
     suspend fun confirmInstallment(id: String, record: Record, expectedPurchaseRevision: Long? = null): Boolean = writes.withLock {
@@ -249,6 +269,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             ) return@withTransaction false
             dao.insertRecord(RecordEntity.from(record, null))
             check(dao.linkCommitment(id, record.id) == 1)
+            saveNextPurchaseRevision(purchase)
             rememberAccount(record.bank)
             true
         }

@@ -119,4 +119,23 @@ class PurchaseManagementRepositoryTest {
         }
         BackupSnapshot.validate(repository.snapshot())
     }
+
+    @Test fun staleCancellationCannotCancelADifferentOpenParcelWithTheSameCount() = runBlocking<Unit> {
+        repository.createPurchase(purchase().copy(installmentCount = 2))
+        val firstPayment = record("primeiro")
+        val secondPayment = record("segundo")
+        assertTrue(repository.confirmInstallment(id(1), firstPayment))
+        val before = repository.purchaseManagement(id(2))!!
+
+        val other = FinanceRepository(database, preferences)
+        assertTrue(other.confirmInstallment(id(2), secondPayment))
+        other.deleteRecord(firstPayment.id)
+        val after = repository.purchaseManagement(id(1))!!
+        assertEquals(1, before.openCount)
+        assertEquals(before.openCount, after.openCount)
+        assertEquals(0, repository.cancelOpenInstallments("compra", before.revision, before.openCount))
+        assertFalse(dao.purchaseById("compra")!!.openCancelled)
+        assertEquals(5000L, repository.commitmentReport(month).committedCents)
+        assertEquals(secondPayment, repository.exportRecords().single())
+    }
 }

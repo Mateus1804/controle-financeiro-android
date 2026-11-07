@@ -116,7 +116,9 @@ class PurchaseManagementUiTest {
     }
 
     private fun replaceMoney(tag: String, cents: String) {
-        rule.onNodeWithTag(tag).performScrollTo().performTextReplacement(cents).performImeAction()
+        val field = rule.onNodeWithTag(tag).performScrollTo()
+        field.performTextReplacement(cents)
+        field.performImeAction()
         rule.waitUntil(5000) {
             ViewCompat.getRootWindowInsets(rule.activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
         }

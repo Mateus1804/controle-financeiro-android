@@ -164,7 +164,7 @@ private fun CancelOpenInstallmentsDialog(
 ) {
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { DialogSystemBars(); Text("Cancelar parcelas em aberto?") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(privateDisplayText(current.purchase.title, hidden), style = MaterialTheme.typography.titleMedium)
                 Text(if (current.openCount == 1) "Uma parcela sairá do Planejamento."
                     else "${current.openCount} parcelas sairão do Planejamento, incluindo as de outros meses.")
