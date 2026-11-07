@@ -60,3 +60,7 @@ A verificação pelo ambiente padrão do projeto utiliza:
 ```
 
 Esta fase não comprova a integração do parcelamento com a interface, o banco ou o backup, que ainda não foi implementada. Os resultados de execução e as limitações do ambiente ficam no pull request correspondente.
+
+## Integração com o comprometimento mensal
+
+A [segunda fase no core](comprometimento.md) adapta as parcelas abertas para compromissos por mês. O adaptador conserva identidades, valores e vencimentos; a inclusão dos compromissos já confirmados dependerá da integração com a persistência. A montagem do relatório deve manter uma única entrada por obrigação do mês.
