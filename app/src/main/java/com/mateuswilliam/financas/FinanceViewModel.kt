@@ -161,7 +161,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (repository.skipRecurring(plan.id, plan.nextDate)) {
             RecurringReminders.cancel(app, plan.id, plan.nextDate)
             "Vencimento pulado. Nenhum lançamento foi criado."
-        } else "Esse vencimento já foi tratado."
+        } else "A previsão mudou, foi pausada ou já foi tratada. Confira o Planejamento."
     }
     fun confirmRecurring(id: String, due: String, record: Record, onSaved: () -> Unit) = action {
         if (repository.confirmRecurring(id, due, record)) { RecurringReminders.cancel(app, id, due); onSaved(); "Lançamento confirmado e próxima previsão atualizada." }

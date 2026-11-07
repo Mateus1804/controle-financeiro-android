@@ -40,6 +40,8 @@ class ForecastRemovalUiTest {
         awaitText("Excluir esta parcela prevista?")
         rule.onNodeWithText("Excluir parcela", substring = false).performClick()
         assertReport("0% da renda comprometidos; nenhum compromisso.")
+        awaitPlanningText("Sem parcelas neste mês")
+        rule.onNodeWithTag(action).assertDoesNotExist()
         assertEquals(10000L, repo.commitmentReport(month.plusMonths(1)).committedCents)
         assertTrue(repo.exportRecords().isEmpty())
     }
@@ -56,8 +58,7 @@ class ForecastRemovalUiTest {
         awaitText("Excluir previsão mensal?")
         rule.onNodeWithTag("confirm-exclude-recurring").performClick()
         assertReport("0% da renda comprometidos; nenhum compromisso.")
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Nenhuma recorrência cadastrada"))
-        rule.onNodeWithText("Nenhuma recorrência cadastrada").assertIsDisplayed()
+        awaitPlanningText("Nenhuma recorrência cadastrada")
         assertTrue(repo.exportRecords().isEmpty())
     }
 
@@ -73,6 +74,19 @@ class ForecastRemovalUiTest {
 
     private fun awaitText(text: String) {
         rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    private fun awaitPlanningText(text: String) {
+        // O relatório e a lista recebem atualizações independentes depois da exclusão.
+        rule.waitUntil(5000) {
+            try {
+                rule.onNodeWithTag("planning-list").performScrollToNode(hasText(text))
+                true
+            } catch (_: AssertionError) {
+                false
+            }
+        }
+        rule.onNodeWithText(text).assertIsDisplayed()
     }
 
     private fun assertReport(description: String) {
