@@ -30,6 +30,10 @@ Contas com saldo inicial e conciliação permanecem para uma etapa própria. Fat
 
 Limites mensais por categoria, previsões recorrentes e lembretes opcionais estão implementados. Cada vencimento exige confirmação para gerar um lançamento. Metas, intervalos diferentes do mensal e regras mais amplas de projeção permanecem para avaliação posterior.
 
+O fluxo de [comprometimento da renda](comprometimento.md) usa renda líquida prevista e limite informados manualmente por mês, parcelas em aberto ou registradas e recorrências explicitamente incluídas como despesas fixas. O indicador e a rosca mostram a relação entre renda, compromissos e limite.
+
+As próximas entregas desse fluxo são a edição e o cancelamento de compras parceladas, preservando lançamentos já confirmados, e a validação final da interface e da recuperação dos dados.
+
 ## Etapa 5 — Distribuição
 
 A distribuição depende da preparação de assinatura e versionamento, dos testes de atualização sem perda de dados, da revisão de acessibilidade e desempenho e do preenchimento das informações exigidas pela loja. Bancos e aparelhos só poderão ser apresentados como validados após o registro de evidências.

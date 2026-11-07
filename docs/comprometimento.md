@@ -4,7 +4,7 @@
 
 O módulo `core` calcula quanto da renda líquida mensal prevista está comprometido com obrigações de despesa fornecidas ao relatório. A renda é uma entrada explícita por mês; não é inferida de notificações nem somada automaticamente a partir das receitas confirmadas.
 
-A segunda fase reuniu cálculos e contratos Kotlin puros. A terceira acrescentou a persistência e a quarta conectou os cadastros à interface. A apresentação do indicador, o desenho da rosca e a importação de PDF são etapas separadas.
+A segunda fase reuniu cálculos e contratos Kotlin puros. A terceira acrescentou a persistência e a quarta conectou os cadastros à interface. A quinta apresenta o indicador e a rosca em Planejamento. A renda líquida prevista é cadastrada manualmente por mês.
 
 ## Entradas e resultado
 
@@ -44,7 +44,7 @@ O corte de 3% compara o valor de cada item com a renda, antes de arredondamentos
 
 Depois do agrupamento, as fatias de despesa são ordenadas do maior para o menor valor, com desempate por chave estável. Outros pode aparecer antes de uma despesa individual se seu total for maior. Os membros permanecem acessíveis em `entries` e `entryIds`. A fatia Livre, quando positiva, fecha a sequência.
 
-As chaves distinguem despesas individuais, Outros e Livre; não dependem da ordem de chegada. A seleção das cores e os componentes de legenda serão implementados na fase de interface.
+As chaves distinguem despesas individuais, Outros e Livre; não dependem da ordem de chegada. A legenda segue a ordem da rosca e dá acesso aos itens agrupados em Outros.
 
 ## Ângulos e escala
 
@@ -64,7 +64,7 @@ Os percentuais dos itens e do centro sempre usam a renda, inclusive acima de 100
 
 Percentuais usam `BigDecimal` com precisão DECIMAL128, sem teto de 100%; centavos continuam em `Long`, com soma verificada. Produtos auxiliares usam `BigInteger` para evitar estouro em proporções elevadas. Nenhum cálculo financeiro utiliza `Float` ou `Double`. As conversões dos quocientes usam os limites demonstrados do círculo e da renda, sem chamadas a `BigInteger.intValueExact` ou `longValueExact`, que exigem [API 31](https://developer.android.com/reference/java/math/BigInteger#intValueExact()). Isso preserva a API mínima 26 do projeto sem novas dependências.
 
-Itens menores que a resolução angular podem ter arco zero, mas seus centavos, percentual e identificação continuam no relatório textual. Ao integrar a interface, percentuais mínimos e excessos muito pequenos devem ser apresentados sem sugerir zero ou igualdade: `exceedsIncome` identifica inclusive um centavo acima da renda. A descrição para leitores de tela e a ocultação de valores serão verificadas na fase da interface.
+Itens menores que a resolução angular podem ter arco zero, mas seus centavos, percentual e identificação continuam no relatório textual. Na interface, percentuais positivos inferiores a 0,01% aparecem como `< 0,01%`. A apresentação amplia a precisão quando o arredondamento ocultaria uma diferença para o limite ou para 100%. `exceedsIncome` identifica inclusive um centavo acima da renda.
 
 ## Testes e limites da evidência
 
@@ -106,4 +106,14 @@ Datas legadas de recorrência são preservadas no mês de `nextDate`, mesmo quan
 - Em **Parcelas do mês**, confira os vencimentos da competência selecionada. **Conferir e registrar parcela** permite revisar o valor e a data efetiva e criar uma despesa vinculada. Salvar a compra cria apenas as previsões; não cria pagamentos retroativos nem soma valores ao extrato.
 - Nas recorrências de despesa, **Incluir como despesa fixa** usa o mês selecionado como início. Desmarcar interrompe as projeções e conserva o que já foi confirmado. Se a previsão mudar para receita, a marcação é retirada; uma futura volta a despesa exige nova inclusão explícita.
 
-A ocultação de valores alcança renda, limite e valores das parcelas. É possível revelar os campos temporariamente para edição. Nenhuma sugestão é consumida se a revisão estiver desatualizada ou for cancelada. Edição e cancelamento de compras já cadastradas, faturas bancárias, card de comprometimento, rosca e leitura de contracheque em PDF ficam fora desta etapa.
+A ocultação de valores alcança renda, limite e valores das parcelas. É possível revelar os campos temporariamente para edição. Nenhuma sugestão é consumida se a revisão estiver desatualizada ou for cancelada. A quarta fase foi dedicada aos cadastros; edição e cancelamento de compras já cadastradas e faturas bancárias ficaram fora dessa entrega.
+
+## Quinta fase — indicador em Planejamento
+
+O card **Comprometimento da renda** acompanha o mês selecionado. Mostra o percentual comprometido, o valor das parcelas e despesas fixas, a renda líquida prevista, a parte ainda não comprometida ou o valor acima da renda e o estado em relação ao limite pessoal. A parte livre corresponde apenas à diferença para essas obrigações; outras despesas do extrato não entram nessa projeção.
+
+A rosca usa os ângulos calculados pelo core. O traço indica o limite escolhido na mesma escala da rosca. A legenda apresenta nome, valor e percentual da renda em texto, com o mesmo identificador visual da fatia. **Ver itens de Outros** revela os compromissos agrupados. A descrição do gráfico informa a proporção comprometida e o maior gasto individual. Em telas estreitas, com fonte ampliada ou com números longos, o total e o percentual ficam abaixo do anel.
+
+Sem renda positiva, o card mantém o valor dos compromissos e oferece o cadastro de renda e limite. A rosca e os percentuais ficam indisponíveis nesse estado. Ao ocultar valores, o card esconde os montantes, percentuais, fatias, posição do limite, estado e legenda, inclusive nas descrições de acessibilidade.
+
+O relatório é recalculado ao trocar de mês ou quando o banco muda as informações usadas no cálculo. A consulta usa a mesma transação que reúne previsões e lançamentos vinculados, sem contar uma obrigação duas vezes. O esquema Room e o formato de backup permanecem os mesmos.

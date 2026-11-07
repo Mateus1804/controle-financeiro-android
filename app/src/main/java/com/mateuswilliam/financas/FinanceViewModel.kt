@@ -14,6 +14,7 @@ import com.mateuswilliam.financas.core.MonthlyIncomePlan
 import com.mateuswilliam.financas.core.InstallmentPurchase
 import com.mateuswilliam.financas.core.RecurringPlan
 import com.mateuswilliam.financas.core.Category
+import com.mateuswilliam.financas.core.CommitmentReport
 import com.mateuswilliam.financas.data.StagedRestore
 import com.mateuswilliam.financas.data.CaptureSettings
 import com.mateuswilliam.financas.data.DraftEntity
@@ -24,9 +25,12 @@ import java.time.ZoneId
 import java.time.YearMonth
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,6 +94,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun saveBudget(budget: MonthlyBudget, onSaved: () -> Unit) = action { repository.saveBudget(budget); onSaved(); "Limite mensal salvo." }
     fun deleteBudget(month: String, category: Category) = action { repository.deleteBudget(month, category); "Limite mensal removido." }
     fun commitmentSetup(month: YearMonth) = repository.commitmentSetup(month)
+    fun commitmentReport(month: YearMonth): Flow<Result<CommitmentReport>> =
+        repository.observeCommitmentReport(month).map { Result.success(it) }.catch { emit(Result.failure(it)) }
     fun saveMonthlyIncome(plan: MonthlyIncomePlan, onSaved: () -> Unit) = action {
         repository.saveMonthlyPlan(plan)
         onSaved()
