@@ -16,6 +16,7 @@ import com.mateuswilliam.financas.core.*
 import java.time.YearMonth
 import java.time.LocalDate
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.util.UUID
 import kotlinx.coroutines.flow.map
@@ -214,6 +215,10 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             }
         }
     }
+
+    fun observeCommitmentReport(month: YearMonth) = database.invalidationTracker.createFlow(
+        "monthly_plans", "commitments", "records", "occurrences", "recurring", "fixed_recurring",
+    ).conflate().map { commitmentReport(month) }.distinctUntilChanged()
 
     suspend fun commitmentReport(month: YearMonth): CommitmentReport = withContext(Dispatchers.Default) {
         database.withTransaction {

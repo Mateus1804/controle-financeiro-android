@@ -77,6 +77,10 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         val setup by remember(month) { model.commitmentSetup(month) }.collectAsStateWithLifecycle(initialValue = null)
         setup?.takeIf { it.month == month }
     } else null
+    val commitmentReport = if (tab == 4) key(month) {
+        val report by remember { model.commitmentReport(month) }.collectAsStateWithLifecycle(initialValue = null)
+        report
+    } else null
     val installmentPreset = commitments?.installments?.find { it.id == selectedInstallmentId && it.recordId == null }?.let {
         Record(plannedRecordId, it.amountCents, Movement.EXPENSE, it.method, it.category, it.bank, it.title, plannedRecordAt)
     }
@@ -246,7 +250,8 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         }, onSkip = model::skipRecurring,
                         onReminders = { model.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
                         onAlerts = ::requestAlerts, onAddAccount = model::addAccount,
-                        commitments = commitments, onIncome = model::saveMonthlyIncome, onFixedRecurring = model::setFixedRecurring,
+                        commitments = commitments, commitmentReport = commitmentReport,
+                        onIncome = model::saveMonthlyIncome, onFixedRecurring = model::setFixedRecurring,
                         onConfirmInstallment = {
                             selectedInstallmentId = it.id; selectedRecurringId = null
                             openPlannedRecord()

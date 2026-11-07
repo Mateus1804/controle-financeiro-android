@@ -46,6 +46,7 @@ class OptionalFeaturesUiTest {
 
     @Test fun monthlyBudgetCanBeCreatedAndRecoveredAfterRecreation() = runBlocking<Unit> {
         openPlanning()
+        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Adicionar limite mensal"))
         rule.onNodeWithText("Adicionar limite mensal").performClick()
         rule.onNodeWithTag("amount-input").performTextInput("10000")
         rule.onNodeWithTag("amount-input").performImeAction()

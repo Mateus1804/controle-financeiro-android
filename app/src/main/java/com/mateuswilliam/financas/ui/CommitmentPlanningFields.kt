@@ -14,7 +14,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.CommitmentForms
-import com.mateuswilliam.financas.core.Money
 import com.mateuswilliam.financas.core.MoneyInput
 import com.mateuswilliam.financas.core.MonthlyIncomePlan
 import com.mateuswilliam.financas.data.InstallmentDue
@@ -23,27 +22,6 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
 internal val commitmentMonthFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("MM/yyyy")
-
-@Composable
-internal fun MonthlyIncomeCard(plan: MonthlyIncomePlan?, loaded: Boolean, busy: Boolean, hidden: Boolean, onEdit: () -> Unit) {
-    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-        Column(Modifier.fillMaxWidth().padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Renda prevista e limite", style = MaterialTheme.typography.titleMedium)
-            when {
-                !loaded -> Text("Carregando a configuração do mês…")
-                plan == null -> Text("Renda ainda não informada")
-                hidden -> Text("Renda e limite ocultos")
-                else -> {
-                    Text("Renda líquida prevista: ${Money.format(plan.incomeCents)}")
-                    Text("Limite de comprometimento: ${CommitmentForms.formatPercent(plan.healthyLimitBasisPoints)}%")
-                }
-            }
-            OutlinedButton(onClick = onEdit, enabled = loaded && !busy, modifier = Modifier.fillMaxWidth().testTag("edit-monthly-income")) {
-                Text(if (plan == null) "Informar renda e limite" else "Editar renda e limite")
-            }
-        }
-    }
-}
 
 @Composable
 internal fun MonthlyIncomeEditor(

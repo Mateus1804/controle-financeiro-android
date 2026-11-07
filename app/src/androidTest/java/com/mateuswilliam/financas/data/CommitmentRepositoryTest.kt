@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.mateuswilliam.financas.core.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -41,6 +42,37 @@ class CommitmentRepositoryTest {
         assertEquals(400000L, repository.commitmentReport(month.plusMonths(1)).incomeCents)
         assertEquals(4000, repository.commitmentReport(month.plusMonths(1)).healthyLimitBasisPoints)
     }
+    @Test fun observedReportRefreshesWhenIncomeForecastAndLinkedPaymentChange() = runBlocking<Unit> {
+        val updates = Channel<CommitmentReport>(Channel.UNLIMITED)
+        val collection = launch { repository.observeCommitmentReport(month).collect { updates.send(it) } }
+        suspend fun nextWhere(matches: (CommitmentReport) -> Boolean): CommitmentReport = withTimeout(5000) {
+            var report = updates.receive()
+            while (!matches(report)) report = updates.receive()
+            report
+        }
+        try {
+            assertEquals(CommitmentState.NO_INCOME, nextWhere { true }.state)
+            repository.saveMonthlyPlan(MonthlyIncomePlan(month, 100000, 4000))
+            assertEquals(CommitmentState.COMFORTABLE, nextWhere { it.incomeCents == 100000L }.state)
+            repository.createPurchase(purchase())
+            assertEquals(1, nextWhere { it.committedCents == 3333L }.entries.size)
+            val rent = recurring()
+            repository.saveRecurring(rent)
+            repository.setFixedRecurring(rent.id, month)
+            assertEquals(2, nextWhere { it.committedCents == 63333L }.entries.size)
+            val linked = record("pagamento-vinculado", 3400)
+            assertTrue(repository.confirmInstallment("installment:compra:2", linked))
+            assertEquals(2, nextWhere { it.committedCents == 63400L }.entries.size)
+            assertTrue(repository.save(linked.copy(amountCents = 3500), null, editing = true))
+            assertEquals(2, nextWhere { it.committedCents == 63500L }.entries.size)
+            repository.skipRecurring(rent.id, rent.nextDate)
+            assertEquals(1, nextWhere { it.committedCents == 3500L }.entries.size)
+        } finally {
+            collection.cancelAndJoin()
+            updates.cancel()
+        }
+    }
+
     @Test fun ongoingPurchaseCreatesOnlyOpenObligationsAndNoFinancialRecord() = runBlocking<Unit> {
         assertTrue(repository.createPurchase(purchase()))
         assertFalse(repository.createPurchase(purchase()))

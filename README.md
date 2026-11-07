@@ -21,7 +21,7 @@ O Controle Financeiro Android permite acompanhar receitas e despesas com menos d
 - Avisos de possível duplicidade entre lançamentos manuais e novas pendências, sem união ou exclusão automática.
 - Revisão em sequência com progresso e oferta de acesso ao próximo item, preservando a edição quando chegam novas notificações.
 - Orçamentos mensais por categoria e previsões recorrentes, com confirmação manual de cada vencimento.
-- Renda líquida prevista e limite de comprometimento por mês, com opção de incluir recorrências de despesa como fixas.
+- Renda líquida prevista e limite de comprometimento por mês, com card e gráfico de rosca para parcelas e despesas recorrentes marcadas como fixas.
 - Compras parceladas no cadastro manual e na revisão de notificações, com prévia dos valores e vencimentos e registro separado de cada parcela.
 - Lembretes opcionais de vencimentos e proteção opcional por biometria ou credencial do aparelho.
 
@@ -91,7 +91,7 @@ A captura não equivale a uma integração oficial com os bancos ou ao acesso ao
 
 Os resultados efetivamente executados estão registrados em [Qualidade e validação](docs/qualidade.md), junto às [decisões técnicas](docs/decisoes.md) e às [referências de estudo](docs/referencias.md). As instruções do ambiente e os comandos ficam no [guia de desenvolvimento](docs/desenvolvimento.md).
 
-As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. A terceira fase acrescenta a persistência no esquema Room 5, a vinculação das confirmações e a recuperação por backup. A quarta fase disponibiliza os cadastros de renda, limite e compras parceladas no app, além da consulta das parcelas por mês. A apresentação do indicador e da rosca fica para a próxima etapa.
+As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. A terceira fase acrescenta a persistência no esquema Room 5, a vinculação das confirmações e a recuperação por backup. A quarta fase disponibiliza os cadastros de renda, limite e compras parceladas no app, além da consulta das parcelas por mês. A quinta fase apresenta o indicador, a rosca e a legenda em Planejamento. A renda líquida prevista continua sendo informada manualmente por mês.
 
 ## Atualizações e preservação do histórico
 

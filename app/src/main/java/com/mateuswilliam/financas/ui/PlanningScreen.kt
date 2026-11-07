@@ -39,7 +39,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     onDeleteBudget: (Category) -> Unit, onRecurring: (RecurringPlan, () -> Unit) -> Unit,
     onConfirmRecurring: (RecurringPlan) -> Unit, onSkip: (RecurringPlan) -> Unit,
     onReminders: (Boolean) -> Unit, onAlerts: () -> Unit, onAddAccount: suspend (String) -> String,
-    commitments: CommitmentSetup?, onIncome: (MonthlyIncomePlan, () -> Unit) -> Unit,
+    commitments: CommitmentSetup?, commitmentReport: Result<CommitmentReport>?, onIncome: (MonthlyIncomePlan, () -> Unit) -> Unit,
     onFixedRecurring: (String, YearMonth?) -> Unit, onConfirmInstallment: (InstallmentDue) -> Unit,
 ) {
     var budgetEditor by rememberSaveable { mutableStateOf(false) }
@@ -48,15 +48,22 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     var recurringId by rememberSaveable { mutableStateOf<String?>(null) }
     var skipping by rememberSaveable { mutableStateOf<String?>(null) }
     var incomeEditor by rememberSaveable(month.toString()) { mutableStateOf(false) }
+    var otherExpanded by rememberSaveable(month.toString()) { mutableStateOf(false) }
     val zone = ZoneId.systemDefault()
     val usage = remember(state.records, state.budgets, month, zone) { Budgets.usage(state.records, state.budgets, month, zone) }
     val hidden = state.settings.hideAmounts
     LazyColumn(Modifier.testTag("planning-list"), contentPadding = PaddingValues(FinanceSpacing.page, 20.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             TextButton(onClick = onBack) { AppIcon(R.drawable.ic_chevron_left); Text("Voltar") }
-            SectionTitle("Planejamento", "Previsões e limites; os totais incluem apenas lançamentos confirmados")
+            SectionTitle("Planejamento", "Renda prevista, compromissos e limites do mês")
         }
         item { MonthPicker(month, onMonth) }
+        item(key = "commitment-card") {
+            MonthlyCommitmentCard(commitmentReport, commitments?.income, commitments != null, busy, hidden) { incomeEditor = true }
+        }
+        if (!hidden && commitments != null) commitmentReport?.getOrNull()?.let { report ->
+            commitmentLegend(report, otherExpanded) { otherExpanded = !otherExpanded }
+        }
         item {
             SectionTitle("Orçamentos por categoria", "Despesas líquidas confirmadas, com estornos descontados. Receitas e transferências não consomem o limite.")
             Button(onClick = { budgetCategory = null; budgetEditor = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Adicionar limite mensal") }
@@ -79,9 +86,6 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
                     }
                 }
             }
-        }
-        item {
-            MonthlyIncomeCard(commitments?.income, loaded = commitments != null, busy = busy, hidden = hidden) { incomeEditor = true }
         }
         item {
             SectionTitle("Parcelas do mês", "Os valores só entram no extrato ao registrar cada parcela.")
