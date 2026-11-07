@@ -39,7 +39,7 @@ Os casos reproduzíveis e a situação de Inter, Nubank, PicPay, Mercado Pago e 
 
 Os limites mensais acompanham despesas líquidas confirmadas por categoria. Previsões recorrentes permanecem separadas dos lançamentos: cada vencimento pode ser conferido, registrado ou pulado. Os lembretes dependem da autorização de alertas e das condições de execução do Android, sem garantia de horário exato.
 
-O backup inclui lançamentos, pendências, contas, orçamentos, recorrências e preferências de apresentação. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
+O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 2, mantendo a leitura dos arquivos de versão 1. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
 
 ## Privacidade
 
@@ -89,7 +89,7 @@ A captura não equivale a uma integração oficial com os bancos ou ao acesso ao
 
 Os resultados efetivamente executados estão registrados em [Qualidade e validação](docs/qualidade.md), junto às [decisões técnicas](docs/decisoes.md) e às [referências de estudo](docs/referencias.md). As instruções do ambiente e os comandos ficam no [guia de desenvolvimento](docs/desenvolvimento.md).
 
-As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. Cadastro na interface, persistência e apresentação do indicador ficam para as etapas seguintes.
+As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. A terceira fase acrescenta a persistência no esquema Room 5, a vinculação das confirmações e a recuperação por backup. Cadastro na interface e apresentação do indicador ficam para as etapas seguintes.
 
 ## Atualizações e preservação do histórico
 

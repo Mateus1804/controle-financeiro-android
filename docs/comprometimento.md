@@ -4,7 +4,7 @@
 
 O módulo `core` calcula quanto da renda líquida mensal prevista está comprometido com obrigações de despesa fornecidas ao relatório. A renda é uma entrada explícita por mês; não é inferida de notificações nem somada automaticamente a partir das receitas confirmadas.
 
-A entrega reúne cálculos e contratos Kotlin puros. Persistência da renda e do limite, montagem dos dados a partir do banco, formulários, card, desenho da rosca e importação de PDF permanecem nas próximas fases. Não há alteração de Room, backup, consentimento, segurança ou lançamentos.
+A segunda fase reuniu cálculos e contratos Kotlin puros. A terceira acrescenta a persistência descrita abaixo. Formulários, card, desenho da rosca e importação de PDF permanecem nas próximas fases; consentimento e segurança do aparelho são preservados.
 
 ## Entradas e resultado
 
@@ -18,7 +18,7 @@ A renda usa o limite monetário já existente e pode ser zero. Cada compromisso 
 
 `CommitmentReport` mantém a renda usada como base, o total comprometido, o valor livre, o limite, o percentual e o estado do mês. `entries` conserva os itens individuais, seus valores e percentuais da renda; `largestExpense` refere-se ao maior item individual, mesmo quando o grupo Outros é maior. `slices` informa os grupos e suas associações aos itens por `entryIds`.
 
-A montagem dos dados nas fases seguintes deve incluir cada obrigação apenas uma vez, mesmo depois de confirmada. Não se deve somar uma previsão e seu lançamento vinculado como despesas diferentes. O adaptador de parcelamento fornece somente previsões abertas; compromissos confirmados do mês também precisarão ser incluídos pela integração com a persistência. Esta API não interpreta receitas, transferências, estornos ou o pagamento de uma fatura para produzir obrigações automaticamente.
+A montagem dos dados inclui cada obrigação apenas uma vez, mesmo depois de confirmada. Não se deve somar uma previsão e seu lançamento vinculado como despesas diferentes. O adaptador de parcelamento fornece somente previsões abertas; a integração persistida também inclui os compromissos confirmados do mês. Esta API não interpreta receitas, transferências, estornos ou o pagamento de uma fatura para produzir obrigações automaticamente.
 
 ## Limite e estados
 
@@ -76,4 +76,25 @@ O comando padrão é:
 ./gradlew --no-daemon --max-workers=2 :core:test
 ```
 
-As regras não produzem telas nem escrevem dados. Os testes de core não comprovam migração, restauração, TalkBack, aparência do gráfico ou edição de preferências: essas integrações ainda não foram implementadas. Resultados executados, limitações do ambiente e estado do CI ficam registrados no pull request da fase.
+As regras não produzem telas nem escrevem dados. Os testes de core não comprovam migração, restauração, TalkBack, aparência do gráfico ou edição de preferências. Migração e restauração da terceira fase possuem testes instrumentados próprios; as interfaces novas ainda não foram implementadas. Resultados executados, limitações do ambiente e estado do CI ficam registrados no pull request da fase.
+
+
+## Terceira fase — persistência e recuperação
+
+O esquema Room 5 acrescenta `monthly_plans`, `purchases`, `fixed_recurring` e `commitments`. A migração 4→5 cria essas tabelas vazias, com índices e chaves estrangeiras, preservando registros, pendências, contas, orçamentos, recorrências e ocorrências existentes. Não há recriação destrutiva ou classificação automática do histórico.
+
+`FinanceRepository.saveMonthlyPlan` grava renda e limite pela chave do mês. Atualizar novembro não altera dezembro ou meses anteriores, e meses sem configuração permanecem sem renda informada. `createPurchase` valida a programação original e insere somente parcelas em aberto, sem criar despesas confirmadas. Uma compra de notificação exige a revisão atual; sua origem é consumida uma única vez, mantendo o pacote original separado da conta escolhida e removendo o texto bruto após a confirmação.
+
+`confirmInstallment` cria a despesa e vincula a parcela na mesma transação. Confirmações repetidas não criam outro lançamento. O relatório usa o valor efetivamente confirmado uma única vez, mantendo o compromisso no mês do vencimento mesmo quando o pagamento ocorreu em outro mês. A edição de uma despesa vinculada atualiza o valor refletido no relatório. Excluir o lançamento ou convertê-lo em receita/transferência desfaz o vínculo: a obrigação volta à previsão original, sem cancelar a compra.
+
+`setFixedRecurring` marca explicitamente uma recorrência de despesa a partir do mês escolhido. Não marca receitas e não altera as recorrências legadas por padrão. Vencimentos já confirmados são reaproveitados sem criar outro registro. Vencimentos pulados não entram no comprometimento. Confirmados mantêm uma fotografia do compromisso, preservada após mudanças no plano; desmarcar a opção interrompe as projeções futuras e conserva os compromissos confirmados anteriores.
+
+`commitmentReport` lê configuração, obrigações e lançamentos na mesma transação. O carregamento dos registros vinculados utiliza consultas em lotes limitados, sem varrer o extrato inteiro para cada parcela. Cálculos e acesso ao banco ocorrem fora da thread principal.
+
+Os contratos persistidos usam anos de 1 a 9999, mantendo datas civis canônicas com ano de quatro dígitos para as consultas indexadas. As funções matemáticas de baixo nível das fases anteriores continuam independentes desse formato de armazenamento.
+
+O [backup de dados versão 2](backup.md) inclui todas as estruturas e vínculos novos, aceita o formato anterior e confere o conteúdo em banco temporário antes da substituição. A migração do banco instalado e a leitura de backups são verificações separadas. Os testes `CommitmentMigrationTest`, `CommitmentRepositoryTest` e `CommitmentBackupTest` utilizam somente dados fictícios, na API de teste configurada no CI.
+
+A terceira fase fornece a API de persistência. O cadastro visual das compras e da renda ainda depende das fases de formulário e apresentação; o único ajuste visual desta etapa acrescenta as contagens novas à prévia protegida de restauração.
+
+Datas legadas de recorrência são preservadas no mês de `nextDate`, mesmo quando seu dia difere do dia mensal configurado; os meses seguintes usam o dia configurado. A correção de uma movimentação recorrente de receita para despesa recompõe seu vínculo financeiro na mesma transação, mantendo o relatório e o backup consistentes.
