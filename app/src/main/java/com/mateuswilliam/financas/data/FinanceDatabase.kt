@@ -112,6 +112,7 @@ data class UsedAccount(val label: String, val lastUsedAt: Long)
 interface FinanceDao {
     @Query("SELECT * FROM monthly_plans ORDER BY month") suspend fun allMonthlyPlans(): List<MonthlyPlanEntity>
     @Query("SELECT * FROM monthly_plans WHERE month = :month") suspend fun monthlyPlan(month: String): MonthlyPlanEntity?
+    @Query("SELECT * FROM monthly_plans WHERE month = :month") fun observeMonthlyPlan(month: String): Flow<MonthlyPlanEntity?>
     @Upsert suspend fun upsertMonthlyPlan(plan: MonthlyPlanEntity)
     @Query("DELETE FROM monthly_plans") suspend fun clearMonthlyPlans()
     @Query("SELECT * FROM purchases ORDER BY id") suspend fun allPurchases(): List<PurchaseEntity>
@@ -119,6 +120,7 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertPurchase(purchase: PurchaseEntity)
     @Query("DELETE FROM purchases") suspend fun clearPurchases()
     @Query("SELECT * FROM fixed_recurring ORDER BY recurringId") suspend fun allFixedRecurring(): List<FixedRecurringEntity>
+    @Query("SELECT * FROM fixed_recurring ORDER BY recurringId") fun observeFixedRecurring(): Flow<List<FixedRecurringEntity>>
     @Query("SELECT * FROM fixed_recurring WHERE recurringId = :id") suspend fun fixedRecurringById(id: String): FixedRecurringEntity?
     @Upsert suspend fun upsertFixedRecurring(plan: FixedRecurringEntity)
     @Query("DELETE FROM fixed_recurring WHERE recurringId = :id") suspend fun removeFixedRecurring(id: String)
@@ -126,6 +128,16 @@ interface FinanceDao {
     @Query("SELECT * FROM commitments ORDER BY dueDate, id") suspend fun allCommitments(): List<CommitmentEntity>
     @Query("SELECT * FROM commitments WHERE dueDate BETWEEN :start AND :end ORDER BY dueDate, id")
     suspend fun commitmentsInPeriod(start: String, end: String): List<CommitmentEntity>
+    @Query("""
+        SELECT c.id, p.title, p.bank, p.category, p.method, COALESCE(r.amountCents, c.amountCents) AS amountCents,
+               c.dueDate, c.installmentNumber AS number, p.installmentCount, c.recordId
+        FROM commitments AS c
+        JOIN purchases AS p ON p.id = c.purchaseId
+        LEFT JOIN records AS r ON r.id = c.recordId
+        WHERE c.dueDate BETWEEN :start AND :end AND c.installmentNumber IS NOT NULL
+        ORDER BY c.dueDate, c.id
+    """)
+    fun observeInstallmentDues(start: String, end: String): Flow<List<InstallmentDue>>
     @Query("SELECT * FROM commitments WHERE id = :id") suspend fun commitmentById(id: String): CommitmentEntity?
     @Query("SELECT * FROM commitments WHERE recordId = :id") suspend fun commitmentByRecord(id: String): CommitmentEntity?
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertCommitment(commitment: CommitmentEntity)

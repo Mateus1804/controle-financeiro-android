@@ -16,6 +16,7 @@ import com.mateuswilliam.financas.core.*
 import java.time.YearMonth
 import java.time.LocalDate
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import java.util.UUID
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
@@ -26,6 +27,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 data class LedgerRecords(val records: List<Record>, val manualRecords: List<Record>)
+
+data class CommitmentSetup(
+    val month: YearMonth, val income: MonthlyIncomePlan?,
+    val fixedRecurring: Map<String, YearMonth>, val installments: List<InstallmentDue>,
+)
 
 data class CaptureResult(val id: String, val isNew: Boolean)
 class DraftChangedException : IllegalStateException("A notificação mudou. Abra a pendência novamente para conferir os dados atuais.")
@@ -52,6 +58,13 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }.flowOn(Dispatchers.Default)
     val budgets = dao.budgets().map { rows -> rows.map { it.toBudget() } }
     val recurring = dao.recurring().map { rows -> rows.map { it.toPlan() } }
+
+    fun commitmentSetup(month: YearMonth) = combine(
+        dao.observeMonthlyPlan(month.toString()), dao.observeFixedRecurring(),
+        dao.observeInstallmentDues(month.atDay(1).toString(), month.atEndOfMonth().toString()),
+    ) { income, fixed, installments ->
+        CommitmentSetup(month, income?.toPlan(), fixed.associate { it.recurringId to YearMonth.parse(it.fromMonth) }, installments)
+    }.distinctUntilChanged()
 
     private suspend fun rememberAccount(name: String) {
         val label = AccountNames.clean(name)
@@ -236,6 +249,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val old = dao.recurringById(plan.id)
             val reminder = if (old?.nextDate == plan.nextDate) old.lastRemindedDate else ""
             dao.upsertRecurring(RecurringEntity.from(plan.copy(lastRemindedDate = reminder)))
+            if (plan.movement != Movement.EXPENSE) dao.removeFixedRecurring(plan.id)
             rememberAccount(plan.bank)
         }
     }

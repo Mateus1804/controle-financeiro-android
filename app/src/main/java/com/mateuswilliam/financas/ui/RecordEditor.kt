@@ -8,11 +8,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
@@ -46,6 +50,8 @@ fun RecordEditor(
     newPendingCount: Int = 0,
     notificationChanged: Boolean = false,
     onAcceptUpdate: () -> Unit = {},
+    onSavePurchase: ((InstallmentPurchase) -> Unit)? = null,
+    installmentConfirmation: Boolean = false,
 ) {
     val initial = existing ?: preset
     val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis() }
@@ -53,6 +59,10 @@ fun RecordEditor(
     val id = rememberSaveable { initial?.id ?: UUID.randomUUID().toString() }
     val amount = rememberTextFieldState(initialText = (initial?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
     var invalidMoneyInput by rememberSaveable { mutableStateOf(false) }
+    val installmentAmount = rememberTextFieldState()
+    var invalidInstallmentAmount by rememberSaveable { mutableStateOf(false) }
+    var installmentMode by rememberSaveable { mutableStateOf(false) }
+    var terms by rememberSaveable(stateSaver = PurchaseTerms.Saver) { mutableStateOf(PurchaseTerms(LocalDate.now())) }
     var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
     var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
     var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: initialMovement) }
@@ -72,9 +82,18 @@ fun RecordEditor(
     val compactScroll = rememberScrollState()
     val fieldsScroll = rememberScrollState()
     val cents = if (invalidMoneyInput) null else MoneyInput.cents(amount.text.toString())
-    val record = Record(id, cents ?: 0, movement, method, category, bank, description,
+    val canInstall = initial == null && onSavePurchase != null && movement == Movement.EXPENSE
+    val purchaseMode = canInstall && installmentMode
+    val byTotal = terms.basis == PurchaseAmountBasis.TOTAL
+    val purchaseCents = if (byTotal) cents else if (invalidInstallmentAmount) null else MoneyInput.cents(installmentAmount.text.toString())
+    val scheduleResult = if (purchaseMode) remember(purchaseCents, terms) {
+        runCatching { CommitmentForms.schedule(purchaseCents, terms.basis, terms.count.toIntOrNull(), terms.paid.toIntOrNull(), terms.due, terms.billingDay) }
+    } else null
+    val schedule = scheduleResult?.getOrNull()
+    val record = Record(id, (if (purchaseMode) schedule?.totalCents else cents) ?: 0, movement,
+        if (purchaseMode) PaymentMethod.CARD else method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), destination)
-    val error = RecordValidation.error(record)
+    val error = scheduleResult?.exceptionOrNull()?.message ?: RecordValidation.error(record)
     val duplicates = remember(duplicateIndex, record, draft?.id) { if (draft != null) duplicateIndex?.find(record).orEmpty() else emptyList() }
 
     ModalBottomSheet(
@@ -86,9 +105,19 @@ fun RecordEditor(
         val scroll = if (compactHeight) Modifier.verticalScroll(compactScroll) else Modifier
         Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding().then(scroll)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(if (draft != null) "Conferir movimentação" else if (preset != null) "Conferir previsão" else if (existing != null) "Editar lançamento" else "Novo lançamento",
-                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text(if (draft != null) "A notificação só vira lançamento após revisão e confirmação." else if (preset != null) "Confira valor, conta e data efetiva antes de transformar a previsão em lançamento." else "Valores, contas e categorias podem ser ajustados antes de salvar.",
+                Text(when {
+                    draft != null -> "Conferir movimentação"
+                    installmentConfirmation -> "Conferir parcela"
+                    preset != null -> "Conferir previsão"
+                    existing != null -> "Editar lançamento"
+                    else -> "Novo lançamento"
+                }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text(when {
+                    draft != null && purchaseMode -> "Confira os dados da notificação e das parcelas antes de salvar."
+                    draft != null -> "A notificação só vira lançamento após revisão e confirmação."
+                    preset != null -> "Confira valor, conta e data efetiva antes de transformar a previsão em lançamento."
+                    else -> "Valores, contas e categorias podem ser ajustados antes de salvar."
+                },
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 reviewProgress?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
             }
@@ -124,9 +153,24 @@ fun RecordEditor(
                         }
                     }
                 }
-                PrivateValueGate(hideAmounts, "Mostrar valor para edição") { MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it }) }
-                ChoiceField("Movimentação", movement, if (preset != null) listOf(Movement.EXPENSE, Movement.INCOME) else Movement.entries.toList(), { it.label }) { movement = it }
-                ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
+                if (canInstall) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Compra parcelada no cartão de crédito", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                    Switch(checked = purchaseMode, onCheckedChange = { installmentMode = it }, enabled = !busy,
+                        modifier = Modifier.testTag("installment-toggle").semantics { contentDescription = "Compra parcelada no cartão de crédito" })
+                }
+                if (purchaseMode) {
+                    InstallmentFields(terms, { terms = it }, if (byTotal) amount else installmentAmount,
+                        { if (byTotal) invalidMoneyInput = it else invalidInstallmentAmount = it },
+                        schedule, hideAmounts, attempted, busy)
+                } else PrivateValueGate(hideAmounts, "Mostrar valor para edição") {
+                    MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
+                }
+                if (!installmentConfirmation) ChoiceField("Movimentação", movement,
+                    if (preset != null) listOf(Movement.EXPENSE, Movement.INCOME) else Movement.entries.toList(), { it.label }) {
+                    movement = it
+                    if (it != Movement.EXPENSE) installmentMode = false
+                }
+                if (!purchaseMode) ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
                 AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount, hidden = hideAmounts)
                 if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount, hidden = hideAmounts)
@@ -134,7 +178,7 @@ fun RecordEditor(
                 OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
                 }
-                OutlinedButton(onClick = {
+                if (!purchaseMode) OutlinedButton(onClick = {
                     val selected = LocalDate.parse(date)
                     showFinanceDatePicker(context, dateDialogTheme, selected) { date = it.toString() }
                 }, modifier = Modifier.fillMaxWidth()) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
@@ -146,8 +190,17 @@ fun RecordEditor(
                 OutlinedButton(onClick = { if (onIgnore != null) onIgnore() else onDismiss() }, enabled = !busy, modifier = Modifier.weight(1f)) {
                     Text(if (onIgnore != null) "Não é transação" else "Cancelar")
                 }
-                Button(onClick = { attempted = true; if (cents != null && error == null && !notificationChanged) onSave(record) }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
-                    Text(if (busy) "Salvando…" else "Confirmar")
+                Button(onClick = {
+                    attempted = true
+                    if (error == null && !notificationChanged) {
+                        if (!purchaseMode) onSave(record)
+                        else schedule?.let {
+                            onSavePurchase?.invoke(InstallmentPurchase(id, description.trim(), bank.trim(), category,
+                                it.totalCents, it.installmentCount, terms.due, it.paidInstallments, it.dayOfMonth))
+                        }
+                    }
+                }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
+                    Text(if (busy) "Salvando…" else if (purchaseMode) "Salvar compra parcelada" else "Confirmar")
                 }
             }
         }

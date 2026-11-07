@@ -19,8 +19,7 @@ object CommitmentPlanning {
         require(purchase.bank.isNotBlank() && purchase.bank.length <= 80 && '\u0000' !in purchase.bank) { "Informe uma conta de até 80 caracteres." }
         val schedule = Installments.fromTotal(purchase.totalCents, purchase.installmentCount,
             purchase.nextDueDate, purchase.paidInstallments, purchase.dayOfMonth)
-        require(schedule.pending.all { it.dueDate.year in 1..9999 }) { "Use vencimentos com ano entre 1 e 9999." }
-        return schedule
+        return schedule.requirePersistableDates()
     }
 
     fun validate(plan: MonthlyIncomePlan) {
@@ -45,4 +44,9 @@ object CommitmentPlanning {
         require(record.movement == Movement.EXPENSE && RecordValidation.error(record) == null) { "O compromisso precisa estar vinculado a uma despesa válida." }
         return expected.copy(amountCents = record.amountCents)
     }
+}
+
+internal fun InstallmentSchedule.requirePersistableDates(): InstallmentSchedule {
+    require(pending.all { it.dueDate.year in 1..9999 }) { "Use vencimentos com ano entre 1 e 9999." }
+    return this
 }

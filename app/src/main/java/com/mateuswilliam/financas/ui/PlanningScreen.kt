@@ -24,6 +24,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.FinanceState
 import com.mateuswilliam.financas.core.*
+import com.mateuswilliam.financas.data.CommitmentSetup
+import com.mateuswilliam.financas.data.InstallmentDue
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -36,12 +38,16 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     canAlert: Boolean, onBack: () -> Unit, onBudget: (MonthlyBudget, () -> Unit) -> Unit,
     onDeleteBudget: (Category) -> Unit, onRecurring: (RecurringPlan, () -> Unit) -> Unit,
     onConfirmRecurring: (RecurringPlan) -> Unit, onSkip: (RecurringPlan) -> Unit,
-    onReminders: (Boolean) -> Unit, onAlerts: () -> Unit, onAddAccount: suspend (String) -> String) {
+    onReminders: (Boolean) -> Unit, onAlerts: () -> Unit, onAddAccount: suspend (String) -> String,
+    commitments: CommitmentSetup?, onIncome: (MonthlyIncomePlan, () -> Unit) -> Unit,
+    onFixedRecurring: (String, YearMonth?) -> Unit, onConfirmInstallment: (InstallmentDue) -> Unit,
+) {
     var budgetEditor by rememberSaveable { mutableStateOf(false) }
     var budgetCategory by rememberSaveable { mutableStateOf<Category?>(null) }
     var recurringEditor by rememberSaveable { mutableStateOf(false) }
     var recurringId by rememberSaveable { mutableStateOf<String?>(null) }
     var skipping by rememberSaveable { mutableStateOf<String?>(null) }
+    var incomeEditor by rememberSaveable(month.toString()) { mutableStateOf(false) }
     val zone = ZoneId.systemDefault()
     val usage = remember(state.records, state.budgets, month, zone) { Budgets.usage(state.records, state.budgets, month, zone) }
     val hidden = state.settings.hideAmounts
@@ -75,17 +81,39 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
             }
         }
         item {
+            MonthlyIncomeCard(commitments?.income, loaded = commitments != null, busy = busy, hidden = hidden) { incomeEditor = true }
+        }
+        item {
+            SectionTitle("Parcelas do mês", "Os valores só entram no extrato ao registrar cada parcela.")
+        }
+        commitments?.let { setup ->
+            if (setup.installments.isEmpty()) item { EmptyCard("Sem parcelas neste mês", "Para planejar parcelas, ative Compra parcelada ao registrar uma despesa.") }
+            items(setup.installments, key = { "due:${it.id}" }) { installment ->
+                InstallmentDueCard(installment, busy, hidden) { onConfirmInstallment(installment) }
+            }
+        }
+        item {
             SectionTitle("Contas e receitas recorrentes", "Previsão mensal com confirmação manual de cada vencimento")
             Button(onClick = { recurringId = null; recurringEditor = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Adicionar recorrência") }
         }
         if (state.recurring.isEmpty()) item { EmptyCard("Nenhuma recorrência cadastrada", "O vencimento pode ser lembrado sem criar pagamentos ou receitas automaticamente.") }
         items(state.recurring, key = { "recurring:${it.id}" }) { plan ->
+            val fixedSince = commitments?.fixedRecurring?.get(plan.id)
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
                 Column(Modifier.fillMaxWidth().padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(privateDisplayText(plan.title, hidden), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("${plan.movement.label} prevista · ${formatDate(plan.nextDate)}${if (!plan.active) " · pausada" else ""}")
                     Text("${privateDisplayText(plan.bank, hidden)} · ${plan.category.label}", style = MaterialTheme.typography.bodySmall)
                     Amount(plan.amountCents, hidden)
+                    if (plan.movement == Movement.EXPENSE || fixedSince != null) {
+                        Text(if (fixedSince != null) "Despesa fixa desde ${fixedSince.format(commitmentMonthFormat)}"
+                            else "Se incluída como fixa, a previsão conta a partir de ${month.format(commitmentMonthFormat)}.",
+                            style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { onFixedRecurring(plan.id, if (fixedSince == null) month else null) },
+                            enabled = !busy && commitments != null, modifier = Modifier.testTag("fixed-${plan.id}")) {
+                            Text(if (fixedSince == null) "Incluir como despesa fixa" else "Deixar de incluir como fixa")
+                        }
+                    }
                     OutlinedButton(onClick = { onConfirmRecurring(plan) }, enabled = !busy && plan.active, modifier = Modifier.fillMaxWidth()) { Text("Conferir e registrar") }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = { recurringId = plan.id; recurringEditor = true }, enabled = !busy) { Text("Editar previsão") }
@@ -110,6 +138,10 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
                 }
             }
         }
+    }
+    if (incomeEditor && commitments != null) key(month) {
+        MonthlyIncomeEditor(month, commitments.income, busy, hidden, onDismiss = { incomeEditor = false },
+            onSave = { onIncome(it) { incomeEditor = false } })
     }
     if (budgetEditor) key(budgetCategory, month) {
         BudgetEditor(state.budgets.find { it.month == month.toString() && it.category == budgetCategory }, month, busy, hidden,

@@ -117,6 +117,20 @@ class CommitmentRepositoryTest {
         assertEquals(61000L, repository.commitmentReport(month).committedCents)
         BackupSnapshot.validate(repository.snapshot())
     }
+
+    @Test fun changingAFixedPlanToIncomeRetainsHistoryButRequiresANewOptIn() = runBlocking<Unit> {
+        val plan = recurring()
+        repository.saveRecurring(plan)
+        repository.setFixedRecurring(plan.id, month)
+        repository.confirmRecurring(plan.id, plan.nextDate, record("aluguel-confirmado", 62000))
+        val next = plan.copy(nextDate = "2026-12-31")
+        repository.saveRecurring(next.copy(movement = Movement.INCOME))
+        assertNull(database.financeDao().fixedRecurringById(plan.id))
+        assertEquals(62000L, repository.commitmentReport(month).committedCents)
+        repository.saveRecurring(next)
+        assertEquals(0L, repository.commitmentReport(month.plusMonths(1)).committedCents)
+        BackupSnapshot.validate(repository.snapshot())
+    }
     @Test fun fixedRecurringExpenseCanBecomeIncomeAndExpenseAgainWithoutBreakingBackup() = runBlocking<Unit> {
         val plan = recurring()
         repository.saveRecurring(plan); repository.setFixedRecurring(plan.id, month)
