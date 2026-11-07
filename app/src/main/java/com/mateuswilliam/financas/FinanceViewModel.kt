@@ -128,6 +128,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         onFinished()
         if (count > 0) "Parcelas em aberto canceladas no Planejamento." else "A compra mudou. Confira as parcelas em aberto antes de cancelar."
     }
+    fun excludeInstallmentForecast(current: PurchaseManagement, onFinished: () -> Unit) = action {
+        val removed = repository.excludeInstallmentForecast(current.installmentId, current.revision)
+        onFinished()
+        if (removed) "Parcela excluída do Planejamento." else "A parcela mudou. Abra novamente para conferir."
+    }
     fun confirmInstallment(id: String, record: Record, expectedPurchaseRevision: Long, onSaved: () -> Unit) = action {
         if (repository.confirmInstallment(id, record, expectedPurchaseRevision)) {
             onSaved()
@@ -145,6 +150,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (old != null && (!plan.active || old.nextDate != plan.nextDate)) RecurringReminders.cancel(app, old.id, old.nextDate)
         onSaved()
         "Previsão mensal salva. Nenhum lançamento foi criado."
+    }
+    fun excludeRecurringForecast(plan: RecurringPlan, onFinished: () -> Unit) = action {
+        val removed = repository.archiveRecurringForecast(plan)
+        if (removed) RecurringReminders.cancel(app, plan.id, plan.nextDate)
+        onFinished()
+        if (removed) "Previsão mensal excluída." else "A previsão mudou. Abra novamente para conferir."
     }
     fun skipRecurring(plan: RecurringPlan) = action {
         if (repository.skipRecurring(plan.id, plan.nextDate)) {

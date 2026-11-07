@@ -67,7 +67,7 @@ Bases reais, exportações, arquivos de assinatura e configurações locais deve
 
 ## Atualizações dos dados e da interface
 
-O esquema Room 6 fica em `app/schemas`, e as migrações de 1 a 6 estão em `FinanceDatabase.kt`. Os testes abrem bases isoladas reconstruídas dos esquemas anteriores e conferem os dados, inclusive compras parceladas e pagamentos vinculados no esquema 5.
+O esquema Room 7 fica em `app/schemas`, e as migrações de 1 a 7 estão em `FinanceDatabase.kt`. Os testes abrem bases isoladas reconstruídas dos esquemas anteriores e conferem as previsões, compras parceladas e pagamentos vinculados.
 
 O comando `python3 scripts/verify-contrast.py` confere os 16 pares principais das paletas de fallback de texto e fundo. Esse resultado complementa a inspeção visual; não substitui a avaliação com leitor de tela.
 
@@ -75,7 +75,7 @@ A instalação de uma atualização sobre uma base que deve ser preservada exige
 
 ## Backup e planejamento
 
-O [backup criptografado](backup.md) usa o formato de dados V3 e restaura também V1 e V2. `BackupStoreTest` cobre o envelope criptográfico no Android, a base temporária, o cancelamento, entradas inválidas e o rollback de uma restauração com falha simulada.
+O [backup criptografado](backup.md) usa o formato de dados V4 e restaura também V1, V2 e V3. `BackupStoreTest` cobre o envelope criptográfico no Android, a base temporária, o cancelamento, entradas inválidas e o rollback de uma restauração com falha simulada.
 
 A recuperação usa **Ajustes → Restaurar backup**, senha original e confirmação da prévia. Um teste manual utiliza emulador dedicado e arquivo com dados fictícios; a instalação de uso pessoal permanece preservada. Os arquivos `.cfbackup` e a pasta `casos-locais/` ficam fora do Git. O formato e os limites estão descritos em [Backup e recuperação](backup.md).
 

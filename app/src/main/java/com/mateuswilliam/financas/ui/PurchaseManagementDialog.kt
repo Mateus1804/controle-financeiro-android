@@ -18,9 +18,11 @@ import com.mateuswilliam.financas.data.PurchaseManagement
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 
+internal enum class PurchaseManagementAction { EDIT, EXCLUDE, CANCEL_REMAINING }
+
 @Composable
 internal fun PurchaseManagementDialog(
-    model: FinanceViewModel, installmentId: String, cancel: Boolean, busy: Boolean,
+    model: FinanceViewModel, installmentId: String, action: PurchaseManagementAction, busy: Boolean,
     hidden: Boolean, accounts: List<AccountOption>, onDismiss: () -> Unit,
 ) {
     val result by produceState<Result<PurchaseManagement?>?>(null, installmentId) {
@@ -39,7 +41,7 @@ internal fun PurchaseManagementDialog(
                 Text(when {
                     result == null -> "Carregando as parcelas…"
                     result?.isFailure == true -> "Não foi possível carregar a compra. Tente novamente."
-                    else -> "Esta parcela foi registrada, cancelada ou alterada. Confira o Planejamento."
+                    else -> "Esta parcela mudou ou saiu do Planejamento. Confira a lista atual."
                 })
             },
             confirmButton = { TextButton(onClick = onDismiss) { Text("Voltar") } })
@@ -48,8 +50,11 @@ internal fun PurchaseManagementDialog(
 
     key(current.installmentId, current.revision) {
         when {
-            cancel -> CancelOpenInstallmentsDialog(current, busy, hidden, onDismiss) {
+            action == PurchaseManagementAction.CANCEL_REMAINING -> CancelOpenInstallmentsDialog(current, busy, hidden, onDismiss) {
                 model.cancelOpenInstallments(current, onDismiss)
+            }
+            action == PurchaseManagementAction.EXCLUDE -> ExcludeInstallmentDialog(current, busy, hidden, onDismiss) {
+                model.excludeInstallmentForecast(current, onDismiss)
             }
             current.canReplacePurchase -> EditPurchaseDialog(current.purchase, busy, hidden, accounts, model::addAccount, onDismiss) {
                 model.editPurchase(current, it, onDismiss)
@@ -59,6 +64,28 @@ internal fun PurchaseManagementDialog(
             }
         }
     }
+}
+
+@Composable
+private fun ExcludeInstallmentDialog(
+    current: PurchaseManagement, busy: Boolean, hidden: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit,
+) {
+    val part = current.installment
+    AlertDialog(onDismissRequest = { if (!busy) onDismiss() },
+        title = { DialogSystemBars(); Text("Excluir esta parcela prevista?") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(privateDisplayText(current.purchase.title, hidden), style = MaterialTheme.typography.titleMedium)
+                Text("Parcela ${part.number} de ${current.purchase.installmentCount} · ${part.dueDate.format(commitmentDateFormat)}")
+                Text("Só esta parcela sai do Planejamento. As demais parcelas e os lançamentos já registrados serão mantidos.")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = !busy) { Text("Excluir parcela", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy, modifier = Modifier.testTag("keep-installment-forecast")) { Text("Voltar") }
+        })
 }
 
 @Composable

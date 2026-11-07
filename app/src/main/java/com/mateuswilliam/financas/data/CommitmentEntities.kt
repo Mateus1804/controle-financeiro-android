@@ -50,6 +50,7 @@ data class CommitmentEntity(
     @PrimaryKey val id: String, val label: String, val amountCents: Long, val dueDate: String,
     val purchaseId: String?, val installmentNumber: Int?, val recurringId: String?, val recordId: String?,
     @ColumnInfo(defaultValue = "0") val adjusted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val excluded: Boolean = false,
 ) {
     fun toCommitment() = FixedCommitment(id, label, amountCents, LocalDate.parse(dueDate))
 }

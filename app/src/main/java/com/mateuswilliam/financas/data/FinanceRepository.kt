@@ -202,15 +202,25 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     suspend fun purchaseManagement(installmentId: String): PurchaseManagement? = database.withTransaction {
-        val item = dao.commitmentById(installmentId) ?: return@withTransaction null
-        val purchaseId = item.purchaseId ?: return@withTransaction null
-        val number = item.installmentNumber ?: return@withTransaction null
-        val purchase = dao.purchaseById(purchaseId) ?: return@withTransaction null
-        if (purchase.openCancelled || item.recordId != null) return@withTransaction null
-        val installments = dao.installmentsForPurchase(purchaseId)
+        val (item, purchase) = openInstallment(installmentId) ?: return@withTransaction null
+        val installments = dao.installmentsForPurchase(purchase.id)
         PurchaseManagement(purchase.toPurchase(), purchase.revision, item.id,
-            Installment(number, LocalDate.parse(item.dueDate), item.amountCents),
-            installments.count { it.recordId == null }, installments.none { it.recordId != null || it.adjusted })
+            Installment(checkNotNull(item.installmentNumber), LocalDate.parse(item.dueDate), item.amountCents),
+            installments.count { it.isOpenInstallment() }, installments.canReplaceSchedule())
+    }
+
+    private fun CommitmentEntity.isOpenInstallment() =
+        purchaseId != null && installmentNumber != null && recordId == null && !excluded
+
+    private fun List<CommitmentEntity>.canReplaceSchedule() =
+        isNotEmpty() && all { it.isOpenInstallment() && !it.adjusted }
+
+    // Consultada dentro da mesma transação que altera ou confirma a parcela.
+    private suspend fun openInstallment(id: String, expectedRevision: Long? = null): Pair<CommitmentEntity, PurchaseEntity>? {
+        val item = dao.commitmentById(id)?.takeIf { it.isOpenInstallment() } ?: return null
+        val purchase = item.purchaseId?.let { dao.purchaseById(it) } ?: return null
+        if (purchase.openCancelled || (expectedRevision != null && purchase.revision != expectedRevision)) return null
+        return item to purchase
     }
 
     suspend fun editPurchase(expectedRevision: Long, purchase: InstallmentPurchase): Boolean = writes.withLock {
@@ -219,7 +229,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val previous = dao.purchaseById(purchase.id) ?: return@withTransaction false
             if (previous.openCancelled || previous.revision != expectedRevision) return@withTransaction false
             val installments = dao.installmentsForPurchase(purchase.id)
-            if (installments.isEmpty() || installments.any { it.recordId != null || it.adjusted }) return@withTransaction false
+            if (!installments.canReplaceSchedule()) return@withTransaction false
             val edited = PurchaseEntity.from(purchase, previous.sourceDraftId).copy(revision = previous.revision)
             if (edited == previous) return@withTransaction true
             check(dao.deleteReplaceableInstallments(purchase.id) == installments.size)
@@ -232,12 +242,19 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun adjustInstallment(id: String, expectedRevision: Long, adjustment: InstallmentAdjustment): Boolean = writes.withLock {
         database.withTransaction {
-            val item = dao.commitmentById(id) ?: return@withTransaction false
-            val purchase = item.purchaseId?.let { dao.purchaseById(it) } ?: return@withTransaction false
-            if (purchase.openCancelled || purchase.revision != expectedRevision || item.recordId != null) return@withTransaction false
+            val (item, purchase) = openInstallment(id, expectedRevision) ?: return@withTransaction false
             val date = adjustment.dueDate.toString()
             if (item.amountCents == adjustment.amountCents && item.dueDate == date) return@withTransaction true
             check(dao.adjustOpenInstallment(id, adjustment.amountCents, date) == 1)
+            saveNextPurchaseRevision(purchase)
+            true
+        }
+    }
+
+    suspend fun excludeInstallmentForecast(id: String, expectedRevision: Long): Boolean = writes.withLock {
+        database.withTransaction {
+            val (_, purchase) = openInstallment(id, expectedRevision) ?: return@withTransaction false
+            check(dao.excludeOpenInstallment(id) == 1)
             saveNextPurchaseRevision(purchase)
             true
         }
@@ -247,7 +264,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         database.withTransaction {
             val purchase = dao.purchaseById(id) ?: return@withTransaction 0
             if (purchase.openCancelled || purchase.revision != expectedRevision) return@withTransaction 0
-            val count = dao.installmentsForPurchase(id).count { it.recordId == null }
+            val count = dao.installmentsForPurchase(id).count { it.isOpenInstallment() }
             if (count == 0 || count != expectedOpenCount) return@withTransaction 0
             saveNextPurchaseRevision(purchase.copy(openCancelled = true))
             count
@@ -262,11 +279,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
         require(record.movement == Movement.EXPENSE) { "A parcela precisa ser confirmada como despesa." }
         val saved = database.withTransaction {
-            val item = dao.commitmentById(id) ?: return@withTransaction false
-            val purchase = item.purchaseId?.let { dao.purchaseById(it) } ?: return@withTransaction false
-            if (item.recordId != null || purchase.openCancelled ||
-                (expectedPurchaseRevision != null && purchase.revision != expectedPurchaseRevision)
-            ) return@withTransaction false
+            val (_, purchase) = openInstallment(id, expectedPurchaseRevision) ?: return@withTransaction false
             dao.insertRecord(RecordEntity.from(record, null))
             check(dao.linkCommitment(id, record.id) == 1)
             saveNextPurchaseRevision(purchase)
@@ -279,9 +292,11 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun setFixedRecurring(id: String, fromMonth: YearMonth?) = writes.withLock {
         database.withTransaction {
+            val stored = dao.recurringById(id)
+            require(stored?.archived != true) { "Esta previsão foi excluída." }
             if (fromMonth == null) { dao.removeFixedRecurring(id); return@withTransaction }
             CommitmentPlanning.validate(MonthlyIncomePlan(fromMonth, 0))
-            val plan = dao.recurringById(id)?.toPlan() ?: throw IllegalArgumentException("Recorrência não encontrada.")
+            val plan = stored?.toPlan() ?: throw IllegalArgumentException("Recorrência não encontrada.")
             Recurrences.error(plan)?.let { throw IllegalArgumentException(it) }
             require(plan.movement == Movement.EXPENSE) { "Somente despesas podem ser marcadas como compromissos fixos." }
             dao.upsertFixedRecurring(FixedRecurringEntity(id, fromMonth.toString()))
@@ -312,7 +327,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val items = stored.map { CommitmentPlanning.resolve(it.toCommitment(), it.recordId?.let { id -> records[id]?.toRecord() }) }.toMutableList()
             val occupied = items.map { it.id }.toMutableSet()
             dao.occurrencesInPeriod(start, end).forEach { occupied.add(CommitmentPlanning.recurringId(it.recurringId, LocalDate.parse(it.dueDate))) }
-            val recurring = dao.allRecurring().associateBy { it.id }
+            val recurring = dao.allRecurring().filterNot { it.archived }.associateBy { it.id }
             dao.allFixedRecurring().forEach { fixed ->
                 val recurringPlan = recurring[fixed.recurringId]?.toPlan() ?: return@forEach
                 val item = CommitmentPlanning.forecast(recurringPlan, YearMonth.parse(fixed.fromMonth), month)
@@ -331,12 +346,25 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     suspend fun saveRecurring(plan: RecurringPlan) = writes.withLock {
         Recurrences.error(plan)?.let { throw IllegalArgumentException(it) }
         database.withTransaction {
-            require(dao.occurrence(plan.id, plan.nextDate) == null) { "Esse vencimento já foi tratado. Escolha outra data para a previsão." }
             val old = dao.recurringById(plan.id)
+            require(old?.archived != true) { "Esta previsão foi excluída." }
+            require(dao.occurrence(plan.id, plan.nextDate) == null) { "Esse vencimento já foi tratado. Escolha outra data para a previsão." }
             val reminder = if (old?.nextDate == plan.nextDate) old.lastRemindedDate else ""
             dao.upsertRecurring(RecurringEntity.from(plan.copy(lastRemindedDate = reminder)))
             if (plan.movement != Movement.EXPENSE) dao.removeFixedRecurring(plan.id)
             rememberAccount(plan.bank)
+        }
+    }
+
+    suspend fun archiveRecurringForecast(expected: RecurringPlan): Boolean = writes.withLock {
+        database.withTransaction {
+            val current = dao.recurringById(expected.id) ?: return@withTransaction false
+            if (current.archived || current.toPlan().copy(lastRemindedDate = expected.lastRemindedDate) != expected) {
+                return@withTransaction false
+            }
+            // A origem fica na base para que os pagamentos confirmados mantenham seus vínculos.
+            dao.upsertRecurring(current.copy(active = false, lastRemindedDate = "", archived = true))
+            true
         }
     }
 
@@ -345,7 +373,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         require(record.movement in setOf(Movement.EXPENSE, Movement.INCOME)) { "O registro de uma previsão precisa ser receita ou despesa." }
         val saved = database.withTransaction {
             val plan = dao.recurringById(id) ?: return@withTransaction false
-            if (!plan.active || plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
+            if (!plan.active || plan.archived || plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
             dao.insertRecord(RecordEntity.from(record, null))
             dao.insertOccurrence(OccurrenceEntity(id, due, "RECORDED", record.id))
             val fixed = dao.fixedRecurringById(id)
@@ -364,7 +392,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     suspend fun skipRecurring(id: String, due: String): Boolean = writes.withLock {
         database.withTransaction {
             val plan = dao.recurringById(id) ?: return@withTransaction false
-            if (plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
+            if (!plan.active || plan.archived || plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
             dao.insertOccurrence(OccurrenceEntity(id, due, "SKIPPED", null))
             check(dao.advanceRecurring(id, due, Recurrences.followingDate(due, plan.dayOfMonth)) == 1)
             true
@@ -373,7 +401,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun notifyDue(today: LocalDate, send: (RecurringPlan) -> Boolean) = writes.withLock {
         if (!settings.snapshot().remindersEnabled) return@withLock
-        dao.allRecurring().filter { it.active && !LocalDate.parse(it.nextDate).isAfter(today) && it.lastRemindedDate != it.nextDate }
+        dao.allRecurring().filter { it.active && !it.archived && !LocalDate.parse(it.nextDate).isAfter(today) && it.lastRemindedDate != it.nextDate }
             .forEach { if (settings.snapshot().remindersEnabled && send(it.toPlan())) dao.markReminded(it.id, it.nextDate) }
     }
 

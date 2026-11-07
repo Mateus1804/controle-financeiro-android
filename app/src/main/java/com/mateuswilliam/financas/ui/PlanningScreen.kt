@@ -38,16 +38,18 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     canAlert: Boolean, onBack: () -> Unit, onBudget: (MonthlyBudget, () -> Unit) -> Unit,
     onDeleteBudget: (Category) -> Unit, onRecurring: (RecurringPlan, () -> Unit) -> Unit,
     onConfirmRecurring: (RecurringPlan) -> Unit, onSkip: (RecurringPlan) -> Unit,
+    onExcludeRecurring: (RecurringPlan, () -> Unit) -> Unit,
     onReminders: (Boolean) -> Unit, onAlerts: () -> Unit, onAddAccount: suspend (String) -> String,
     commitments: CommitmentSetup?, commitmentReport: Result<CommitmentReport>?, onIncome: (MonthlyIncomePlan, () -> Unit) -> Unit,
     onFixedRecurring: (String, YearMonth?) -> Unit, onConfirmInstallment: (InstallmentDue) -> Unit,
-    onEditPurchase: (String) -> Unit, onCancelPurchase: (String) -> Unit,
+    onEditPurchase: (String) -> Unit, onExcludeInstallment: (String) -> Unit, onCancelPurchase: (String) -> Unit,
 ) {
     var budgetEditor by rememberSaveable { mutableStateOf(false) }
     var budgetCategory by rememberSaveable { mutableStateOf<Category?>(null) }
     var recurringEditor by rememberSaveable { mutableStateOf(false) }
     var recurringId by rememberSaveable { mutableStateOf<String?>(null) }
     var skipping by rememberSaveable { mutableStateOf<String?>(null) }
+    var excludingRecurring by rememberSaveable { mutableStateOf<String?>(null) }
     var incomeEditor by rememberSaveable(month.toString()) { mutableStateOf(false) }
     var otherExpanded by rememberSaveable(month.toString()) { mutableStateOf(false) }
     val zone = ZoneId.systemDefault()
@@ -95,7 +97,8 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
             if (setup.installments.isEmpty()) item { EmptyCard("Sem parcelas neste mês", "Para planejar parcelas, ative Compra parcelada ao registrar uma despesa.") }
             items(setup.installments, key = { "due:${it.id}" }) { installment ->
                 InstallmentDueCard(installment, busy, hidden, onConfirm = { onConfirmInstallment(installment) },
-                    onEdit = { onEditPurchase(installment.id) }, onCancel = { onCancelPurchase(installment.id) })
+                    onEdit = { onEditPurchase(installment.id) }, onExclude = { onExcludeInstallment(installment.id) },
+                    onCancel = { onCancelPurchase(installment.id) })
             }
         }
         item {
@@ -124,6 +127,8 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = { recurringId = plan.id; recurringEditor = true }, enabled = !busy) { Text("Editar previsão") }
                         TextButton(onClick = { onRecurring(plan.copy(active = !plan.active), {}) }, enabled = !busy) { Text(if (plan.active) "Pausar" else "Retomar") }
+                        TextButton(onClick = { excludingRecurring = plan.id }, enabled = !busy,
+                            modifier = Modifier.testTag("exclude-recurring-${plan.id}")) { Text("Excluir previsão") }
                     }
                     if (plan.active) TextButton(onClick = { skipping = plan.id }, enabled = !busy) { Text("Pular este vencimento") }
                 }
@@ -162,6 +167,23 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
         text = { Text("A previsão de ${formatDate(plan.nextDate)} será marcada como pulada. Nenhum lançamento será criado, e a próxima previsão mensal ficará disponível.") },
         confirmButton = { TextButton(enabled = !busy, onClick = { onSkip(plan); skipping = null }) { Text("Pular vencimento") } },
         dismissButton = { TextButton(onClick = { skipping = null }) { Text("Cancelar") } })
+    state.recurring.find { it.id == excludingRecurring }?.let { current ->
+        AlertDialog(onDismissRequest = { if (!busy) excludingRecurring = null },
+            title = { DialogSystemBars(); Text("Excluir previsão mensal?") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(privateDisplayText(current.title, hidden), style = MaterialTheme.typography.titleMedium)
+                    Text("Esta previsão deixa de gerar vencimentos e lembretes. Os lançamentos já registrados continuam no extrato.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onExcludeRecurring(current) { excludingRecurring = null } }, enabled = !busy,
+                    modifier = Modifier.testTag("confirm-exclude-recurring")) {
+                    Text("Excluir previsão", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { excludingRecurring = null }, enabled = !busy) { Text("Voltar") } })
+    }
 }
 
 @Composable
