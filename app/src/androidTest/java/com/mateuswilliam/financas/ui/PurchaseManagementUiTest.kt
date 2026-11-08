@@ -51,21 +51,21 @@ class PurchaseManagementUiTest {
         assertTrue(repository.confirmInstallment(id(1), payment))
         repository.saveMonthlyPlan(MonthlyIncomePlan(month.plusMonths(1), 100000))
         openPlanning()
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasContentDescription("Próximo mês"))
+        rule.scrollAnalysisTo(hasContentDescription("Próximo mês"))
         rule.onNodeWithContentDescription("Próximo mês").performClick()
         // Espera o mês novo emitir a programação antes de procurar a parcela na lista.
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag("commitment-card"))
+        rule.scrollAnalysisTo(hasTestTag("commitment-card"))
         rule.waitUntil(5000) { rule.onAllNodesWithContentDescription("20% da renda comprometidos; maior gasto: Compra fictícia · 2/3.").fetchSemanticsNodes().isNotEmpty() }
         tapRowAction("edit-${id(2)}")
         awaitDialog("Editar parcela em aberto")
         replaceMoney("adjust-installment-amount", "22001")
         rule.onNodeWithText("Salvar parcela").performClick()
         rule.waitUntil(5000) { runBlocking { dao.commitmentById(id(2))?.amountCents == 22001L } }
-        rule.waitUntil(8000) { rule.onAllNodesWithText("Parcela corrigida no Planejamento.").fetchSemanticsNodes().isEmpty() }
+        rule.waitUntil(8000) { rule.onAllNodesWithText("Parcela corrigida nas movimentações.").fetchSemanticsNodes().isEmpty() }
 
         tapRowAction("cancel-${id(2)}")
         awaitDialog("Cancelar parcelas em aberto?")
-        rule.onNodeWithText("2 parcelas sairão do Planejamento, incluindo as de outros meses.").assertExists()
+        rule.onNodeWithText("2 parcelas sairão das movimentações, incluindo as de outros meses.").assertExists()
         rule.onNodeWithTag("keep-open-installments").performClick()
         assertEquals(22001L, repository.commitmentReport(month.plusMonths(1)).committedCents)
         tapRowAction("cancel-${id(2)}")
@@ -73,7 +73,7 @@ class PurchaseManagementUiTest {
         rule.onNodeWithText("Cancelar parcelas").performClick()
         rule.waitUntil(5000) { runBlocking { dao.purchaseById("gestao-ficticia")?.openCancelled == true } }
 
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag("commitment-card"))
+        rule.scrollAnalysisTo(hasTestTag("commitment-card"))
         rule.waitUntil(5000) { rule.onAllNodesWithContentDescription("0% da renda comprometidos; nenhum compromisso.").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(19000L, repository.commitmentReport(month).committedCents)
         assertEquals(0L, repository.commitmentReport(month.plusMonths(1)).committedCents)
@@ -100,9 +100,9 @@ class PurchaseManagementUiTest {
     }
 
     private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag("edit-monthly-income"))
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
+        rule.onNodeWithText("Planejamento e análises").performClick()
+        rule.scrollAnalysisTo(hasTestTag("edit-monthly-income"))
         rule.waitUntil(5000) { rule.onAllNodes(hasTestTag("edit-monthly-income") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
     }
 

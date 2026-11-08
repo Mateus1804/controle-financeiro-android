@@ -30,7 +30,7 @@ class CompactUiInteractionTest {
             Category.OTHER, 20000, 2, month.atDay(12)))
         openPlanning()
         val trigger = "actions-installment:compacta:1"
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag(trigger))
+        rule.scrollPlanningToTag(trigger)
         rule.onNodeWithTag("exclude-installment:compacta:1").assertDoesNotExist()
         rule.onNodeWithTag(trigger).assertContentDescriptionEquals("Mais ações de Compra compacta")
             .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
@@ -56,13 +56,13 @@ class CompactUiInteractionTest {
     }
 
     private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
+        rule.onNodeWithText("Planejamento e análises").performClick()
     }
 
     private fun openBudgetMenu() {
         val tag = "actions-budget-${Category.HOME.name}"
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag(tag))
+        rule.scrollAnalysisTo(hasTestTag(tag))
         rule.onNodeWithTag(tag).performClick()
     }
 }

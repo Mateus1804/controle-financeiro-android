@@ -34,22 +34,22 @@ class MonthlyRecurringUiTest {
         openPlanning()
         rule.openPlanningActions("recurring-${plan.id}")
         rule.onNodeWithTag("edit-month-${plan.id}").performClick()
-        rule.onNodeWithText("Editar este mês · ${month.format(commitmentMonthFormat)}").assertIsDisplayed()
+        rule.onNodeWithText("Editar só este mês").assertIsDisplayed()
         rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("7500")
         rule.onNodeWithTag("recurring-title").performScrollTo().performTextReplacement("Conta ajustada só neste mês")
         rule.onNodeWithTag("recurring-title").performImeAction()
         rule.activityRule.scenario.recreate()
         rule.onNodeWithTag("recurring-title").assertTextContains("Conta ajustada só neste mês")
-        rule.onNodeWithText("Salvar este mês").performClick()
+        rule.onNodeWithText("Salvar só este mês").performClick()
         rule.waitUntil(5000) { runBlocking { app.repository.commitmentReport(month).committedCents == 7500L } }
         assertEquals(5000L, app.repository.commitmentReport(month.plusMonths(1)).committedCents)
         assertEquals(5000L, app.repository.recurring.first().single().amountCents)
         assertTrue(app.repository.exportRecords().isEmpty())
         changeMonth("Próximo mês")
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Conta mensal"))
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Conta mensal"))
         rule.onNodeWithText("Conta ajustada só neste mês").assertDoesNotExist()
         changeMonth("Mês anterior")
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Conta ajustada só neste mês"))
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Conta ajustada só neste mês"))
         rule.onNodeWithText("Conta ajustada só neste mês").assertIsDisplayed()
     }
 
@@ -59,7 +59,7 @@ class MonthlyRecurringUiTest {
         rule.onNodeWithText("Descrição").performScrollTo().performImeAction()
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().size == 1 } }
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Registrada no extrato · Despesa fixa"))
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Realizada · Recorrente mensal · Fixa"))
         rule.onNodeWithTag("confirm-recurring-${plan.id}").assertDoesNotExist()
         rule.openPlanningActions("recurring-${plan.id}")
         rule.onNodeWithTag("edit-month-${plan.id}").assertDoesNotExist()
@@ -92,7 +92,7 @@ class MonthlyRecurringUiTest {
             current.plan.copy(title = "Ajuste deste mês", amountCents = 6250, nextDate = month.atDay(14).toString())))
         openPlanning()
         rule.openPlanningActions("recurring-${plan.id}")
-        rule.onNodeWithTag("active-recurring-${plan.id}").assertTextEquals("Pausar a partir deste mês").performClick()
+        rule.onNodeWithTag("active-recurring-${plan.id}").assertTextEquals("Pausar desta e futuras").performClick()
         rule.waitUntil(5000) { runBlocking { !app.repository.observeRecurringMonths(month).first().single().plan.active } }
         val paused = app.repository.observeRecurringMonths(month).first().single().plan
         assertEquals("Ajuste deste mês", paused.title)
@@ -104,13 +104,13 @@ class MonthlyRecurringUiTest {
         assertEquals("Conta futura", later.bank)
         assertEquals(23, later.dayOfMonth)
         rule.openPlanningActions("recurring-${plan.id}")
-        rule.onNodeWithTag("active-recurring-${plan.id}").assertTextEquals("Retomar a partir deste mês").performClick()
+        rule.onNodeWithTag("active-recurring-${plan.id}").assertTextEquals("Retomar desta e futuras").performClick()
         rule.waitUntil(5000) { runBlocking { app.repository.observeRecurringMonths(month).first().single().plan.active } }
         assertEquals(6250L, app.repository.observeRecurringMonths(month).first().single().plan.amountCents)
         assertEquals(9000L, app.repository.observeRecurringMonths(next).first().single().plan.amountCents)
     }
 
-    @Test fun configurationEditorLoadsTheSelectedRuleAndKeepsLaterRules() = runBlocking<Unit> {
+    @Test fun configurationEditorLoadsTheSelectedRuleAndReplacesFuturePendingRules() = runBlocking<Unit> {
         val next = month.plusMonths(1)
         app.repository.saveRecurringFromMonth(plan.copy(title = "Configuração futura", amountCents = 9000,
             bank = "Conta futura", nextDate = next.atDay(23).toString(), dayOfMonth = 23), next)
@@ -124,29 +124,27 @@ class MonthlyRecurringUiTest {
         val displayedAmount = rule.onNodeWithTag("amount-input").fetchSemanticsNode()
             .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
         assertEquals(5000L, MoneyInput.normalize(displayedAmount)?.toLongOrNull())
-        rule.onNodeWithText("Salvar configuração").performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Salvar configuração").fetchSemanticsNodes().isEmpty() }
+        rule.onNodeWithText("Salvar recorrência").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithText("Salvar recorrência").fetchSemanticsNodes().isEmpty() }
         val selectedRule = requireNotNull(app.repository.recurringConfiguration(plan.id, month))
         assertEquals("Conta mensal", selectedRule.title)
         assertEquals(5000L, selectedRule.amountCents)
         assertEquals(12, selectedRule.dayOfMonth)
         val laterRule = requireNotNull(app.repository.recurringConfiguration(plan.id, next))
-        assertEquals("Configuração futura", laterRule.title)
-        assertEquals(9000L, laterRule.amountCents)
-        assertEquals("Conta futura", laterRule.bank)
-        assertEquals(23, laterRule.dayOfMonth)
-        assertEquals(6250L, app.repository.observeRecurringMonths(month).first().single().plan.amountCents)
+        assertEquals("Conta mensal", laterRule.title)
+        assertEquals(5000L, laterRule.amountCents)
+        assertEquals(12, laterRule.dayOfMonth)
+        assertEquals(5000L, app.repository.observeRecurringMonths(month).first().single().plan.amountCents)
         assertTrue(app.repository.exportRecords().isEmpty())
     }
 
     private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+        rule.showMovements()
         rule.scrollPlanningToTag("actions-recurring-${plan.id}")
     }
 
     private fun changeMonth(description: String) {
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasContentDescription(description))
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasContentDescription(description))
         rule.onNodeWithContentDescription(description).performClick()
     }
 }

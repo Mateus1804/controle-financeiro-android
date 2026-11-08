@@ -60,7 +60,7 @@ class RedesignInteractionTest {
     }
 
     @Test fun navigationKeepsFourReadableDestinationsAndTouchTargets() {
-        for (label in listOf("Resumo", "Revisar", "Extrato", "Ajustes")) {
+        for (label in listOf("Resumo", "Revisar", "Movimentações", "Ajustes")) {
             rule.onNode(hasText(label) and hasClickAction()).assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
         }
         rule.onNodeWithContentDescription("Novo lançamento").assertIsDisplayed()
@@ -79,7 +79,7 @@ class RedesignInteractionTest {
             command("wm size 640x1280"); command("wm density 320"); command("settings put system font_scale 2.0")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.9f && rule.activity.resources.configuration.screenWidthDp <= 320 }
             checkpoint("Conferindo navegação com fonte ampliada")
-            for (label in listOf("Resumo", "Revisar", "Extrato", "Ajustes")) {
+            for (label in listOf("Resumo", "Revisar", "Movimentações", "Ajustes")) {
                 rule.onNode(hasText(label) and hasClickAction()).assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
             }
             rule.onNode(hasText("Resumo") and hasClickAction()).performClick()
@@ -149,7 +149,7 @@ class RedesignInteractionTest {
             app.repository.save(Record("linha-$index", 10000L + index, Movement.EXPENSE, PaymentMethod.PIX,
                 Category.FOOD, "Conta fictícia", "Lançamento fictício $index", now - index * 1000L), null)
         }
-        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
+        rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("30 lançamento(s)").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("records-list").performScrollToNode(hasText("Lançamento fictício 29"))
         val record = rule.onNodeWithText("Lançamento fictício 29").assertIsDisplayed().fetchSemanticsNode().boundsInRoot

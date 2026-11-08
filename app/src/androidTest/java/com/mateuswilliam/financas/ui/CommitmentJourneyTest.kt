@@ -62,8 +62,8 @@ class CommitmentJourneyTest {
         assertTrue(repository.exportRecords().isEmpty())
 
         rule.onNodeWithText("Resumo").performClick()
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
+        rule.onNodeWithText("Planejamento e análises").performClick()
         saveIncome(month, "36")
         assertChart("35%", "Compra revisada · 1/3", 65000)
         rule.onNodeWithText("Atenção").assertExists()
@@ -87,7 +87,7 @@ class CommitmentJourneyTest {
         rule.onAllNodes(hasText("37%", substring = true) or hasContentDescription("37%", substring = true)).assertCountEquals(0)
         rule.runOnIdle { app.settings.hideAmounts(false) }
 
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasContentDescription("Próximo mês"))
+        rule.scrollAnalysisTo(hasContentDescription("Próximo mês"))
         rule.onNodeWithContentDescription("Próximo mês").performClick()
         scrollTo("commitment-card")
         rule.waitUntil(5000) { rule.onAllNodesWithText("Renda ainda não informada").fetchSemanticsNodes().isNotEmpty() }
@@ -100,11 +100,11 @@ class CommitmentJourneyTest {
         typeAndCloseKeyboard("adjust-installment-amount", "22500")
         rule.onNodeWithText("Salvar parcela").performClick()
         assertChart("37,5%", "Compra revisada · 2/3", 62500)
-        waitForMessageToClose("Parcela corrigida no Planejamento.")
+        waitForMessageToClose("Parcela corrigida nas movimentações.")
 
         tapPlanning("cancel-$openId")
         rule.waitUntil(5000) { rule.onAllNodesWithText("Cancelar parcelas em aberto?").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("2 parcelas sairão do Planejamento, incluindo as de outros meses.").assertExists()
+        rule.onNodeWithText("2 parcelas sairão das movimentações, incluindo as de outros meses.").assertExists()
         rule.onNodeWithText("Cancelar parcelas").performClick()
         assertChart("15%", "Compra em andamento · 3/4", 85000)
         rule.onNodeWithText("Confortável").assertExists()
@@ -131,7 +131,7 @@ class CommitmentJourneyTest {
     }
 
     private fun setInstallments(count: String, alreadyPaid: String? = null) {
-        rule.onNodeWithTag("installment-toggle").performScrollTo().performClick()
+        rule.chooseInstallments()
         type("installment-count", count)
         alreadyPaid?.let { type("installments-paid", it) }
     }
@@ -172,7 +172,7 @@ class CommitmentJourneyTest {
     }
 
     private fun scrollTo(tag: String) {
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag(tag))
+        rule.scrollPlanningToTag(tag)
     }
 
     private fun type(tag: String, value: String) {

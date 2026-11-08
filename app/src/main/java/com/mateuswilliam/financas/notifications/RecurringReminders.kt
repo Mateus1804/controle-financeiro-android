@@ -56,7 +56,7 @@ object RecurringReminders {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Há uma movimentação prevista para conferir")
-            .setContentText("Abra o planejamento. Uma previsão só entra nos totais após confirmação.")
+            .setContentText("Abra as movimentações. Uma previsão só entra nos totais após confirmação.")
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setOnlyAlertOnce(true).setAutoCancel(true).setContentIntent(pending).build()
         return try { manager.notify("plan:${plan.id}:${plan.nextDate}", NOTIFICATION_ID, notification); true }
             catch (_: SecurityException) { false }

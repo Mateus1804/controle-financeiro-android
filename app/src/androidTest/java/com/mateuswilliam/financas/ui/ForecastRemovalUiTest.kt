@@ -40,7 +40,7 @@ class ForecastRemovalUiTest {
         awaitText("Excluir esta parcela prevista?")
         rule.onNodeWithText("Excluir parcela", substring = false).performClick()
         assertReport("0% da renda comprometidos; nenhum compromisso.")
-        awaitPlanningText("Sem parcelas neste mês")
+        awaitPlanningText("Sem movimentações neste mês")
         rule.onNodeWithTag(action).assertDoesNotExist()
         assertEquals(10000L, repo.commitmentReport(month.plusMonths(1)).committedCents)
         assertTrue(repo.exportRecords().isEmpty())
@@ -55,16 +55,16 @@ class ForecastRemovalUiTest {
         openPlanning()
         assertReport("5% da renda comprometidos; maior gasto: Conta fictícia.")
         tap("exclude-recurring-${plan.id}")
-        awaitText("Excluir previsão mensal?")
+        awaitText("Excluir recorrência?")
         rule.onNodeWithTag("confirm-exclude-recurring").performClick()
         assertReport("0% da renda comprometidos; nenhum compromisso.")
-        awaitPlanningText("Nenhuma recorrência cadastrada")
+        awaitPlanningText("Sem movimentações neste mês")
         assertTrue(repo.exportRecords().isEmpty())
     }
 
     private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
+        rule.onNodeWithText("Planejamento e análises").performClick()
     }
 
     private fun tap(tag: String) {
@@ -79,7 +79,8 @@ class ForecastRemovalUiTest {
         // O relatório e a lista recebem atualizações independentes depois da exclusão.
         rule.waitUntil(5000) {
             try {
-                rule.onNodeWithTag("planning-list").performScrollToNode(hasText(text))
+                rule.showMovements()
+                rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText(text))
                 true
             } catch (_: AssertionError) {
                 false
@@ -89,7 +90,7 @@ class ForecastRemovalUiTest {
     }
 
     private fun assertReport(description: String) {
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag("commitment-card"))
+        rule.scrollAnalysisTo(hasTestTag("commitment-card"))
         rule.waitUntil(5000) { rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("commitment-donut").assertContentDescriptionEquals(description)
     }

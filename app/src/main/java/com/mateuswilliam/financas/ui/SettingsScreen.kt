@@ -33,7 +33,7 @@ fun SettingsScreen(
     onReconnect: () -> Unit, onAlerts: () -> Unit, onExport: () -> Unit,
     onClear: () -> Unit, onSimulate: () -> Unit, onAppearance: (Appearance) -> Unit, busy: Boolean,
     onBackup: () -> Unit, onRestore: () -> Unit, onPlanning: () -> Unit,
-    onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit,
+    onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit, onReminders: (Boolean) -> Unit = {},
 ) {
     var privacy by remember { mutableStateOf(false) }
     LazyColumn(Modifier.testTag("settings-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
@@ -123,8 +123,8 @@ fun SettingsScreen(
         item {
             SettingsCard {
                 SettingsHeading("Planejamento", R.drawable.ic_calendar)
-                Text("Limites e previsões com confirmação manual.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = onPlanning, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Orçamentos e recorrências") }
+                Text("Análises, projeções e limites mensais.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = onPlanning, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Projeções e orçamentos") }
             }
         }
         item {
@@ -144,6 +144,17 @@ fun SettingsScreen(
                 FinanceDisclosure("Sobre a proteção da tela", "screen-protection-explanation") {
                     Text("Protege a imagem no seletor de aplicativos e impede capturas e compartilhamento da tela quando respeitado pelo Android. A proteção é ativada junto com o bloqueio e pode ser ajustada separadamente.", style = MaterialTheme.typography.bodySmall)
                 }
+            }
+        }
+        item {
+            SettingsCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Lembretes de vencimentos", Modifier.weight(1f))
+                    Switch(settings.remindersEnabled, onReminders,
+                        modifier = Modifier.semantics { contentDescription = "Lembretes de vencimentos" })
+                }
+                Text("Lembretes das movimentações previstas, sujeitos às permissões e às condições do Android.", style = MaterialTheme.typography.bodySmall)
+                if (!canAlert) TextButton(onClick = onAlerts) { Text("Permitir alertas") }
             }
         }
         if (BuildConfig.DEBUG) item {

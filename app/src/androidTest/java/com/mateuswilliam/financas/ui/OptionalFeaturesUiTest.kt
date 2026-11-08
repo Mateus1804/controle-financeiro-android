@@ -35,8 +35,8 @@ class OptionalFeaturesUiTest {
         "EXEMPLO FICTÍCIO", "Compra aprovada no cartão de R$ 42,90. Mercado Exemplo.", 4290,
         Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Dados fictícios para revisão.", System.currentTimeMillis(), System.currentTimeMillis() - 60_000)
     private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
+        rule.onNodeWithText("Planejamento e análises").performClick()
     }
     private fun openReview(id: String) {
         rule.onNodeWithText("Revisar").performClick()
@@ -46,7 +46,7 @@ class OptionalFeaturesUiTest {
 
     @Test fun monthlyBudgetCanBeCreatedAndRecoveredAfterRecreation() = runBlocking<Unit> {
         openPlanning()
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Adicionar limite mensal"))
+        rule.scrollAnalysisTo(hasText("Adicionar limite mensal"))
         rule.onNodeWithText("Adicionar limite mensal").performClick()
         rule.onNodeWithTag("amount-input").performTextInput("10000")
         rule.onNodeWithTag("amount-input").performImeAction()
@@ -69,8 +69,7 @@ class OptionalFeaturesUiTest {
     @Test fun forecastRequiresConfirmationAndRecordsTheEffectiveDateWithoutDuplicating() = runBlocking<Unit> {
         app.repository.saveRecurring(forecast())
         openPlanning()
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Conferir e registrar"))
-        rule.onNodeWithText("Conferir e registrar").performScrollTo().performClick()
+        rule.performPlanningAction("confirm-recurring-${forecast().id}")
         rule.onNodeWithText("Conferir previsão").assertExists()
         assertTrue(app.repository.exportRecords().isEmpty())
         rule.onNodeWithText("Descrição").performScrollTo().performImeAction()
@@ -80,7 +79,8 @@ class OptionalFeaturesUiTest {
         val record = app.repository.exportRecords().single()
         assertEquals(60000L, record.amountCents)
         assertEquals(LocalDate.now(), java.time.Instant.ofEpochMilli(record.occurredAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Registrada no extrato"))
+        rule.showMovements()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Realizada · Recorrente mensal"))
         rule.onNodeWithTag("confirm-recurring-${forecast().id}").assertDoesNotExist()
         assertEquals("2026-10-31", app.repository.recurring.first().single().nextDate)
     }
@@ -143,7 +143,7 @@ class OptionalFeaturesUiTest {
             rule.runOnIdle { app.settings.setLockEnabled(true) }
             rule.waitUntil(5000) { rule.onAllNodesWithText("Acesso protegido").fetchSemanticsNodes().isNotEmpty() }
             rule.onAllNodesWithText("Finanças").assertCountEquals(0)
-            rule.onAllNodesWithText("Extrato").assertCountEquals(0)
+            rule.onAllNodesWithText("Movimentações").assertCountEquals(0)
             rule.runOnIdle { assertTrue(rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
             rule.activityRule.scenario.recreate()
             rule.onNodeWithText("Acesso protegido").assertExists()
@@ -224,7 +224,7 @@ class OptionalFeaturesUiTest {
                 assertFalse(WindowCompat.getInsetsController(activity.window, activity.window.decorView).isAppearanceLightStatusBars)
             }
             openPlanning()
-            rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Gasto e limite ocultos"))
+            rule.scrollAnalysisTo(hasText("Gasto e limite ocultos"))
             rule.onAllNodesWithText(Money.format(123456), substring = true).assertCountEquals(0)
             rule.onAllNodesWithContentDescription(Money.format(123456), substring = true).assertCountEquals(0)
             checkpoint("Capturando planejamento com fonte ampliada")
@@ -232,8 +232,8 @@ class OptionalFeaturesUiTest {
             checkpoint("Mudando orientação")
             rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
-            rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Adicionar recorrência"))
-            rule.onNodeWithText("Adicionar recorrência").assertIsDisplayed()
+            rule.scrollAnalysisTo(hasText("Adicionar limite mensal"))
+            rule.onNodeWithText("Adicionar limite mensal").assertIsDisplayed()
             checkpoint("Capturando planejamento em paisagem")
             screenshot("planejamento-paisagem")
             checkpoint("Paisagem conferida")

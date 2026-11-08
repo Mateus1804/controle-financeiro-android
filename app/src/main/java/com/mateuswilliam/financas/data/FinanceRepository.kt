@@ -384,7 +384,16 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun saveRecurringFromMonth(plan: RecurringPlan, effectiveMonth: YearMonth) = writes.withLock {
         database.withTransaction {
-            recurringStore.saveTemplate(plan, effectiveMonth)
+            recurringStore.saveTemplate(plan, effectiveMonth, replaceFuture = true)
+            rememberAccount(plan.bank)
+        }
+    }
+
+    /** Cadastro unificado: configuração e classificação são gravadas na mesma transação. */
+    suspend fun saveRecurringMovement(plan: RecurringPlan, effectiveMonth: YearMonth, fixedExpense: Boolean) = writes.withLock {
+        database.withTransaction {
+            recurringStore.saveTemplate(plan, effectiveMonth, replaceFuture = true)
+            recurringStore.setFixedFromMonth(plan.id, effectiveMonth, fixedExpense && plan.movement == Movement.EXPENSE, pendingOnly = true)
             rememberAccount(plan.bank)
         }
     }

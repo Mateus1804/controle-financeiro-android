@@ -31,6 +31,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+private enum class MovementFrequency(val label: String) { SINGLE("Única"), RECURRING("Recorrente"), INSTALLMENTS("Parcelada") }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordEditor(
@@ -53,16 +55,23 @@ fun RecordEditor(
     onAcceptUpdate: () -> Unit = {},
     onSavePurchase: ((InstallmentPurchase) -> Unit)? = null,
     installmentConfirmation: Boolean = false,
+    recurring: RecurringPlan? = null,
+    onSaveRecurring: ((RecurringPlan, Boolean) -> Unit)? = null,
+    recurrenceScope: java.time.YearMonth? = null,
+    recurrenceOnlyMonth: Boolean = false,
+    recurringFixed: Boolean = true,
+    initialDate: LocalDate? = null,
 ) {
-    val initial = existing ?: preset
-    val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: System.currentTimeMillis() }
+    val initial = existing ?: preset ?: recurring?.proposedRecord(recurring.id, ZoneId.systemDefault())
+    val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: initialDate?.atTime(12, 0)?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis() }
     val originalDate = Instant.ofEpochMilli(originalAt).atZone(ZoneId.systemDefault())
     val id = rememberSaveable { initial?.id ?: UUID.randomUUID().toString() }
     val amount = rememberTextFieldState(initialText = (initial?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
     var invalidMoneyInput by rememberSaveable { mutableStateOf(false) }
     val installmentAmount = rememberTextFieldState()
     var invalidInstallmentAmount by rememberSaveable { mutableStateOf(false) }
-    var installmentMode by rememberSaveable { mutableStateOf(false) }
+    var frequency by rememberSaveable { mutableStateOf(if (recurring != null) MovementFrequency.RECURRING else MovementFrequency.SINGLE) }
+    var fixedExpense by rememberSaveable { mutableStateOf(recurringFixed) }
     var terms by rememberSaveable(stateSaver = PurchaseTerms.Saver) { mutableStateOf(PurchaseTerms(LocalDate.now())) }
     var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
     var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
@@ -71,6 +80,7 @@ fun RecordEditor(
     var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.category ?: Category.OTHER) }
     var destination by rememberSaveable { mutableStateOf(initial?.destination.orEmpty()) }
     var date by rememberSaveable { mutableStateOf(originalDate.toLocalDate().toString()) }
+    var recurringDay by rememberSaveable { mutableIntStateOf(recurring?.dayOfMonth ?: LocalDate.parse(date).dayOfMonth) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var deleteDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -84,7 +94,9 @@ fun RecordEditor(
     val fieldsScroll = rememberScrollState()
     val cents = if (invalidMoneyInput) null else MoneyInput.cents(amount.text.toString())
     val canInstall = initial == null && onSavePurchase != null && movement == Movement.EXPENSE
-    val purchaseMode = canInstall && installmentMode
+    val purchaseMode = canInstall && frequency == MovementFrequency.INSTALLMENTS
+    val recurringMode = frequency == MovementFrequency.RECURRING && movement in setOf(Movement.INCOME, Movement.EXPENSE)
+    val canRecur = onSaveRecurring != null && existing == null && preset == null && draft == null
     val byTotal = terms.basis == PurchaseAmountBasis.TOTAL
     val purchaseCents = if (byTotal) cents else if (invalidInstallmentAmount) null else MoneyInput.cents(installmentAmount.text.toString())
     val scheduleResult = if (purchaseMode) remember(purchaseCents, terms) {
@@ -95,7 +107,13 @@ fun RecordEditor(
         if (purchaseMode) PaymentMethod.CARD else method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
         if (movement == Movement.TRANSFER) destination else "")
-    val error = scheduleResult?.exceptionOrNull()?.message ?: RecordValidation.error(record)
+    val recurringValue = RecurringPlan(id, description.trim(), cents ?: 0, movement, method, category,
+        bank, date, recurringDay, recurring?.active ?: true)
+    val error = when {
+        recurringMode && recurrenceScope != null && java.time.YearMonth.from(LocalDate.parse(date)) != recurrenceScope -> "Escolha um vencimento dentro desta competência."
+        recurringMode -> Recurrences.error(recurringValue)
+        else -> scheduleResult?.exceptionOrNull()?.message ?: RecordValidation.error(record)
+    }
     val duplicates = remember(duplicateIndex, record, draft?.id) { if (draft != null) duplicateIndex?.find(record).orEmpty() else emptyList() }
 
     ModalBottomSheet(
@@ -108,6 +126,7 @@ fun RecordEditor(
         Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding().then(scroll)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(when {
+                    recurring != null -> if (recurrenceOnlyMonth) "Editar só este mês" else "Editar desta e futuras"
                     draft != null -> "Conferir movimentação"
                     installmentConfirmation -> "Conferir parcela"
                     preset != null -> "Conferir previsão"
@@ -155,10 +174,20 @@ fun RecordEditor(
                         }
                     }
                 }
-                if (canInstall) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Compra parcelada no cartão de crédito", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                    Switch(checked = purchaseMode, onCheckedChange = { installmentMode = it }, enabled = !busy,
-                        modifier = Modifier.testTag("installment-toggle").semantics { contentDescription = "Compra parcelada no cartão de crédito" })
+                if (recurring == null && initial == null && (canInstall || canRecur) && movement in setOf(Movement.INCOME, Movement.EXPENSE)) {
+                    val frequencies = buildList {
+                        add(MovementFrequency.SINGLE)
+                        if (canRecur) add(MovementFrequency.RECURRING)
+                        if (canInstall) add(MovementFrequency.INSTALLMENTS)
+                    }
+                    ChoiceField("Frequência", frequency, frequencies, { it.label }) { if (!busy) frequency = it }
+                }
+                if (recurringMode) {
+                    Text(if (recurrenceOnlyMonth) "Apenas esta ocorrência será alterada." else "Mensal · o valor pode ser ajustado ou ignorado em cada mês.", style = MaterialTheme.typography.bodySmall)
+                    if (!recurrenceOnlyMonth && movement == Movement.EXPENSE) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Despesa fixa", Modifier.weight(1f))
+                        Switch(fixedExpense, { fixedExpense = it }, enabled = !busy, modifier = Modifier.semantics { contentDescription = "Despesa fixa" })
+                    }
                 }
                 if (purchaseMode) {
                     InstallmentFields(terms, { terms = it }, if (byTotal) amount else installmentAmount,
@@ -167,23 +196,26 @@ fun RecordEditor(
                 } else PrivateValueGate(hideAmounts, "Mostrar valor para edição") {
                     MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
                 }
-                if (preset == null && !installmentConfirmation) ChoiceField("Movimentação", movement,
+                if (recurring == null && preset == null && !installmentConfirmation) ChoiceField("Movimentação", movement,
                     Movement.entries.toList(), { it.label }) {
                     movement = it
-                    if (it != Movement.EXPENSE) installmentMode = false
+                    if (it !in setOf(Movement.INCOME, Movement.EXPENSE) || (it != Movement.EXPENSE && frequency == MovementFrequency.INSTALLMENTS)) frequency = MovementFrequency.SINGLE
                 }
                 if (!purchaseMode) ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
                 ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
                 AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount, hidden = hideAmounts)
                 if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount, hidden = hideAmounts)
                 PrivateValueGate(hideAmounts && privateDisplayText(description, true) != description, "Mostrar descrição para edição") {
-                OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth(), minLines = 2,
+                OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth().testTag(if (recurring != null) "recurring-title" else "record-description"), minLines = 2,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
                 }
                 if (!purchaseMode) OutlinedButton(onClick = {
                     val selected = LocalDate.parse(date)
-                    showFinanceDatePicker(context, dateDialogTheme, selected) { date = it.toString() }
-                }, modifier = Modifier.fillMaxWidth()) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
+                    showFinanceDatePicker(context, dateDialogTheme, selected) {
+                        date = it.toString()
+                        if (!recurrenceOnlyMonth) recurringDay = if (recurring != null && it.dayOfMonth == LocalDate.parse(recurring.nextDate).dayOfMonth) recurring.dayOfMonth else it.dayOfMonth
+                    }
+                }, modifier = Modifier.fillMaxWidth().testTag(if (recurringMode) "recurring-due-date" else "record-date")) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("${if (recurringMode) if (recurrenceOnlyMonth) "Vencimento deste mês" else "Início / primeiro vencimento" else "Data"}: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 if (onDelete != null) TextButton(onClick = { deleteDialog = true }, enabled = !busy) { Text("Excluir lançamento", color = MaterialTheme.colorScheme.error) }
                 Spacer(Modifier.height(8.dp))
@@ -195,14 +227,15 @@ fun RecordEditor(
                 Button(onClick = {
                     attempted = true
                     if (error == null && !notificationChanged) {
-                        if (!purchaseMode) onSave(record)
+                        if (recurringMode) onSaveRecurring?.invoke(recurringValue, fixedExpense)
+                        else if (!purchaseMode) onSave(record)
                         else schedule?.let {
                             onSavePurchase?.invoke(InstallmentPurchase(id, description.trim(), bank.trim(), category,
                                 it.totalCents, it.installmentCount, terms.due, it.paidInstallments, it.dayOfMonth))
                         }
                     }
                 }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
-                    Text(if (busy) "Salvando…" else if (purchaseMode) "Salvar compra parcelada" else "Confirmar")
+                    Text(if (busy) "Salvando…" else if (recurringMode) if (recurrenceOnlyMonth) "Salvar só este mês" else "Salvar recorrência" else if (purchaseMode) "Salvar compra parcelada" else "Confirmar")
                 }
             }
         }
