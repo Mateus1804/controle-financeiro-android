@@ -1,0 +1,7 @@
+<!-- Phosphor Icons Fill, @phosphor-icons/core 2.1.1: assets/fill/arrow-up-fill.svg
+     Copyright (c) 2023 Phosphor Icons. MIT; assets/licenses/phosphor-icons-LICENSE.txt. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="256" android:viewportHeight="256">
+    <path android:fillColor="#FF000000" android:pathData="M207.39,115.06A8,8,0,0,1,200,120H136v96a8,8,0,0,1-16,0V120H56a8,8,0,0,1-5.66-13.66l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,207.39,115.06Z" />
+</vector>

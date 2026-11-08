@@ -28,7 +28,7 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
     val zone = ZoneId.systemDefault()
     val summary = remember(state.records, month, zone) { Ledger.month(state.records, month, zone) }
     val hidden = state.settings.hideAmounts
-    LazyColumn(Modifier.testTag("dashboard-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    LazyColumn(Modifier.testTag("dashboard-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -36,7 +36,7 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
                     Text("Visão geral", style = MaterialTheme.typography.headlineMedium)
                 }
                 TextButton(onClick = onHide, contentPadding = PaddingValues(8.dp)) {
-                    AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility)
+                    AppIcon(selectedIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, hidden))
                     Spacer(Modifier.width(6.dp))
                     Text(if (hidden) "Mostrar" else "Ocultar")
                 }
@@ -44,14 +44,14 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
         }
         item { MonthPicker(month, onMonth) }
         item {
-            Surface(Modifier.testTag("period-summary"), shape = RoundedCornerShape(28.dp),
+            Surface(Modifier.testTag("period-summary"), shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
-                Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppIcon(R.drawable.ic_wallet)
                         Text("Resultado do período", style = MaterialTheme.typography.titleSmall)
                     }
-                    Amount(summary.result, hidden, Modifier.fillMaxWidth(), size = 40)
+                    Amount(summary.result, hidden, Modifier.fillMaxWidth(), size = 32)
                     val largeText = LocalDensity.current.fontScale > 1.3f
                     if (largeText) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SummaryValue("Receitas", summary.income, hidden, R.drawable.ic_income)
@@ -60,7 +60,9 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
                         Box(Modifier.weight(1f)) { SummaryValue("Receitas", summary.income, hidden, R.drawable.ic_income) }
                         Box(Modifier.weight(1f)) { SummaryValue("Despesas líquidas", summary.expenses, hidden, R.drawable.ic_expense) }
                     }
-                    Text("Somente lançamentos confirmados. Não representa o saldo bancário.", style = MaterialTheme.typography.bodySmall)
+                    FinanceDisclosure("Sobre o resultado", "period-summary-details") {
+                        Text("Somente lançamentos confirmados. Não representa o saldo bancário.", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -86,16 +88,15 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
             }
         }
         if (summary.records.isNotEmpty()) {
-            item { SectionTitle("Últimos lançamentos", "Movimentações confirmadas do período") }
+            item { Box(Modifier.padding(top = 8.dp)) { SectionTitle("Últimos lançamentos", "Movimentações confirmadas do período") } }
             item {
                 Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
                     Column { summary.records.take(4).forEach { RecordRow(it, hidden) } }
                 }
             }
         } else item { EmptyCard("Tudo pronto para começar", "Receitas, despesas e transferências podem ser registradas nas ações acima. A captura opcional fica em Ajustes.") }
-        item { SectionTitle("Visão do período", "Receitas e despesas líquidas confirmadas") }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FinanceDisclosure("Detalhes do período", "period-breakdown") {
                 val maximum = maxOf(summary.income, summary.expenses, 1)
                 CategoryBar("Receitas", summary.income.coerceAtLeast(0), maximum, hidden)
                 CategoryBar("Despesas líquidas", summary.expenses.coerceAtLeast(0), maximum, hidden)
@@ -112,7 +113,7 @@ private fun SummaryValue(label: String, cents: Long, hidden: Boolean, icon: Int)
             AppIcon(icon, Modifier.size(16.dp))
             Text(label, style = MaterialTheme.typography.bodySmall)
         }
-        Amount(cents, hidden, size = 19)
+        Amount(cents, hidden, size = 18)
     }
 }
 
@@ -127,7 +128,7 @@ private fun QuickActions(onNew: (Movement) -> Unit) {
                 contentColor = MaterialTheme.colorScheme.onSurface), contentPadding = PaddingValues(8.dp)) {
             if (largeText) {
                 AppIcon(movementIcon(movement)); Spacer(Modifier.width(12.dp)); Text(label)
-            } else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            } else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 AppIcon(movementIcon(movement)); Text(label, style = MaterialTheme.typography.labelMedium)
             }
         }

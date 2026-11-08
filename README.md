@@ -14,7 +14,7 @@ O Controle Financeiro Android permite acompanhar receitas e despesas com menos d
 - Gráfico de rosca das despesas brutas por categoria, conta ou meio de pagamento, com detalhamento e estornos indicados separadamente.
 - Busca e filtros no histórico, navegação por mês e exportação CSV.
 - Temas Sistema, Claro e Escuro persistentes, com cores dinâmicas do Material You no Android 12 ou superior e paletas próprias nas versões anteriores.
-- Ações rápidas de receita, despesa e transferência, histórico em superfícies agrupadas e ícones vetoriais Material Icons Round.
+- Ações rápidas de receita, despesa e transferência, histórico em superfícies agrupadas e ícones vetoriais Phosphor Regular/Fill.
 - Ocultação de valores nos resumos, gráficos, textos de notificações e leitores de tela, com revelação explícita no editor.
 - Apresentação inicial da captura opcional e avisos de configuração que podem ser fechados, mantendo o cadastro manual disponível.
 - Backup criptografado com senha e formato versionado, com prévia e conferência em banco temporário antes da restauração.
@@ -41,7 +41,7 @@ Os casos reproduzíveis e a situação de Inter, Nubank, PicPay, Mercado Pago e 
 
 Os limites mensais acompanham despesas líquidas confirmadas por categoria. Previsões recorrentes permanecem separadas dos lançamentos: cada vencimento pode ser conferido, registrado ou pulado. Os lembretes dependem da autorização de alertas e das condições de execução do Android, sem garantia de horário exato.
 
-O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 3, mantendo a leitura dos arquivos de versões 1 e 2. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
+O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 5, mantendo a leitura dos arquivos de versões 1 a 4 e incluindo competências e configurações recorrentes versionadas. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
 
 ## Privacidade
 
@@ -64,6 +64,8 @@ Os valores monetários são armazenados em centavos inteiros. Transferências fi
 A validação combina testes Kotlin, persistência Room, migrações, fluxos de interface e atualização sobre a versão anterior. A validação atual está concentrada na API 35; as execuções anteriores em outras APIs permanecem documentadas. Os resultados e as limitações de cada execução ficam registrados em [Qualidade e validação](docs/qualidade.md). As novas interações e o sistema de temas são descritos em [Revisão visual](docs/redesign.md).
 
 A [execução da revisão visual](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40209636647) aprovou 104 testes do core, 95 testes instrumentados na API 35 e as duas fases de atualização e recuperação. O lint debug e release concluiu sem erros, com 14 avisos anteriores por variante. TalkBack manual, biometria no aparelho e notificações bancárias reais permanecem fora dessa validação.
+
+A revisão de competências mensais, interface compacta e ícone Rendly está descrita em [Validação de recorrências e Rendly](docs/validacao-recorrencias-rendly.md), com checklist para o celular e evidências desta execução.
 
 ## Interface
 

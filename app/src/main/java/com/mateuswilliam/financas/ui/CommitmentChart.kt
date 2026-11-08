@@ -49,7 +49,7 @@ internal fun MonthlyCommitmentCard(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {
-        Column(Modifier.padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Comprometimento da renda", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             Text("Parcelas e despesas fixas do mês, previstas ou já registradas.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
@@ -78,7 +78,7 @@ internal fun MonthlyCommitmentCard(
                     }
                 }
             }
-            OutlinedButton(onClick = onEdit, enabled = loaded && !busy, modifier = Modifier.fillMaxWidth().testTag("edit-monthly-income")) {
+            OutlinedButton(onClick = onEdit, enabled = loaded && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch).testTag("edit-monthly-income")) {
                 Text(if (plan == null) "Informar renda e limite" else "Editar renda e limite", textAlign = TextAlign.Center)
             }
         }
@@ -127,7 +127,7 @@ private fun CommitmentDonut(report: CommitmentReport, percentage: String) {
         val centerFits = maxWidth >= 220.dp && scale <= 1.25f && percentage.length <= 8 &&
             Money.format(report.committedCents).length <= 16
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.widthIn(max = 224.dp).fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+            Box(Modifier.widthIn(max = 200.dp).fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.matchParentSize().testTag("commitment-donut").semantics { contentDescription = description }) {
                     val stroke = 18.dp.toPx()
                     val radius = (size.minDimension - stroke) / 2 - 8.dp.toPx()

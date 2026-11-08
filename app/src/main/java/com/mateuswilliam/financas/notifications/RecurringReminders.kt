@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.isActive
 import java.time.LocalDate
+import java.time.YearMonth
 
 object RecurringReminders {
     const val EXTRA_PLANNING = "open_planning"
@@ -62,6 +63,18 @@ object RecurringReminders {
     }
     fun cancel(context: Context, id: String, due: String) {
         context.getSystemService(NotificationManager::class.java).cancel("plan:$id:$due", NOTIFICATION_ID)
+    }
+
+    fun cancelForRecurring(context: Context, id: String, fromMonth: YearMonth? = null) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val prefix = "plan:$id:"
+        manager.activeNotifications.forEach { notification ->
+            val tag = notification.tag ?: return@forEach
+            if (notification.id != NOTIFICATION_ID || !tag.startsWith(prefix)) return@forEach
+            // IDs podem conter dois-pontos; só um sufixo de data identifica esta recorrência.
+            val due = runCatching { LocalDate.parse(tag.removePrefix(prefix)) }.getOrNull() ?: return@forEach
+            if (fromMonth == null || YearMonth.from(due) >= fromMonth) manager.cancel(tag, notification.id)
+        }
     }
 }
 

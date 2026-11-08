@@ -39,6 +39,7 @@ class DraftChangedException : IllegalStateException("A notificação mudou. Abra
 
 class FinanceRepository(private val database: FinanceDatabase, private val settings: CapturePreferences) {
     private val dao = database.financeDao()
+    private val recurringStore = RecurringStore(dao)
     private val writes = Mutex()
     val pending = dao.pending()
     // Uma emissão mantém o extrato e os candidatos manuais na mesma revisão do banco.
@@ -78,7 +79,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun addAccount(name: String): String = writes.withLock {
         val label = AccountNames.clean(name)
-        require(label.isNotBlank() && label.length <= 80) { "Informe um nome de conta com até 80 caracteres." }
+        require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
         database.withTransaction { rememberAccount(label) }
         dao.accountByKey(AccountNames.key(label))!!.label
     }
@@ -156,6 +157,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         database.withTransaction {
             unlinkCommitment(id)
             dao.unlinkOccurrence(id)
+            dao.reopenRecurringMonth(id)
             dao.deleteRecord(id)
         }
     }
@@ -291,47 +293,76 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     suspend fun setFixedRecurring(id: String, fromMonth: YearMonth?) = writes.withLock {
+        database.withTransaction { recurringStore.setFixed(id, fromMonth) }
+    }
+    suspend fun setFixedRecurringFromMonth(id: String, effectiveMonth: YearMonth, enabled: Boolean) = writes.withLock {
+        database.withTransaction { recurringStore.setFixedFromMonth(id, effectiveMonth, enabled) }
+    }
+    suspend fun setRecurringActiveFromMonth(id: String, effectiveMonth: YearMonth, active: Boolean) = writes.withLock {
+        database.withTransaction { recurringStore.setActiveFromMonth(id, effectiveMonth, active) }
+    }
+
+    fun observeRecurringMonths(month: YearMonth) = database.invalidationTracker.createFlow(
+        "recurring", "recurring_revisions", "recurring_months", "occurrences", "records", "fixed_recurring", "commitments",
+    ).conflate().map { database.withTransaction { recurringStore.months(month) } }.distinctUntilChanged()
+
+    suspend fun recurringConfiguration(id: String, month: YearMonth): RecurringPlan? = database.withTransaction {
+        require(month.year in 1..9999) { "Use uma competência com ano entre 1 e 9999." }
+        val origin = dao.recurringById(id)?.let { recurringStore.ensureOrigin(it) } ?: return@withTransaction null
+        if (origin.archived || month.toString() < origin.startMonth) return@withTransaction null
+        dao.recurringRevision(id, month.toString())?.let { RecurringMonths.planForMonth(it.toPlan(), month) }
+    }
+
+    suspend fun saveRecurringMonth(expected: RecurringMonth, edited: RecurringPlan): Boolean = writes.withLock {
         database.withTransaction {
-            val stored = dao.recurringById(id)
-            require(stored?.archived != true) { "Esta previsão foi excluída." }
-            if (fromMonth == null) { dao.removeFixedRecurring(id); return@withTransaction }
-            CommitmentPlanning.validate(MonthlyIncomePlan(fromMonth, 0))
-            val plan = stored?.toPlan() ?: throw IllegalArgumentException("Recorrência não encontrada.")
-            Recurrences.error(plan)?.let { throw IllegalArgumentException(it) }
-            require(plan.movement == Movement.EXPENSE) { "Somente despesas podem ser marcadas como compromissos fixos." }
-            dao.upsertFixedRecurring(FixedRecurringEntity(id, fromMonth.toString()))
-            for (occurrence in dao.occurrencesForRecurring(id)) {
-                val date = LocalDate.parse(occurrence.dueDate)
-                if (YearMonth.from(date) < fromMonth || occurrence.status != "RECORDED") continue
-                val record = occurrence.recordId?.let { dao.recordById(it) } ?: continue
-                if (record.movement != Movement.EXPENSE) continue
-                val key = CommitmentPlanning.recurringId(id, date)
-                if (dao.commitmentById(key) == null) dao.insertCommitment(CommitmentEntity(key,
-                    record.description, record.amountCents, occurrence.dueDate, null, null, id, record.id))
-            }
+            val saved = recurringStore.saveMonth(expected, edited)
+            if (saved) rememberAccount(edited.bank)
+            saved
         }
     }
 
+    suspend fun confirmRecurringMonth(expected: RecurringMonth, record: Record): Boolean = writes.withLock {
+        val saved = database.withTransaction {
+            val confirmed = recurringStore.confirm(expected, record)
+            if (confirmed) rememberAccount(record.bank)
+            confirmed
+        }
+        if (saved) withContext(Dispatchers.IO) { settings.rememberOrigin(record.bank) }
+        saved
+    }
+
+    suspend fun skipRecurringMonth(expected: RecurringMonth): Boolean = writes.withLock {
+        database.withTransaction { recurringStore.skip(expected) }
+    }
+
     fun observeCommitmentReport(month: YearMonth) = database.invalidationTracker.createFlow(
-        "monthly_plans", "commitments", "purchases", "records", "occurrences", "recurring", "fixed_recurring",
+        "monthly_plans", "commitments", "purchases", "records", "occurrences", "recurring", "fixed_recurring", "recurring_months", "recurring_revisions",
     ).conflate().map { commitmentReport(month) }.distinctUntilChanged()
 
     suspend fun commitmentReport(month: YearMonth): CommitmentReport = withContext(Dispatchers.Default) {
         database.withTransaction {
             val plan = dao.monthlyPlan(month.toString())?.toPlan() ?: MonthlyIncomePlan(month, 0)
             CommitmentPlanning.validate(plan)
-            val start = month.atDay(1).toString()
-            val end = month.atEndOfMonth().toString()
-            val stored = dao.commitmentsInPeriod(start, end)
-            val records = stored.mapNotNull { it.recordId }.chunked(900).flatMap { dao.recordsByIds(it) }.associateBy { it.id }
-            val items = stored.map { CommitmentPlanning.resolve(it.toCommitment(), it.recordId?.let { id -> records[id]?.toRecord() }) }.toMutableList()
-            val occupied = items.map { it.id }.toMutableSet()
-            dao.occurrencesInPeriod(start, end).forEach { occupied.add(CommitmentPlanning.recurringId(it.recurringId, LocalDate.parse(it.dueDate))) }
-            val recurring = dao.allRecurring().filterNot { it.archived }.associateBy { it.id }
-            dao.allFixedRecurring().forEach { fixed ->
-                val recurringPlan = recurring[fixed.recurringId]?.toPlan() ?: return@forEach
-                val item = CommitmentPlanning.forecast(recurringPlan, YearMonth.parse(fixed.fromMonth), month)
-                if (item != null && occupied.add(item.id)) items.add(item)
+            recurringStore.materialize(month)
+            val monthly = dao.recurringMonths(month.toString()).associateBy { it.recurringId }
+            val origins = dao.allRecurring().associateBy { it.id }
+            val stored = dao.commitmentsInPeriod(month.atDay(1).toString(), month.atEndOfMonth().toString())
+            // A linha mensal substitui sua fotografia legada. Pagamentos legados adicionais
+            // da mesma competência continuam contados e nunca são apagados pela migração.
+            val retained = stored.filter { item ->
+                val row = item.recurringId?.let { monthly[it] }
+                row == null || (item.recordId != null && item.recordId != row.recordId)
+            }
+            val ids = (retained.mapNotNull { it.recordId } + monthly.values.mapNotNull { it.recordId }).distinct()
+            val records = ids.chunked(900).flatMap { dao.recordsByIds(it) }.associateBy { it.id }
+            val items = retained.map { CommitmentPlanning.resolve(it.toCommitment(), it.recordId?.let { id -> records[id]?.toRecord() }) }.toMutableList()
+            monthly.values.forEach { row ->
+                if (!row.fixedExpense || row.movement != Movement.EXPENSE || row.status == "SKIPPED") return@forEach
+                if (row.status == "PENDING" && (!row.active || origins[row.recurringId]?.archived == true)) return@forEach
+                val expected = FixedCommitment(RecurringMonths.commitmentId(row.recurringId, month), row.title,
+                    row.amountCents, LocalDate.parse(row.dueDate))
+                val paid = row.recordId?.let { records[it]?.toRecord() }?.takeIf { it.movement == Movement.EXPENSE }
+                items.add(CommitmentPlanning.resolve(expected, paid))
             }
             CommitmentReports.month(items, month, plan.incomeCents, plan.healthyLimitBasisPoints)
         }
@@ -344,14 +375,16 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     suspend fun deleteBudget(month: String, category: com.mateuswilliam.financas.core.Category) = writes.withLock { dao.deleteBudget(month, category) }
 
     suspend fun saveRecurring(plan: RecurringPlan) = writes.withLock {
-        Recurrences.error(plan)?.let { throw IllegalArgumentException(it) }
         database.withTransaction {
-            val old = dao.recurringById(plan.id)
-            require(old?.archived != true) { "Esta previsão foi excluída." }
             require(dao.occurrence(plan.id, plan.nextDate) == null) { "Esse vencimento já foi tratado. Escolha outra data para a previsão." }
-            val reminder = if (old?.nextDate == plan.nextDate) old.lastRemindedDate else ""
-            dao.upsertRecurring(RecurringEntity.from(plan.copy(lastRemindedDate = reminder)))
-            if (plan.movement != Movement.EXPENSE) dao.removeFixedRecurring(plan.id)
+            recurringStore.saveTemplate(plan, YearMonth.from(LocalDate.parse(plan.nextDate)))
+            rememberAccount(plan.bank)
+        }
+    }
+
+    suspend fun saveRecurringFromMonth(plan: RecurringPlan, effectiveMonth: YearMonth) = writes.withLock {
+        database.withTransaction {
+            recurringStore.saveTemplate(plan, effectiveMonth)
             rememberAccount(plan.bank)
         }
     }
@@ -359,29 +392,22 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     suspend fun archiveRecurringForecast(expected: RecurringPlan): Boolean = writes.withLock {
         database.withTransaction {
             val current = dao.recurringById(expected.id) ?: return@withTransaction false
-            if (current.archived || current.toPlan().copy(lastRemindedDate = expected.lastRemindedDate) != expected) {
-                return@withTransaction false
-            }
-            // A origem fica na base para que os pagamentos confirmados mantenham seus vínculos.
+            if (current.archived || current.toPlan().copy(lastRemindedDate = expected.lastRemindedDate) != expected) return@withTransaction false
             dao.upsertRecurring(current.copy(active = false, lastRemindedDate = "", archived = true))
             true
         }
     }
 
+    /** Adaptador legado; a interface mensal não depende nem avança este cursor. */
     suspend fun confirmRecurring(id: String, due: String, record: Record): Boolean = writes.withLock {
-        RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
-        require(record.movement in setOf(Movement.EXPENSE, Movement.INCOME)) { "O registro de uma previsão precisa ser receita ou despesa." }
         val saved = database.withTransaction {
-            val plan = dao.recurringById(id) ?: return@withTransaction false
-            if (!plan.active || plan.archived || plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
-            dao.insertRecord(RecordEntity.from(record, null))
-            dao.insertOccurrence(OccurrenceEntity(id, due, "RECORDED", record.id))
-            val fixed = dao.fixedRecurringById(id)
-            if (fixed != null && YearMonth.from(LocalDate.parse(due)) >= YearMonth.parse(fixed.fromMonth)) {
-                dao.insertCommitment(CommitmentEntity(CommitmentPlanning.recurringId(id, LocalDate.parse(due)), plan.title,
-                    plan.amountCents, due, null, null, id, record.id.takeIf { record.movement == Movement.EXPENSE }))
-            }
-            check(dao.advanceRecurring(id, due, Recurrences.followingDate(due, plan.dayOfMonth)) == 1)
+            val template = dao.recurringById(id) ?: return@withTransaction false
+            if (!template.active || template.archived || template.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
+            val month = YearMonth.from(LocalDate.parse(due))
+            recurringStore.materialize(month)
+            val expected = dao.recurringMonth(id, month.toString())?.toMonth() ?: return@withTransaction false
+            if (!recurringStore.confirm(expected, record, allowLegacyMovementChange = true)) return@withTransaction false
+            check(dao.advanceRecurring(id, due, Recurrences.followingDate(due, template.dayOfMonth)) == 1)
             rememberAccount(record.bank)
             true
         }
@@ -391,18 +417,34 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun skipRecurring(id: String, due: String): Boolean = writes.withLock {
         database.withTransaction {
-            val plan = dao.recurringById(id) ?: return@withTransaction false
-            if (!plan.active || plan.archived || plan.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
-            dao.insertOccurrence(OccurrenceEntity(id, due, "SKIPPED", null))
-            check(dao.advanceRecurring(id, due, Recurrences.followingDate(due, plan.dayOfMonth)) == 1)
+            val template = dao.recurringById(id) ?: return@withTransaction false
+            if (!template.active || template.archived || template.nextDate != due || dao.occurrence(id, due) != null) return@withTransaction false
+            val month = YearMonth.from(LocalDate.parse(due))
+            recurringStore.materialize(month)
+            val expected = dao.recurringMonth(id, month.toString())?.toMonth() ?: return@withTransaction false
+            if (!recurringStore.skip(expected)) return@withTransaction false
+            check(dao.advanceRecurring(id, due, Recurrences.followingDate(due, template.dayOfMonth)) == 1)
             true
         }
     }
 
     suspend fun notifyDue(today: LocalDate, send: (RecurringPlan) -> Boolean) = writes.withLock {
         if (!settings.snapshot().remindersEnabled) return@withLock
-        dao.allRecurring().filter { it.active && !it.archived && !LocalDate.parse(it.nextDate).isAfter(today) && it.lastRemindedDate != it.nextDate }
-            .forEach { if (settings.snapshot().remindersEnabled && send(it.toPlan())) dao.markReminded(it.id, it.nextDate) }
+        database.withTransaction {
+            recurringStore.materialize(YearMonth.from(today))
+            dao.allRecurring().filterNot { it.archived }.map { YearMonth.from(LocalDate.parse(it.nextDate)) }.distinct()
+                .filter { it <= YearMonth.from(today) }.forEach { recurringStore.materialize(it) }
+        }
+        val origins = dao.allRecurring().associateBy { it.id }
+        dao.allRecurringMonths().filter { it.status == "PENDING" && it.active && origins[it.recurringId]?.archived == false &&
+            !LocalDate.parse(it.dueDate).isAfter(today) && it.lastRemindedDate != it.dueDate }
+            .forEach { if (settings.snapshot().remindersEnabled && send(it.toPlan())) database.withTransaction {
+                val current = dao.recurringMonth(it.recurringId, it.month)
+                if (current?.status == "PENDING" && current.revision == it.revision) {
+                    dao.updateRecurringMonth(current.copy(lastRemindedDate = it.dueDate))
+                    dao.markReminded(it.recurringId, it.dueDate)
+                }
+            } }
     }
 
     suspend fun snapshot(): FinanceSnapshot = writes.withLock {
@@ -410,7 +452,8 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         database.withTransaction { readSnapshot(dao, System.currentTimeMillis(), display) }
     }
 
-    suspend fun restore(snapshot: FinanceSnapshot) = writes.withLock {
+    suspend fun restore(original: FinanceSnapshot) = writes.withLock {
+        val snapshot = RecurringSnapshots.upgrade(original)
         BackupSnapshot.validate(snapshot)
         val previousSettings = settings.snapshot()
         withContext(Dispatchers.IO) { settings.pauseForRestore() }
@@ -428,6 +471,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     private suspend fun clearTables() {
         dao.clearCommitments(); dao.clearFixedRecurring(); dao.clearPurchases(); dao.clearMonthlyPlans()
+        dao.clearRecurringMonths(); dao.clearRecurringRevisions()
         dao.clearOccurrences(); dao.clearRecurring(); dao.clearBudgets()
         dao.clearRecords(); dao.clearDrafts(); dao.clearAccounts()
     }

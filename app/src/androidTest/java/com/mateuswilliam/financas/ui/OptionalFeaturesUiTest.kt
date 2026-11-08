@@ -55,8 +55,10 @@ class OptionalFeaturesUiTest {
         rule.waitUntil(5000) { runBlocking { app.repository.budgets.first().isNotEmpty() } }
         assertEquals(10000L, app.repository.budgets.first().single().limitCents)
         rule.activityRule.scenario.recreate()
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Editar limite"))
+        rule.openPlanningActions("budget-${Category.FOOD.name}")
         rule.onNodeWithText("Editar limite").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        rule.waitForIdle()
         assertEquals(YearMonth.now().toString(), app.repository.budgets.first().single().month)
         screenshot("planejamento-claro")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
@@ -78,7 +80,9 @@ class OptionalFeaturesUiTest {
         val record = app.repository.exportRecords().single()
         assertEquals(60000L, record.amountCents)
         assertEquals(LocalDate.now(), java.time.Instant.ofEpochMilli(record.occurredAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
-        assertEquals("2026-11-30", app.repository.recurring.first().single().nextDate)
+        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Registrada no extrato"))
+        rule.onNodeWithTag("confirm-recurring-${forecast().id}").assertDoesNotExist()
+        assertEquals("2026-10-31", app.repository.recurring.first().single().nextDate)
     }
 
     @Test fun duplicateWarningLeavesTheManualRecordIntactAndAllowsExplicitConfirmation() = runBlocking<Unit> {

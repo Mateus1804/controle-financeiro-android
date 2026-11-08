@@ -1,3 +1,6 @@
+Historical icon set — preserved for the screenshots in docs/imagens/.
+The active application UI uses Phosphor Icons; see phosphor-icons-NOTICE.txt.
+
 Google Material Icons Round
 Fonte: https://github.com/google/material-design-icons
 Revisão: 10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7

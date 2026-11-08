@@ -42,7 +42,7 @@ class BackupDocumentFlowTest {
             rule.onNodeWithText("Repetir senha").performTextInput(secret)
             rule.onNodeWithText("Repetir senha").performImeAction()
             waitForKeyboard()
-            rule.onNodeWithText("Preparar backup").performClick()
+            rule.onNodeWithText("Preparar backup").assertIsDisplayed().performClick()
             val fileName = "backup-ficticio-${UUID.randomUUID()}.cfbackup"
             val name = awaitSystemNode { it.className?.toString() == "android.widget.EditText" && it.isEditable }
             assertTrue(name.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
@@ -56,7 +56,7 @@ class BackupDocumentFlowTest {
             rule.waitForIdle()
             assertTrue(app.repository.exportRecords().isEmpty())
             // O aviso temporário fica acima da navegação e não deve receber o toque destinado à restauração.
-            rule.waitUntil(8000) { rule.onAllNodesWithText("Backup salvo.", substring = true).fetchSemanticsNodes().isEmpty() }
+            rule.dismissFeedback("Backup salvo.")
             rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Restaurar backup"))
             rule.onNodeWithText("Restaurar backup").performScrollTo().assertIsDisplayed().performClick()
             click(awaitSystemNode { it.text?.toString() == fileName })
@@ -144,6 +144,8 @@ class BackupDocumentFlowTest {
         }
     }
     private fun waitForKeyboard() {
+        // O diálogo tem janela própria; na API 26, os insets da Activity não enxergam seu teclado.
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
         rule.waitUntil(5000) {
             val views = if (android.os.Build.VERSION.SDK_INT >= 29) android.view.inspector.WindowInspector.getGlobalWindowViews() else listOf(rule.activity.window.decorView)
             views.none { androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }

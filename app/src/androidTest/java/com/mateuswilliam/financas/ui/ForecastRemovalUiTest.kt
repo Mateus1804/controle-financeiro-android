@@ -68,8 +68,7 @@ class ForecastRemovalUiTest {
     }
 
     private fun tap(tag: String) {
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag(tag))
-        rule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()
+        rule.performPlanningAction(tag)
     }
 
     private fun awaitText(text: String) {

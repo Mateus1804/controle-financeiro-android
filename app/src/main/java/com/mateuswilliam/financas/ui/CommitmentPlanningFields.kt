@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -68,24 +69,27 @@ internal fun InstallmentDueCard(
 ) {
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier.fillMaxWidth().testTag("installment-${item.id}")) {
-        Column(Modifier.padding(FinanceSpacing.section), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(privateDisplayText(item.title, hidden), style = MaterialTheme.typography.titleMedium)
-            Text("Parcela ${item.number} de ${item.installmentCount} · ${LocalDate.parse(item.dueDate).format(commitmentDateFormat)}",
-                style = MaterialTheme.typography.bodyMedium)
-            Text(privateDisplayText(item.bank, hidden), style = MaterialTheme.typography.bodySmall)
-            Amount(item.amountCents, hidden)
+        Column(Modifier.padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(privateDisplayText(item.title, hidden), style = MaterialTheme.typography.titleMedium)
+                    Text("Parcela ${item.number} de ${item.installmentCount} · ${LocalDate.parse(item.dueDate).format(commitmentDateFormat)}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(privateDisplayText(item.bank, hidden), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (item.recordId == null) ContextualActions(privateDisplayText(item.title, hidden), "actions-${item.id}", !busy,
+                    listOf(
+                        FinanceAction("Editar", onEdit, "edit-${item.id}"),
+                        FinanceAction("Excluir só esta parcela", onExclude, "exclude-${item.id}", destructive = true),
+                        FinanceAction("Cancelar parcelas em aberto", onCancel, "cancel-${item.id}", destructive = true),
+                    ))
+            }
+            Amount(item.amountCents, hidden, size = 18)
             if (item.recordId == null) {
                 OutlinedButton(onClick = onConfirm, enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().testTag("confirm-installment-${item.id}")) { Text("Conferir e registrar parcela") }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onEdit, enabled = !busy, modifier = Modifier.testTag("edit-${item.id}")) { Text("Editar") }
-                    TextButton(onClick = onExclude, enabled = !busy, modifier = Modifier.testTag("exclude-${item.id}")) {
-                        Text("Excluir só esta parcela")
-                    }
-                    TextButton(onClick = onCancel, enabled = !busy, modifier = Modifier.testTag("cancel-${item.id}")) {
-                        Text("Cancelar parcelas em aberto")
-                    }
-                }
+                    modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)
+                        .testTag("confirm-installment-${item.id}")) { Text("Conferir e registrar parcela") }
             } else Text("Registrada no extrato", style = MaterialTheme.typography.labelMedium)
         }
     }

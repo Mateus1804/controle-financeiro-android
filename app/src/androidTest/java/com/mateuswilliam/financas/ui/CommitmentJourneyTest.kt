@@ -167,8 +167,7 @@ class CommitmentJourneyTest {
     }
 
     private fun tapPlanning(tag: String) {
-        scrollTo(tag)
-        rule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()
+        rule.performPlanningAction(tag)
     }
 
     private fun scrollTo(tag: String) {
@@ -192,9 +191,7 @@ class CommitmentJourneyTest {
     }
 
     private fun waitForMessageToClose(prefix: String) {
-        rule.waitUntil(8000) {
-            rule.onAllNodesWithText(prefix, substring = true).fetchSemanticsNodes().isEmpty()
-        }
+        rule.dismissFeedback(prefix)
     }
 
     private fun testPassword() = "Senha fictícia de teste 2026!".toCharArray()

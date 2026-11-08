@@ -97,6 +97,7 @@ data class RecurringEntity(
     val method: PaymentMethod, val category: Category, val bank: String, val nextDate: String,
     val dayOfMonth: Int, val active: Boolean = true, val lastRemindedDate: String = "",
     @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
+    @ColumnInfo(defaultValue = "''") val startMonth: String = "",
 ) {
     fun toPlan() = RecurringPlan(id, title, amountCents, movement, method, category, bank, nextDate, dayOfMonth, active, lastRemindedDate)
     companion object {
@@ -112,6 +113,20 @@ data class UsedAccount(val label: String, val lastUsedAt: Long)
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM recurring_revisions ORDER BY recurringId, effectiveMonth") suspend fun allRecurringRevisions(): List<RecurringRevisionEntity>
+    @Query("SELECT * FROM recurring_revisions WHERE recurringId = :id AND effectiveMonth <= :month ORDER BY effectiveMonth DESC LIMIT 1")
+    suspend fun recurringRevision(id: String, month: String): RecurringRevisionEntity?
+    @Upsert suspend fun upsertRecurringRevision(row: RecurringRevisionEntity)
+    @Query("DELETE FROM recurring_revisions") suspend fun clearRecurringRevisions()
+    @Query("SELECT * FROM recurring_months ORDER BY month, dueDate, recurringId") suspend fun allRecurringMonths(): List<RecurringMonthEntity>
+    @Query("SELECT * FROM recurring_months WHERE month = :month ORDER BY dueDate, recurringId") suspend fun recurringMonths(month: String): List<RecurringMonthEntity>
+    @Query("SELECT * FROM recurring_months WHERE recurringId = :id AND month = :month LIMIT 1") suspend fun recurringMonth(id: String, month: String): RecurringMonthEntity?
+    @Query("SELECT * FROM recurring_months WHERE recordId = :id LIMIT 1") suspend fun recurringMonthByRecord(id: String): RecurringMonthEntity?
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertRecurringMonth(row: RecurringMonthEntity): Long
+    @Update suspend fun updateRecurringMonth(row: RecurringMonthEntity): Int
+    @Query("UPDATE recurring_months SET status = 'PENDING', recordId = NULL, revision = revision + 1, lastRemindedDate = '' WHERE recordId = :id")
+    suspend fun reopenRecurringMonth(id: String)
+    @Query("DELETE FROM recurring_months") suspend fun clearRecurringMonths()
     @Query("SELECT * FROM monthly_plans ORDER BY month") suspend fun allMonthlyPlans(): List<MonthlyPlanEntity>
     @Query("SELECT * FROM monthly_plans WHERE month = :month") suspend fun monthlyPlan(month: String): MonthlyPlanEntity?
     @Query("SELECT * FROM monthly_plans WHERE month = :month") fun observeMonthlyPlan(month: String): Flow<MonthlyPlanEntity?>
@@ -187,6 +202,7 @@ interface FinanceDao {
     @Query("SELECT * FROM occurrences WHERE recordId = :id LIMIT 1") suspend fun occurrenceByRecord(id: String): OccurrenceEntity?
     @Query("SELECT * FROM occurrences WHERE recurringId = :id AND dueDate = :due LIMIT 1") suspend fun occurrence(id: String, due: String): OccurrenceEntity?
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertOccurrence(occurrence: OccurrenceEntity)
+    @Upsert suspend fun upsertOccurrence(occurrence: OccurrenceEntity)
     @Query("UPDATE occurrences SET recordId = NULL, status = 'REMOVED' WHERE recordId = :id") suspend fun unlinkOccurrence(id: String)
     @Query("DELETE FROM occurrences") suspend fun clearOccurrences()
     @Query("SELECT * FROM accounts ORDER BY lastUsedAt DESC, nameKey ASC")
@@ -231,11 +247,23 @@ interface FinanceDao {
     @Query("DELETE FROM records") suspend fun clearRecords()
 }
 
-@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class], version = 7, exportSchema = true)
+@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class, RecurringRevisionEntity::class, RecurringMonthEntity::class], version = 8, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `recurring` ADD COLUMN `startMonth` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE recurring SET startMonth = (SELECT MIN(value) FROM (SELECT substr(recurring.nextDate,1,7) AS value UNION ALL SELECT substr(o.dueDate,1,7) FROM occurrences o WHERE o.recurringId = recurring.id UNION ALL SELECT f.fromMonth FROM fixed_recurring f WHERE f.recurringId = recurring.id))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `recurring_revisions` (`recurringId` TEXT NOT NULL, `effectiveMonth` TEXT NOT NULL, `title` TEXT NOT NULL, `amountCents` INTEGER NOT NULL, `movement` TEXT NOT NULL, `method` TEXT NOT NULL, `category` TEXT NOT NULL, `bank` TEXT NOT NULL, `anchorDate` TEXT NOT NULL, `dayOfMonth` INTEGER NOT NULL, `active` INTEGER NOT NULL, `fixedFromMonth` TEXT, PRIMARY KEY(`recurringId`, `effectiveMonth`), FOREIGN KEY(`recurringId`) REFERENCES `recurring`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION)")
+                db.execSQL("INSERT INTO recurring_revisions SELECT r.id,r.startMonth,r.title,r.amountCents,r.movement,r.method,r.category,r.bank,r.nextDate,r.dayOfMonth,r.active,f.fromMonth FROM recurring r LEFT JOIN fixed_recurring f ON f.recurringId=r.id")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `recurring_months` (`recurringId` TEXT NOT NULL, `month` TEXT NOT NULL, `title` TEXT NOT NULL, `amountCents` INTEGER NOT NULL, `movement` TEXT NOT NULL, `method` TEXT NOT NULL, `category` TEXT NOT NULL, `bank` TEXT NOT NULL, `dueDate` TEXT NOT NULL, `dayOfMonth` INTEGER NOT NULL, `active` INTEGER NOT NULL, `status` TEXT NOT NULL, `recordId` TEXT, `fixedExpense` INTEGER NOT NULL, `revision` INTEGER NOT NULL, `overridden` INTEGER NOT NULL, `lastRemindedDate` TEXT NOT NULL, PRIMARY KEY(`recurringId`, `month`), FOREIGN KEY(`recurringId`) REFERENCES `recurring`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION, FOREIGN KEY(`recordId`) REFERENCES `records`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_recurring_months_recordId` ON `recurring_months` (`recordId`)")
+                // Ocorrências legadas permanecem intactas, inclusive pagamentos repetidos no mesmo mês.
+                db.execSQL("INSERT INTO recurring_months SELECT o.recurringId,substr(o.dueDate,1,7),COALESCE(c.label,r.title),COALESCE(c.amountCents,p.amountCents,r.amountCents),CASE WHEN c.id IS NOT NULL THEN 'EXPENSE' ELSE r.movement END,COALESCE(p.method,r.method),COALESCE(p.category,r.category),COALESCE(p.bank,r.bank),o.dueDate,r.dayOfMonth,r.active,CASE WHEN o.status='RECORDED' THEN 'RECORDED' WHEN o.status='SKIPPED' THEN 'SKIPPED' ELSE 'PENDING' END,o.recordId,CASE WHEN c.id IS NOT NULL OR (f.recurringId IS NOT NULL AND substr(o.dueDate,1,7)>=f.fromMonth) THEN 1 ELSE 0 END,0,0,'' FROM occurrences o JOIN recurring r ON r.id=o.recurringId LEFT JOIN records p ON p.id=o.recordId LEFT JOIN commitments c ON c.recurringId=o.recurringId AND c.dueDate=o.dueDate LEFT JOIN fixed_recurring f ON f.recurringId=o.recurringId WHERE o.dueDate=(SELECT x.dueDate FROM occurrences x WHERE x.recurringId=o.recurringId AND substr(x.dueDate,1,7)=substr(o.dueDate,1,7) ORDER BY CASE x.status WHEN 'RECORDED' THEN 0 WHEN 'REMOVED' THEN 1 ELSE 2 END,x.dueDate DESC LIMIT 1)")
+            }
+        }
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `recurring` ADD COLUMN `archived` INTEGER NOT NULL DEFAULT 0")

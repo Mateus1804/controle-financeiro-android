@@ -146,6 +146,8 @@ class ForecastRemovalRepositoryTest {
         assertTrue(runCatching { BackupSnapshot.decode(old.toString().toByteArray()) }.isFailure)
         val installments = old.getJSONArray("commitments")
         repeat(installments.length()) { installments.getJSONObject(it).remove("excluded") }
+        old.getJSONArray("recurring").getJSONObject(0).remove("startMonth")
+        old.remove("recurringRevisions"); old.remove("recurringMonths")
         assertEquals(snapshot, BackupSnapshot.decode(old.toString().toByteArray()))
     }
 

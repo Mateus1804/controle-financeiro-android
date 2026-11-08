@@ -21,8 +21,10 @@ object FinanceSpacing {
     val small = 8.dp
     val medium = 12.dp
     val section = 20.dp
-    val page = 20.dp
-    val large = 24.dp
+    val page = 16.dp
+    val card = 16.dp
+    val cardGap = 12.dp
+    val large = 20.dp
     val listBottom = 24.dp
     val touch = 48.dp
 }
@@ -94,7 +96,7 @@ fun FinanceTheme(darkTheme: Boolean = isSystemInDarkTheme(), dynamicColor: Boole
     } else if (darkTheme) Dark else Light
     CompositionLocalProvider(LocalFinanceColors provides if (darkTheme) DarkFinance else LightFinance) {
         MaterialTheme(colorScheme = colors, typography = FinanceTypography,
-            shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(20.dp),
-                large = RoundedCornerShape(24.dp), extraLarge = RoundedCornerShape(28.dp)), content = content)
+            shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(16.dp),
+                large = RoundedCornerShape(20.dp), extraLarge = RoundedCornerShape(24.dp)), content = content)
     }
 }

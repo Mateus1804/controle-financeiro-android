@@ -6,7 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -25,6 +26,10 @@ import android.view.WindowManager
 import com.mateuswilliam.financas.FinanceApplication
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,7 +78,7 @@ fun AppIcon(@DrawableRes icon: Int, modifier: Modifier = Modifier, description: 
 @Composable
 fun SectionTitle(title: String, subtitle: String? = null) {
     Column(Modifier.padding(top = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge)
+        Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
         if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -81,8 +86,7 @@ fun SectionTitle(title: String, subtitle: String? = null) {
 @Composable
 fun EmptyCard(title: String, message: String) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shape = MaterialTheme.shapes.large) {
-        Column(Modifier.fillMaxWidth().padding(FinanceSpacing.large), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            IconBadge(R.drawable.ic_records)
+        Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
@@ -127,7 +131,7 @@ fun movementIcon(movement: Movement): Int = when (movement) {
 
 // A formatação é apenas visual. Cálculos e persistência continuam em centavos inteiros.
 @Composable
-fun Amount(cents: Long, hidden: Boolean, modifier: Modifier = Modifier, size: Int = 20) {
+fun Amount(cents: Long, hidden: Boolean, modifier: Modifier = Modifier, size: Int = 18) {
     androidx.compose.foundation.text.BasicText(
         text = if (hidden) "••••" else Money.format(cents), modifier = modifier.semantics { if (hidden) contentDescription = "Valor oculto" },
         style = LocalTextStyle.current.copy(color = LocalContentColor.current, fontSize = size.sp,
@@ -144,7 +148,7 @@ fun RecordRow(record: Record, hidden: Boolean, onEdit: (() -> Unit)? = null) {
     val largeText = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.25f
     val clickable = if (onEdit != null) Modifier.clickable(onClickLabel = "Editar lançamento", onClick = onEdit) else Modifier
     ListItem(
-        modifier = Modifier.fillMaxWidth().then(clickable).heightIn(min = 80.dp),
+        modifier = Modifier.fillMaxWidth().then(clickable).heightIn(min = 72.dp),
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
         leadingContent = { IconBadge(if (record.movement == Movement.TRANSFER) R.drawable.ic_transfer else categoryIcon(record.category), color) },
         headlineContent = { Text(privateDisplayText(record.description, hidden), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium) },
@@ -169,8 +173,52 @@ fun RecordRow(record: Record, hidden: Boolean, onEdit: (() -> Unit)? = null) {
 
 // Superfícies adjacentes compartilham o mesmo fundo sem divisórias ou cartões aninhados.
 fun groupedShape(index: Int, count: Int): RoundedCornerShape = RoundedCornerShape(
-    topStart = if (index == 0) 24.dp else 0.dp, topEnd = if (index == 0) 24.dp else 0.dp,
-    bottomStart = if (index == count - 1) 24.dp else 0.dp, bottomEnd = if (index == count - 1) 24.dp else 0.dp)
+    topStart = if (index == 0) 20.dp else 0.dp, topEnd = if (index == 0) 20.dp else 0.dp,
+    bottomStart = if (index == count - 1) 20.dp else 0.dp, bottomEnd = if (index == count - 1) 20.dp else 0.dp)
+
+@Composable
+internal fun FinanceDisclosure(title: String, tag: String, content: @Composable ColumnScope.() -> Unit) {
+    var expanded by rememberSaveable(tag) { mutableStateOf(false) }
+    Column {
+        TextButton(onClick = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch).testTag(tag).semantics {
+                stateDescription = if (expanded) "Expandido" else "Recolhido"
+            }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp)) {
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+            AppIcon(selectedIcon(R.drawable.ic_chevron_down, expanded), Modifier.rotate(if (expanded) 180f else 0f))
+        }
+        if (expanded) Column(Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    }
+}
+
+internal data class FinanceAction(
+    val label: String,
+    val onClick: () -> Unit,
+    val tag: String? = null,
+    val enabled: Boolean = true,
+    val destructive: Boolean = false,
+)
+
+@Composable
+internal fun ContextualActions(label: String, tag: String, enabled: Boolean, actions: List<FinanceAction>) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, enabled = enabled,
+            modifier = Modifier.size(FinanceSpacing.touch).testTag(tag)) {
+            AppIcon(selectedIcon(R.drawable.ic_more, expanded), description = "Mais ações de $label")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            actions.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(action.label, color = if (action.destructive) MaterialTheme.colorScheme.error else LocalContentColor.current) },
+                    onClick = { expanded = false; action.onClick() }, enabled = enabled && action.enabled,
+                    modifier = Modifier.heightIn(min = FinanceSpacing.touch).then(action.tag?.let { Modifier.testTag(it) } ?: Modifier),
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun CategoryBar(label: String, cents: Long, maximum: Long, hidden: Boolean, onClick: (() -> Unit)? = null) {

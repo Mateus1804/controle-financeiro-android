@@ -1,8 +1,8 @@
 package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.R
 import com.mateuswilliam.financas.core.AccountNames
@@ -33,9 +34,9 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { choosing = true }, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.small, border = null, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                AppIcon(R.drawable.ic_bank); Spacer(Modifier.width(8.dp))
+                AppIcon(selectedIcon(R.drawable.ic_bank, choosing)); Spacer(Modifier.width(8.dp))
                 Text(privateDisplayText(value.ifBlank { "Escolher conta" }, hidden), Modifier.weight(1f).padding(vertical = 8.dp))
-                AppIcon(R.drawable.ic_chevron_down)
+                AppIcon(selectedIcon(R.drawable.ic_chevron_down, choosing))
             }
             IconButton(onClick = { adding = true; error = null }, modifier = Modifier.size(48.dp)) {
                 AppIcon(R.drawable.ic_add, description = "Adicionar $label")
@@ -51,11 +52,12 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
             Text("Contas recentes primeiro", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(max = 320.dp)) {
                 items(matches, key = { it.key }) { option ->
-                    ListItem(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable { onChange(option.label); choosing = false },
+                    val selected = AccountNames.key(value) == option.key
+                    ListItem(modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).selectable(selected = selected, role = Role.RadioButton) { onChange(option.label); choosing = false },
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        leadingContent = { IconBadge(R.drawable.ic_wallet) },
+                        leadingContent = { IconBadge(selectedIcon(R.drawable.ic_wallet, selected)) },
                         headlineContent = { Text(privateDisplayText(option.label, hidden)) },
-                        trailingContent = if (AccountNames.key(value) == option.key) {{ AppIcon(R.drawable.ic_check) }} else null)
+                        trailingContent = if (selected) {{ AppIcon(selectedIcon(R.drawable.ic_check, true)) }} else null)
 
                 }
                 if (matches.isEmpty()) item { Text("Nenhuma conta encontrada. Adicione uma opção pelo botão +.") }
