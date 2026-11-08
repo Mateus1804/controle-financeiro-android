@@ -62,12 +62,14 @@ data class RecordEntity(
     val description: String,
     val occurredAt: Long,
     val destination: String,
+    val originalRecordId: String? = null,
+    @ColumnInfo(defaultValue = "'EXPENSE'") val reversalMovement: Movement = Movement.EXPENSE,
 ) {
-    fun toRecord() = Record(id, amountCents, movement, method, category, bank, description, occurredAt, destination)
+    fun toRecord() = Record(id, amountCents, movement, method, category, bank, description, occurredAt, destination, originalRecordId, reversalMovement)
     companion object {
         fun from(record: Record, sourceDraftId: String?) = RecordEntity(
             record.id, sourceDraftId, record.amountCents, record.movement, record.method,
-            record.category, record.bank.trim(), record.description.trim(), record.occurredAt, record.destination.trim(),
+            record.category, record.bank.trim(), record.description.trim(), record.occurredAt, record.destination.trim(), record.originalRecordId, record.reversalMovement,
         )
     }
 }
@@ -82,8 +84,16 @@ class Converters {
 }
 
 @Entity(tableName = "accounts")
-data class AccountEntity(@PrimaryKey val nameKey: String, val label: String, val lastUsedAt: Long) {
+data class AccountEntity(@PrimaryKey val nameKey: String, val label: String, val lastUsedAt: Long, @ColumnInfo(defaultValue = "0") val archived: Boolean = false) {
     fun toOption() = AccountOption(nameKey, label, lastUsedAt)
+}
+
+@Entity(tableName = "account_balance_events", indices = [Index(value = ["accountKey", "effectiveAt"])])
+data class AccountBalanceEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val accountKey: String, val balanceCents: Long, val effectiveAt: Long, val createdAt: Long, val reason: String,
+) {
+    fun toReference() = com.mateuswilliam.financas.core.AccountBalanceReference(id, accountKey, balanceCents, effectiveAt, createdAt, reason)
 }
 
 @Entity(tableName = "budgets", primaryKeys = ["month", "category"])
@@ -113,6 +123,11 @@ data class UsedAccount(val label: String, val lastUsedAt: Long)
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM account_balance_events ORDER BY effectiveAt, createdAt, id") fun accountBalanceEvents(): Flow<List<AccountBalanceEventEntity>>
+    @Query("SELECT * FROM account_balance_events ORDER BY effectiveAt, createdAt, id") suspend fun allAccountBalanceEvents(): List<AccountBalanceEventEntity>
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertAccountBalanceEvent(event: AccountBalanceEventEntity): Long
+    @Query("DELETE FROM account_balance_events") suspend fun clearAccountBalanceEvents()
+    @Query("UPDATE accounts SET archived = :archived WHERE nameKey = :key") suspend fun setAccountArchived(key: String, archived: Boolean)
     @Query("SELECT * FROM recurring_revisions ORDER BY recurringId, effectiveMonth") suspend fun allRecurringRevisions(): List<RecurringRevisionEntity>
     @Query("SELECT * FROM recurring_revisions WHERE recurringId = :id AND effectiveMonth <= :month ORDER BY effectiveMonth DESC LIMIT 1")
     suspend fun recurringRevision(id: String, month: String): RecurringRevisionEntity?
@@ -241,6 +256,7 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertRecord(record: RecordEntity)
     @Update suspend fun updateRecord(record: RecordEntity): Int
     @Query("SELECT * FROM records WHERE id IN (:ids)") suspend fun recordsByIds(ids: List<String>): List<RecordEntity>
+    @Query("SELECT * FROM records WHERE originalRecordId = :id") suspend fun refundsForRecord(id: String): List<RecordEntity>
     @Query("SELECT * FROM records WHERE id = :id LIMIT 1") suspend fun recordById(id: String): RecordEntity?
     @Query("UPDATE drafts SET status = :status, sourceTitle = '', sourceBody = '' WHERE id = :id AND status = 'PENDING'")
     suspend fun reviewDraft(id: String, status: String)
@@ -249,11 +265,20 @@ interface FinanceDao {
     @Query("DELETE FROM records") suspend fun clearRecords()
 }
 
-@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class, RecurringRevisionEntity::class, RecurringMonthEntity::class], version = 8, exportSchema = true)
+@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, AccountBalanceEventEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class, RecurringRevisionEntity::class, RecurringMonthEntity::class], version = 9, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE accounts ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE records ADD COLUMN originalRecordId TEXT")
+                db.execSQL("ALTER TABLE records ADD COLUMN reversalMovement TEXT NOT NULL DEFAULT 'EXPENSE'")
+                db.execSQL("CREATE TABLE IF NOT EXISTS account_balance_events (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, accountKey TEXT NOT NULL, balanceCents INTEGER NOT NULL, effectiveAt INTEGER NOT NULL, createdAt INTEGER NOT NULL, reason TEXT NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_account_balance_events_accountKey_effectiveAt ON account_balance_events (accountKey, effectiveAt)")
+            }
+        }
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `recurring` ADD COLUMN `startMonth` TEXT NOT NULL DEFAULT ''")

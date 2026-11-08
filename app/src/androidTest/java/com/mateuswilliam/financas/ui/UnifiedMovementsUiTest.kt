@@ -5,6 +5,8 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
+import com.mateuswilliam.financas.FinanceViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.mateuswilliam.financas.core.*
 import java.time.YearMonth
 import java.time.ZoneId
@@ -20,8 +22,10 @@ class UnifiedMovementsUiTest {
     private val app get() = rule.activity.application as FinanceApplication
     private val month = YearMonth.now()
     @Before fun reset() {
-        runBlocking { app.repository.clear() }
+        runBlocking { app.repository.clear(); app.repository.addAccount("Carteira") }
         app.settings.finishIntro()
+        val model = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
+        rule.waitUntil(10000) { model.state.value.accounts.any { it.label == "Carteira" } }
         rule.waitForIdle()
     }
     private fun click(text: String) {
@@ -86,11 +90,11 @@ class UnifiedMovementsUiTest {
         val payment = plan.proposedRecord("payment", ZoneId.systemDefault()).copy(occurredAt =
             month.plusMonths(1).atDay(2).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
         val occurrence = RecurringMonth(plan.id, month, plan, RecurringMonthStatus.RECORDED, payment.id, true, 1)
-        val before = monthlyMovements(listOf(payment), month, listOf(occurrence), emptyList())
+        val before = monthlyMovements(listOf(payment), month, listOf(occurrence), emptyList(), asOf = Long.MAX_VALUE)
         assertEquals(1, before.size)
         assertFalse(before.single().realized)
         assertTrue(before.single().status.startsWith("Quitada em"))
-        val after = monthlyMovements(listOf(payment), month.plusMonths(1), emptyList(), emptyList())
+        val after = monthlyMovements(listOf(payment), month.plusMonths(1), emptyList(), emptyList(), asOf = Long.MAX_VALUE)
         assertEquals(1, after.size)
         assertTrue(after.single().realized)
         assertEquals(0L, Ledger.month(listOf(payment), month, ZoneId.systemDefault()).expenses)

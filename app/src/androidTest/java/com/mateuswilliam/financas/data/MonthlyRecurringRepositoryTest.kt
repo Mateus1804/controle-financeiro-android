@@ -156,6 +156,7 @@ class MonthlyRecurringRepositoryTest {
         assertTrue(repo.confirmRecurring(plan.id, plan.nextDate, paid))
         val v4 = JSONObject(BackupSnapshot.encode(repo.snapshot()).toString(Charsets.UTF_8)).put("version", 4)
         v4.remove("recurringRevisions"); v4.remove("recurringMonths")
+        v4.withoutBalanceFields()
         v4.getJSONArray("recurring").getJSONObject(0).remove("startMonth")
         val upgraded = BackupSnapshot.decode(v4.toString().toByteArray())
         repo.clear(); repo.restore(upgraded)
@@ -165,7 +166,7 @@ class MonthlyRecurringRepositoryTest {
         assertEquals(62500L, repo.commitmentReport(november).committedCents)
         assertEquals(60000L, repo.commitmentReport(december).committedCents)
         val v5 = JSONObject(BackupSnapshot.encode(repo.snapshot()).toString(Charsets.UTF_8))
-        assertEquals(5, v5.getInt("version"))
+        assertEquals(6, v5.getInt("version"))
         assertTrue(v5.getJSONArray("recurringRevisions").length() > 0)
         assertTrue(v5.getJSONArray("recurringMonths").length() > 0)
     }

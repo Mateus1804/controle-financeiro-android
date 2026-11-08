@@ -54,14 +54,17 @@ fun PendingScreen(pending: List<DraftEntity>, hidden: Boolean, onReview: (DraftE
 internal fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) -> Unit, hidden: Boolean,
                   category: Category?, onCategory: (Category?) -> Unit, onEdit: (Record) -> Unit,
                   expenseFilter: ExpenseFilter? = null, onClearExpenseFilter: () -> Unit = {},
-                  movements: List<MonthlyMovement>? = null, actions: MovementActions? = null, busy: Boolean = false) {
+                  movements: List<MonthlyMovement>? = null, actions: MovementActions? = null, busy: Boolean = false,
+                  accountFilter: AccountOption? = null, onClearAccount: () -> Unit = {}) {
     var search by rememberSaveable { mutableStateOf("") }
     var movement by rememberSaveable { mutableStateOf<Movement?>(null) }
     LaunchedEffect(expenseFilter) { if (expenseFilter != null) movement = Movement.EXPENSE }
     val zone = ZoneId.systemDefault()
+    fun matchesAccount(value: Record) = accountFilter == null || AccountNames.key(value.bank) == accountFilter.key ||
+        (value.movement == Movement.TRANSFER && AccountNames.key(value.destination) == accountFilter.key)
     val period = remember(records, month, zone) { Ledger.month(records, month, zone).records }
-    val filtered = remember(period, category, movement, search, expenseFilter) { period.filter {
-        (expenseFilter == null || expenseFilter.matches(it)) &&
+    val filtered = remember(period, category, movement, search, expenseFilter, accountFilter) { period.filter {
+        matchesAccount(it) && (expenseFilter == null || expenseFilter.matches(it)) &&
             (category == null || it.category == category) && (movement == null || it.movement == movement) &&
             (search.isBlank() || "${it.description} ${it.bank} ${it.destination}".contains(search.trim(), ignoreCase = true))
     } }
@@ -69,6 +72,9 @@ internal fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (Ye
     LazyColumn(Modifier.testTag("records-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom)) {
         item { Box(Modifier.padding(bottom = 16.dp)) { SectionTitle("Movimentações", "Realizadas e previstas, sem duplicar pagamentos") } }
         item { Box(Modifier.padding(bottom = 16.dp)) { MonthPicker(month, onMonth) } }
+        if (accountFilter != null) item {
+            InputChip(selected = true, onClick = onClearAccount, label = { Text("Conta: ${privateDisplayText(accountFilter.label, hidden)} · Limpar filtro") })
+        }
         if (expenseFilter != null) item {
             InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${privateDisplayText(expenseFilter.label, hidden)} · Limpar filtro") })
         }
@@ -89,7 +95,7 @@ internal fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (Ye
         if (movements != null && actions != null) {
             val entries = movements.filter { row ->
                 val value = row.value
-                (expenseFilter == null || (row.realized && expenseFilter.matches(value))) &&
+                matchesAccount(value) && (expenseFilter == null || (row.realized && expenseFilter.matches(value))) &&
                     (category == null || value.category == category) && (movement == null || value.movement == movement) &&
                     (search.isBlank() || "${value.description} ${value.bank} ${value.destination}".contains(search.trim(), true))
             }

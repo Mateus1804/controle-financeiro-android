@@ -6,11 +6,14 @@ O Controle Financeiro Android permite acompanhar receitas e despesas com menos d
 
 - Registro manual de receitas, despesas, transferências e estornos.
 - Entrada monetária com centavos automáticos: a digitação de `1234` exibe `R$ 12,34`. O campo também aceita a colagem de valores formatados em reais.
-- Cadastro e pesquisa de contas reutilizáveis, com opções recentes e aproveitamento dos nomes presentes no histórico.
+- Contas próprias com saldo de referência e data, painel individual e consolidado, extrato por conta, correções auditáveis e arquivamento que preserva o histórico. Contas antigas ficam sem saldo configurado até informação explícita.
+- Transferências entre contas próprias com prévia, recálculo dos dois lados e total conservado.
+- Categorias adequadas a receitas e despesas; estornos com vínculo opcional e natureza preservada.
 - Edição e exclusão de lançamentos confirmados.
 - Caixa de revisão para notificações, com valor, origem, movimentação, meio de pagamento e categoria editáveis.
 - Captura opcional dos aplicativos selecionados, após consentimento e autorização do Android.
-- Resumo do período com receitas e despesas líquidas confirmadas, sem confundir o resultado calculado com saldo bancário.
+- Saldo disponível, resultado realizado e projeção do mês identificados separadamente. Resumo e Planejamento compartilham a projeção de realizados + previsões pendentes.
+- Modelos opcionais de aluguel, luz, água, internet e telefone abrem o cadastro mensal com valor em branco.
 - Gráfico de rosca das despesas brutas por categoria, conta ou meio de pagamento, com detalhamento e estornos indicados separadamente.
 - Busca e filtros no histórico, navegação por mês e exportação CSV.
 - Temas Sistema, Claro e Escuro persistentes, com cores dinâmicas do Material You no Android 12 ou superior e paletas próprias nas versões anteriores.
@@ -24,6 +27,8 @@ O Controle Financeiro Android permite acompanhar receitas e despesas com menos d
 - Renda líquida prevista e limite de comprometimento por mês, com card e gráfico de rosca para parcelas e despesas recorrentes marcadas como fixas.
 - Compras parceladas no cadastro manual e na revisão de notificações, com prévia, registro separado, edição e cancelamento de parcelas em aberto.
 - Lembretes opcionais de vencimentos e proteção opcional por biometria ou credencial do aparelho.
+
+As regras de referência de saldo, transferências, projeção e o checklist de uso estão em [Contas e saldos](docs/contas-saldos-projecoes.md).
 
 ## Captura e revisão de notificações
 
@@ -39,9 +44,9 @@ Os casos reproduzíveis e a situação de Inter, Nubank, PicPay, Mercado Pago e 
 
 ## Planejamento e recuperação
 
-Os limites mensais acompanham despesas líquidas confirmadas por categoria. Previsões recorrentes permanecem separadas dos lançamentos: cada vencimento pode ser conferido, registrado ou pulado. Os lembretes dependem da autorização de alertas e das condições de execução do Android, sem garantia de horário exato.
+Os limites mensais acompanham despesas líquidas confirmadas por categoria. A recorrência é uma característica do lançamento no mesmo cadastro de receitas e despesas: única, mensal ou parcelada. Cada mês pode ser editado, registrado ou ignorado, e alterações futuras preservam pagamentos anteriores. Planejamento reúne análises e parâmetros, sem outro cadastro de movimentações. Os lembretes dependem da autorização de alertas e das condições de execução do Android, sem garantia de horário exato.
 
-O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 5, mantendo a leitura dos arquivos de versões 1 a 4 e incluindo competências e configurações recorrentes versionadas. O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
+O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 6, mantendo a leitura das versões 1 a 5 e incluindo referências de saldo, arquivamento de contas e natureza/vínculo de estornos (Room 9). O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
 
 ## Privacidade
 
@@ -57,7 +62,7 @@ O tratamento dos dados está descrito em [Privacidade](docs/privacidade.md).
 
 A base utiliza Kotlin, Jetpack Compose, Material 3, Room/SQLite, Coroutines e StateFlow. O módulo `core` concentra as regras de dinheiro, interpretação e totais; o módulo `app` reúne interface, persistência e integração com o Android.
 
-Os valores monetários são armazenados em centavos inteiros. Transferências ficam fora do resultado mensal, e estornos reduzem as despesas líquidas. A confirmação de uma pendência e a criação do lançamento ocorrem na mesma transação do banco de dados. Os gráficos apresentam despesas brutas e indicam os estornos separadamente. O cadastro de contas e a validação de transferências utilizam a mesma normalização de nomes.
+Os valores monetários são armazenados em centavos inteiros. Transferências ficam fora do resultado mensal, e estornos de despesas reduzem as despesas líquidas, enquanto devoluções de receitas reduzem as receitas. A confirmação de uma pendência e a criação do lançamento ocorrem na mesma transação do banco de dados. Os gráficos apresentam despesas brutas e indicam os estornos separadamente. O cadastro de contas e a validação de transferências utilizam a mesma normalização de nomes.
 
 ## Qualidade
 
@@ -67,9 +72,11 @@ A [execução da revisão visual](https://github.com/Mateus1804/controle-finance
 
 A revisão de competências mensais, interface compacta e ícone Rendly está descrita em [Validação de recorrências e Rendly](docs/validacao-recorrencias-rendly.md), com checklist para o celular e evidências desta execução.
 
+As verificações desta integração estão em [Validação de contas e saldos](docs/validacao-contas-saldos.md).
+
 ## Interface
 
-A interface utiliza superfícies neutras, espaçamentos compartilhados e cores tonais. O cartão principal apresenta o resultado dos lançamentos confirmados; revisões e planejamento ficam disponíveis sem interferir nesses totais. A implementação mantém os componentes e as interações nativas do Android.
+A interface utiliza superfícies neutras, espaçamentos compartilhados e cores tonais. A tela principal diferencia dinheiro disponível, resultado confirmado e projeção com previsões pendentes. Os mesmos dados alimentam Planejamento, gráficos e relatórios. Saldo inicial e renda de referência não geram receitas. A implementação mantém os componentes e as interações nativas do Android.
 
 As capturas utilizam somente dados fictícios. A comparação entre o visual anterior e o atual, a procedência das imagens e os critérios de acessibilidade estão em [Revisão visual](docs/redesign.md).
 
@@ -89,7 +96,7 @@ As capturas utilizam somente dados fictícios. A comparação entre o visual ant
 
 A versão **0.2.0** está em desenvolvimento, com a base de registro e revisão disponível. Os padrões são validados com exemplos sintéticos; a conferência de notificações reais de cada aplicativo bancário e do comportamento dos aparelhos permanece pendente.
 
-A captura não equivale a uma integração oficial com os bancos ou ao acesso ao extrato completo. Contas com saldo inicial, conciliação, faturas, metas e sincronização em nuvem continuam fora desta etapa, conforme o [planejamento](docs/planejamento.md). Os valores apresentados representam lançamentos registrados, sem promessa de saldo bancário conciliado.
+A captura não equivale a uma integração oficial com os bancos ou ao acesso ao extrato completo. Os saldos dependem das referências e movimentações informadas pelo usuário. Conciliação bancária automática, gestão de faturas, metas e sincronização em nuvem permanecem fora desta etapa. Limites de cartão não devem ser cadastrados como saldo de uma conta.
 
 Os resultados efetivamente executados estão registrados em [Qualidade e validação](docs/qualidade.md), junto às [decisões técnicas](docs/decisoes.md) e às [referências de estudo](docs/referencias.md). As instruções do ambiente e os comandos ficam no [guia de desenvolvimento](docs/desenvolvimento.md).
 

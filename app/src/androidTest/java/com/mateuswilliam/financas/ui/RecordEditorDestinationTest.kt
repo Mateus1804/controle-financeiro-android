@@ -32,15 +32,14 @@ class RecordEditorDestinationTest {
         }
     }
 
-    @Test fun switchingBackToTransferKeepsTheDestinationBeforeSaving() {
+    @Test fun switchingBackToTransferRequiresSelectingDestinationAgain() {
         showEditor(transfer)
         chooseMovement("Transferência", "Despesa")
         chooseMovement("Despesa", "Transferência")
+        rule.onNodeWithText("Conta de destino").performScrollTo()
         confirm()
-        rule.runOnIdle {
-            assertEquals(Movement.TRANSFER, saved?.movement)
-            assertEquals("Conta de destino", saved?.destination)
-        }
+        rule.runOnIdle { assertNull(saved) }
+        rule.onNodeWithText("Informe a conta de destino.").performScrollTo().assertIsDisplayed()
     }
 
     private fun showEditor(record: Record) {

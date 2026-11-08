@@ -9,6 +9,8 @@ import com.mateuswilliam.financas.core.Ledger
 import com.mateuswilliam.financas.core.NotificationInput
 import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.core.AccountOption
+import com.mateuswilliam.financas.core.AccountBalance
+import com.mateuswilliam.financas.core.AccountBalanceReference
 import com.mateuswilliam.financas.core.MonthlyBudget
 import com.mateuswilliam.financas.core.MonthlyIncomePlan
 import com.mateuswilliam.financas.core.InstallmentPurchase
@@ -34,6 +36,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,6 +50,8 @@ data class FinanceState(
     val manualRecords: List<Record> = emptyList(),
     val budgets: List<MonthlyBudget> = emptyList(),
     val recurring: List<RecurringPlan> = emptyList(),
+    val accountBalances: List<AccountBalance> = emptyList(),
+    val balanceReferences: List<AccountBalanceReference> = emptyList(),
 )
 
 data class SelectableApp(val packageName: String, val label: String)
@@ -62,11 +67,14 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val message = MutableStateFlow<String?>(null)
     val apps = MutableStateFlow<List<SelectableApp>>(emptyList())
     val loadingApps = MutableStateFlow(false)
+    private val balanceClock = MutableStateFlow(System.currentTimeMillis())
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val balances = balanceClock.flatMapLatest { repository.observeAccountBalances(it) }
     private val baseState = combine(repository.ledger, repository.pending, preferences.state, repository.accounts) { ledger, drafts, settings, accounts ->
         FinanceState(ledger.records, drafts, settings, loaded = true, accounts = accounts, manualRecords = ledger.manualRecords)
     }
-    val state = combine(baseState, repository.budgets, repository.recurring) { base, budgets, recurring ->
-        base.copy(budgets = budgets, recurring = recurring)
+    val state = combine(baseState, repository.budgets, repository.recurring, balances, repository.accountBalanceEvents) { base, budgets, recurring, balances, references ->
+        base.copy(budgets = budgets, recurring = recurring, accountBalances = balances, balanceReferences = references)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
     val stagedRestore = MutableStateFlow<StagedRestore?>(null)
     private var encryptedBackup: ByteArray? = null
@@ -87,6 +95,17 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun delete(id: String) = action { repository.deleteRecord(id); "Lançamento removido." }
+    fun refreshBalances() { balanceClock.value = System.currentTimeMillis() }
+    fun configureAccountBalance(name: String, cents: Long, effectiveAt: Long, reason: String, onSaved: () -> Unit) = action {
+        repository.configureAccountBalance(name, cents, effectiveAt, reason)
+        refreshBalances()
+        onSaved()
+        "Saldo de referência salvo. Nenhuma receita ou despesa foi criada."
+    }
+    fun setAccountArchived(key: String, archived: Boolean) = action {
+        repository.setAccountArchived(key, archived)
+        if (archived) "Conta arquivada. Saldo e histórico foram preservados." else "Conta reativada."
+    }
     fun clear() = action {
         val preferencesCleared = repository.clear()
         ReviewNotifications.cancelAll(app)
@@ -273,7 +292,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             try { message.value = block() }
             catch (exception: IllegalArgumentException) { message.value = exception.message ?: "Confira os campos." }
             catch (_: Exception) { message.value = "Não foi possível concluir. Seus dados não foram descartados. Tente novamente." }
-            finally { busy.value = false }
+            finally { refreshBalances(); busy.value = false }
         }
     }
 

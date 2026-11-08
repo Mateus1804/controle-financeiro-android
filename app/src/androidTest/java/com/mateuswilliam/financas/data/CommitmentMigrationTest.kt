@@ -38,7 +38,7 @@ class CommitmentMigrationTest {
             }
             finishFixture(db, schema, 4)
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9).build()
         val preferences = CapturePreferences(context)
         try {
             val dao = database.financeDao(); val expected = CompatibilityFixtures.snapshot()
@@ -75,7 +75,7 @@ class CommitmentMigrationTest {
             db.execSQL("INSERT INTO commitments (id,label,amountCents,dueDate,purchaseId,installmentNumber,recurringId,recordId) VALUES ('installment:compra-v5:2','Compra fictícia · 2/2',3400,'2026-12-10','compra-v5',2,NULL,NULL)")
             finishFixture(db, schema, 5)
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9).build()
         try {
             val dao = database.financeDao()
             val purchase = dao.allPurchases().single()
@@ -111,7 +111,7 @@ class CommitmentMigrationTest {
             db.execSQL("INSERT INTO commitments (id,label,amountCents,dueDate,purchaseId,installmentNumber,recurringId,recordId,adjusted) VALUES ('installment:p:1','Compra fictícia · 1/2',3400,'2026-11-12','p',1,NULL,NULL,0), ('installment:p:2','Compra fictícia · 2/2',3400,'2026-12-12','p',2,NULL,NULL,0)")
             finishFixture(db, schema, 6)
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9).build()
         try {
             val dao = database.financeDao()
             assertFalse(dao.allRecurring().single().archived)

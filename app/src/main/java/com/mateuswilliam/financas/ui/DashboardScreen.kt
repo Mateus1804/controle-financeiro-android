@@ -25,11 +25,13 @@ import java.util.Locale
 internal fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -> Unit, onHide: () -> Unit,
                     onPending: () -> Unit, onExpenseGroup: (ExpenseFilter) -> Unit,
                     notice: (@Composable () -> Unit)? = null, onPlanning: () -> Unit = {},
-                    onNew: (Movement) -> Unit = {}, movements: List<MonthlyMovement>, actions: MovementActions, busy: Boolean) {
+                    onNew: (Movement) -> Unit = {}, movements: List<MonthlyMovement>, actions: MovementActions, busy: Boolean,
+                    projection: PeriodProjection, forecastsLoaded: Boolean, onAccounts: () -> Unit,
+                    onTemplate: (FixedExpenseTemplate) -> Unit) {
     var status by rememberSaveable { mutableStateOf("Todas") }
     val visible = movements.filter { status == "Todas" || if (status == "Realizadas") it.realized else it.status == "Prevista" }
     val zone = ZoneId.systemDefault()
-    val summary = remember(state.records, month, zone) { Ledger.month(state.records, month, zone) }
+    val summary = projection.realized
     val hidden = state.settings.hideAmounts
     LazyColumn(Modifier.testTag("dashboard-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
         item {
@@ -45,31 +47,11 @@ internal fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (Ye
                 }
             }
         }
-        item { MonthPicker(month, onMonth) }
-        item {
-            Surface(Modifier.testTag("period-summary"), shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
-                Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppIcon(R.drawable.ic_wallet)
-                        Text("Resultado do período", style = MaterialTheme.typography.titleSmall)
-                    }
-                    Amount(summary.result, hidden, Modifier.fillMaxWidth(), size = 32)
-                    val largeText = LocalDensity.current.fontScale > 1.3f
-                    if (largeText) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SummaryValue("Receitas", summary.income, hidden, R.drawable.ic_income)
-                        SummaryValue("Despesas líquidas", summary.expenses, hidden, R.drawable.ic_expense)
-                    } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.weight(1f)) { SummaryValue("Receitas", summary.income, hidden, R.drawable.ic_income) }
-                        Box(Modifier.weight(1f)) { SummaryValue("Despesas líquidas", summary.expenses, hidden, R.drawable.ic_expense) }
-                    }
-                    FinanceDisclosure("Sobre o resultado", "period-summary-details") {
-                        Text("Somente lançamentos confirmados. Não representa o saldo bancário.", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
         item { QuickActions(onNew) }
+        item { MonthPicker(month, onMonth) }
+        item { AccountsOverview(state.accountBalances, hidden, onAccounts) }
+        item { PeriodResultCard(projection, hidden, forecastsLoaded) }
+        item { OptionalSetup(onAccounts, onTemplate) }
         if (notice != null) item { notice() }
         item {
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
@@ -85,7 +67,7 @@ internal fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (Ye
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
                         leadingContent = { IconBadge(R.drawable.ic_calendar) },
                         headlineContent = { Text("Planejamento e análises", style = MaterialTheme.typography.bodyMedium) },
-                        supportingContent = { Text("Projeções, renda e orçamentos", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("Projeções e parâmetros de análise", style = MaterialTheme.typography.bodySmall) },
                         trailingContent = { AppIcon(R.drawable.ic_chevron_right) })
                 }
             }
@@ -102,18 +84,7 @@ internal fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (Ye
                 CategoryBar("Despesas líquidas", summary.expenses.coerceAtLeast(0), maximum, hidden)
             }
         }
-        item { ExpenseChart(state.records, month, hidden, onExpenseGroup) }
-    }
-}
-
-@Composable
-private fun SummaryValue(label: String, cents: Long, hidden: Boolean, icon: Int) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            AppIcon(icon, Modifier.size(16.dp))
-            Text(label, style = MaterialTheme.typography.bodySmall)
-        }
-        Amount(cents, hidden, size = 18)
+        item { ExpenseChart(summary.records, month, hidden, onExpenseGroup) }
     }
 }
 

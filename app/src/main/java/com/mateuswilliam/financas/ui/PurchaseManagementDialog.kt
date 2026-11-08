@@ -123,7 +123,7 @@ private fun EditPurchaseDialog(
                         modifier = Modifier.fillMaxWidth().testTag("purchase-edit-title"), singleLine = true, enabled = !busy)
                 }
                 AccountPickerField("Conta de origem", bank, accounts, { bank = it; error = null }, onAddAccount, hidden = hidden)
-                ChoiceField("Categoria", category, Category.entries.toList(), { it.label }) { if (!busy) category = it }
+                ChoiceField("Categoria", category, categoriesFor(Movement.EXPENSE), { it.label }) { if (!busy) category = it }
                 InstallmentFields(terms, { terms = it; error = null }, amount,
                     { if (byTotal) invalidTotal = it else invalidPart = it; error = null },
                     preview.getOrNull(), hidden, attempted, busy)

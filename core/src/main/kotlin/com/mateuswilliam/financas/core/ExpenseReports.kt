@@ -33,11 +33,11 @@ object ExpenseReports {
         var refunds = 0L
         records.forEach { record ->
             if (YearMonth.from(Instant.ofEpochMilli(record.occurredAt).atZone(zone)) != month) return@forEach
-            if (record.movement == Movement.REFUND) refunds = Math.addExact(refunds, record.amountCents)
+            if (record.expenseContribution() < 0) refunds = Math.addExact(refunds, -record.expenseContribution())
             if (record.movement != Movement.EXPENSE) return@forEach
             val key = dimension.key(record)
             val previous = totals[key]
-            totals[key] = (previous?.first ?: dimension.label(record)) to Math.addExact(previous?.second ?: 0, record.amountCents)
+            totals[key] = (previous?.first ?: dimension.label(record)) to Math.addExact(previous?.second ?: 0, record.expenseContribution())
         }
         val ordered = totals.entries.sortedWith(compareByDescending<Map.Entry<String, Pair<String, Long>>> { it.value.second }.thenBy { it.key })
         val total = ordered.fold(0L) { sum, entry -> Math.addExact(sum, entry.value.second) }

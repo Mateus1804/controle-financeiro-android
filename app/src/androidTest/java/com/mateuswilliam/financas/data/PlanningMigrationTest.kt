@@ -35,7 +35,7 @@ class PlanningMigrationTest {
             execSQL("INSERT INTO accounts VALUES ('inter pessoal', 'Inter pessoal', 1792800000000)")
             close()
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9).build()
         try {
             val dao = database.financeDao()
             assertEquals(4290L, dao.allRecords().single().amountCents)
