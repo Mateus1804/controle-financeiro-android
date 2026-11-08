@@ -13,3 +13,7 @@ Kotlin, Coroutines, AndroidX/Compose e Room são utilizados por meio de dependê
 ## Material Icons Round
 
 Os ícones de interface são recursos vetoriais do Google Material Icons Round, sob Apache-2.0. Os paths oficiais foram convertidos de SVG para VectorDrawable, sem redesenho. A licença integral consta em `licenses/material-icons-LICENSE.txt`; a origem e a revisão de cada recurso estão em `docs/icones-material.json`. A licença e a procedência também integram os APKs em `assets/licenses/`. O símbolo do aplicativo permanece próprio.
+
+## Phosphor Icons — navegação
+
+As quatro ações da navegação inferior utilizam ícones Phosphor Icons nas variantes Regular e Fill, convertidos dos SVGs oficiais em VectorDrawable. Licença MIT, aviso integral em `licenses/phosphor-MIT.txt`. Fonte: https://github.com/phosphor-icons/core . Os demais ícones ainda são Material Icons.

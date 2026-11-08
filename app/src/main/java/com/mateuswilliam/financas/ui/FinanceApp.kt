@@ -215,14 +215,15 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                     }
                     NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest, tonalElevation = 0.dp) {
                         val labels = listOf("Resumo", "Revisar", "Extrato", "Ajustes")
-                        val icons = listOf(R.drawable.ic_overview, R.drawable.ic_pending, R.drawable.ic_records, R.drawable.ic_settings)
+                        val icons = listOf(R.drawable.ic_ph_overview_regular, R.drawable.ic_ph_pending_regular, R.drawable.ic_ph_records_regular, R.drawable.ic_ph_settings_regular)
+                        val activeIcons = listOf(R.drawable.ic_ph_overview_fill, R.drawable.ic_ph_pending_fill, R.drawable.ic_ph_records_fill, R.drawable.ic_ph_settings_fill)
                         labels.forEachIndexed { index, label ->
                             NavigationBarItem(selected = tab == index, onClick = { tab = index },
                                 colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                                     selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.onSurface),
                                 icon = { if (index == 1 && state.pending.isNotEmpty()) BadgedBox(badge = { Badge { Text(state.pending.size.toString()) } }) {
-                                    AppIcon(icons[index])
-                                } else AppIcon(icons[index]) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
+                                    AppIcon(if (tab == index) activeIcons[index] else icons[index])
+                                } else AppIcon(if (tab == index) activeIcons[index] else icons[index]) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
                         }
                     }
                 }
