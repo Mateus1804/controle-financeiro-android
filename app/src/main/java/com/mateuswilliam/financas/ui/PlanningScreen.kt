@@ -113,7 +113,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
                     Text(privateDisplayText(plan.title, hidden), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("${plan.movement.label} prevista · ${formatDate(plan.nextDate)}${if (!plan.active) " · pausada" else ""}")
                     Text("${privateDisplayText(plan.bank, hidden)} · ${plan.category.label}", style = MaterialTheme.typography.bodySmall)
-                    Amount(plan.amountCents, hidden)
+                    Amount(plan.amountCents, hidden, size = 16)
                     if (plan.movement == Movement.EXPENSE || fixedSince != null) {
                         Text(if (fixedSince != null) "Despesa fixa desde ${fixedSince.format(commitmentMonthFormat)}"
                             else "Se incluída como fixa, a previsão conta a partir de ${month.format(commitmentMonthFormat)}.",
