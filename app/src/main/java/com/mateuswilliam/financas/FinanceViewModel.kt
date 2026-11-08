@@ -110,35 +110,35 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (saved) {
             if (draftId != null) ReviewNotifications.cancel(app, draftId)
             onSaved()
-            "Compra salva. As parcelas em aberto estão no Planejamento."
+            "Compra salva. As parcelas em aberto estão nas movimentações."
         } else "A compra já foi salva ou a notificação não está mais pendente."
     }
     suspend fun purchaseManagement(installmentId: String) = repository.purchaseManagement(installmentId)
     fun editPurchase(current: PurchaseManagement, purchase: InstallmentPurchase, onFinished: () -> Unit) = action {
         val saved = repository.editPurchase(current.revision, purchase)
         onFinished()
-        if (saved) "Compra corrigida no Planejamento." else "A compra mudou. Abra novamente para conferir as parcelas."
+        if (saved) "Compra corrigida nas movimentações." else "A compra mudou. Abra novamente para conferir as parcelas."
     }
     fun adjustInstallment(current: PurchaseManagement, adjustment: InstallmentAdjustment, onFinished: () -> Unit) = action {
         val saved = repository.adjustInstallment(current.installmentId, current.revision, adjustment)
         onFinished()
-        if (saved) "Parcela corrigida no Planejamento." else "A parcela mudou. Abra novamente para conferir."
+        if (saved) "Parcela corrigida nas movimentações." else "A parcela mudou. Abra novamente para conferir."
     }
     fun cancelOpenInstallments(current: PurchaseManagement, onFinished: () -> Unit) = action {
         val count = repository.cancelOpenInstallments(current.purchase.id, current.revision, current.openCount)
         onFinished()
-        if (count > 0) "Parcelas em aberto canceladas no Planejamento." else "A compra mudou. Confira as parcelas em aberto antes de cancelar."
+        if (count > 0) "Parcelas em aberto canceladas nas movimentações." else "A compra mudou. Confira as parcelas em aberto antes de cancelar."
     }
     fun excludeInstallmentForecast(current: PurchaseManagement, onFinished: () -> Unit) = action {
         val removed = repository.excludeInstallmentForecast(current.installmentId, current.revision)
         onFinished()
-        if (removed) "Parcela excluída do Planejamento." else "A parcela mudou. Abra novamente para conferir."
+        if (removed) "Parcela excluída das movimentações." else "A parcela mudou. Abra novamente para conferir."
     }
     fun confirmInstallment(id: String, record: Record, expectedPurchaseRevision: Long, onSaved: () -> Unit) = action {
         if (repository.confirmInstallment(id, record, expectedPurchaseRevision)) {
             onSaved()
             "Parcela registrada no extrato."
-        } else "A parcela mudou, foi registrada ou cancelada. Confira o Planejamento."
+        } else "A parcela mudou, foi registrada ou cancelada. Confira as movimentações."
     }
     fun setFixedRecurring(id: String, fromMonth: YearMonth?) = action {
         repository.setFixedRecurring(id, fromMonth)
@@ -171,6 +171,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
         if (saved) "Previsão corrigida somente nesta competência." else "A competência mudou. Abra novamente para conferir."
     }
+    fun saveRecurringMovement(plan: RecurringPlan, effectiveMonth: YearMonth, fixedExpense: Boolean, onSaved: () -> Unit) = action {
+        repository.saveRecurringMovement(plan, effectiveMonth, fixedExpense)
+        RecurringReminders.cancelForRecurring(app, plan.id, effectiveMonth)
+        onSaved()
+        "Recorrência mensal salva. Os pagamentos anteriores foram mantidos."
+    }
     fun saveRecurringFromMonth(plan: RecurringPlan, effectiveMonth: YearMonth, onSaved: () -> Unit) = action {
         repository.saveRecurringFromMonth(plan, effectiveMonth)
         RecurringReminders.cancelForRecurring(app, plan.id, effectiveMonth)
@@ -180,12 +186,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun confirmRecurringMonth(expected: RecurringMonth, record: Record, onSaved: () -> Unit) = action {
         val saved = repository.confirmRecurringMonth(expected, record)
         if (saved) { RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate); onSaved() }
-        if (saved) "Lançamento confirmado nesta competência." else "A competência mudou ou já foi tratada. Confira o Planejamento."
+        if (saved) "Lançamento confirmado nesta competência." else "A competência mudou ou já foi tratada. Confira as movimentações."
     }
     fun skipRecurringMonth(expected: RecurringMonth) = action {
         val skipped = repository.skipRecurringMonth(expected)
         if (skipped) RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate)
-        if (skipped) "Vencimento pulado somente nesta competência." else "A competência mudou ou já foi tratada. Confira o Planejamento."
+        if (skipped) "Vencimento pulado somente nesta competência." else "A competência mudou ou já foi tratada. Confira as movimentações."
     }
     fun excludeRecurringForecast(plan: RecurringPlan, onFinished: () -> Unit) = action {
         val removed = repository.archiveRecurringForecast(plan)
@@ -197,11 +203,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (repository.skipRecurring(plan.id, plan.nextDate)) {
             RecurringReminders.cancel(app, plan.id, plan.nextDate)
             "Vencimento pulado. Nenhum lançamento foi criado."
-        } else "A previsão mudou, foi pausada ou já foi tratada. Confira o Planejamento."
+        } else "A previsão mudou, foi pausada ou já foi tratada. Confira as movimentações."
     }
     fun confirmRecurring(id: String, due: String, record: Record, onSaved: () -> Unit) = action {
         if (repository.confirmRecurring(id, due, record)) { RecurringReminders.cancel(app, id, due); onSaved(); "Lançamento confirmado e próxima previsão atualizada." }
-        else "A previsão mudou ou já foi tratada. Confira o planejamento."
+        else "A previsão mudou ou já foi tratada. Confira as movimentações."
     }
 
     fun createBackup(password: CharArray, onReady: () -> Unit) {

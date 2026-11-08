@@ -31,7 +31,7 @@ class CommitmentEntryUiTest {
         val today = LocalDate.now()
         val month = YearMonth.from(today)
         rule.onNodeWithContentDescription("Novo lançamento").performClick()
-        rule.onNodeWithTag("installment-toggle").performScrollTo().performClick()
+        rule.chooseInstallments()
         type("installment-count", "6")
         type("installments-paid", "2")
         type("purchase-total", "60001")
@@ -52,9 +52,9 @@ class CommitmentEntryUiTest {
         rule.dismissFeedback("Compra salva.")
         openPlanning()
         val first = obligations.first().id
-        scrollPlanningTo("installment-$first")
-        rule.onNodeWithTag("installment-$first").assertIsDisplayed()
-        rule.onNodeWithTag("confirm-installment-$first").performScrollTo().performClick()
+        scrollPlanningTo("movement-installment:$first")
+        rule.onNodeWithTag("movement-installment:$first").assertIsDisplayed()
+        rule.performPlanningAction("confirm-$first")
         rule.onNodeWithText("Conferir parcela").assertExists()
         assertTrue(app.repository.exportRecords().isEmpty())
         rule.onNodeWithText("Confirmar").performClick()
@@ -74,7 +74,7 @@ class CommitmentEntryUiTest {
         rule.onNodeWithText("Revisar").performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("review-${draft.id}").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("review-${draft.id}").performClick()
-        rule.onNodeWithTag("installment-toggle").performScrollTo().performClick()
+        rule.chooseInstallments()
         type("installment-count", "3")
         rule.onNodeWithTag("purchase-preview-total").assertTextEquals("Total da compra: ${Money.format(12990)}")
         rule.onNodeWithTag("installment-basis-part").performScrollTo().performClick()
@@ -120,7 +120,7 @@ class CommitmentEntryUiTest {
         assertNull(dao.monthlyPlan(month.plusMonths(1).toString()))
         assertTrue(app.repository.exportRecords().isEmpty())
 
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasContentDescription("Próximo mês"))
+        rule.scrollAnalysisTo(hasContentDescription("Próximo mês"))
         rule.onNodeWithContentDescription("Próximo mês").performClick()
         scrollPlanningTo("edit-monthly-income")
         rule.waitUntil(5000) { rule.onAllNodesWithText("Renda ainda não informada").fetchSemanticsNodes().isNotEmpty() }
@@ -168,12 +168,12 @@ class CommitmentEntryUiTest {
     }
 
     private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
+        rule.onNodeWithText("Planejamento e análises").performClick()
     }
 
     private fun scrollPlanningTo(tag: String) {
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag(tag))
+        rule.scrollPlanningToTag(tag)
     }
 
     private fun openIncomeEditor() {

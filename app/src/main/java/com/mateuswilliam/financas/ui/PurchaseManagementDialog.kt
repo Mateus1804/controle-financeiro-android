@@ -41,7 +41,7 @@ internal fun PurchaseManagementDialog(
                 Text(when {
                     result == null -> "Carregando as parcelas…"
                     result?.isFailure == true -> "Não foi possível carregar a compra. Tente novamente."
-                    else -> "Esta parcela mudou ou saiu do Planejamento. Confira a lista atual."
+                    else -> "Esta parcela mudou ou saiu das movimentações. Confira a lista atual."
                 })
             },
             confirmButton = { TextButton(onClick = onDismiss) { Text("Voltar") } })
@@ -77,7 +77,7 @@ private fun ExcludeInstallmentDialog(
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(privateDisplayText(current.purchase.title, hidden), style = MaterialTheme.typography.titleMedium)
                 Text("Parcela ${part.number} de ${current.purchase.installmentCount} · ${part.dueDate.format(commitmentDateFormat)}")
-                Text("Só esta parcela sai do Planejamento. As demais parcelas e os lançamentos já registrados serão mantidos.")
+                Text("Só esta parcela sai das movimentações. As demais parcelas e os lançamentos já registrados serão mantidos.")
             }
         },
         confirmButton = {
@@ -193,8 +193,8 @@ private fun CancelOpenInstallmentsDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(privateDisplayText(current.purchase.title, hidden), style = MaterialTheme.typography.titleMedium)
-                Text(if (current.openCount == 1) "Uma parcela sairá do Planejamento."
-                    else "${current.openCount} parcelas sairão do Planejamento, incluindo as de outros meses.")
+                Text(if (current.openCount == 1) "Uma parcela sairá das movimentações."
+                    else "${current.openCount} parcelas sairão das movimentações, incluindo as de outros meses.")
                 Text("Os lançamentos confirmados ficam no extrato. O cancelamento vale apenas para o Planejamento deste app.")
             }
         },

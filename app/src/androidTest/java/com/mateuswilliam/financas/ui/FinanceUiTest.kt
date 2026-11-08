@@ -33,7 +33,7 @@ class FinanceUiTest {
         rule.onNodeWithText("Descrição").performTextInput("Mercado de exemplo")
         rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Novo lançamento").fetchSemanticsNodes().isEmpty() }
-        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
+        rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Mercado de exemplo").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Mercado de exemplo").assertIsDisplayed()
         assertEquals(4290L, runBlocking { app.repository.exportRecords().single().amountCents })
@@ -77,7 +77,7 @@ class FinanceUiTest {
     @Test fun existingAmountIsNotScaledAgainWhenEditing() = runBlocking {
         app.repository.save(Record("editar-exemplo", 4290, Movement.EXPENSE, PaymentMethod.PIX,
             Category.FOOD, "Conta de exemplo", "Editar valor de exemplo", System.currentTimeMillis()), null)
-        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
+        rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Editar valor de exemplo").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Editar valor de exemplo").performClick()
         confirmEntry()
@@ -142,7 +142,7 @@ class FinanceUiTest {
         screenshot("recentes-claro")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }; rule.waitForIdle()
         screenshot("recentes-escuro")
-        rule.onNode(hasText("Extrato") and hasClickAction()).performClick()
+        rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
         screenshot("extrato-escuro")
         rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }; rule.waitForIdle()
         screenshot("extrato-claro")

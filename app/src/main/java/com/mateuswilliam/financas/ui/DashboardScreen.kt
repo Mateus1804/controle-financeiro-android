@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -21,10 +22,12 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
-fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -> Unit, onHide: () -> Unit,
+internal fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -> Unit, onHide: () -> Unit,
                     onPending: () -> Unit, onExpenseGroup: (ExpenseFilter) -> Unit,
                     notice: (@Composable () -> Unit)? = null, onPlanning: () -> Unit = {},
-                    onNew: (Movement) -> Unit = {}) {
+                    onNew: (Movement) -> Unit = {}, movements: List<MonthlyMovement>, actions: MovementActions, busy: Boolean) {
+    var status by rememberSaveable { mutableStateOf("Todas") }
+    val visible = movements.filter { status == "Todas" || if (status == "Realizadas") it.realized else it.status == "Prevista" }
     val zone = ZoneId.systemDefault()
     val summary = remember(state.records, month, zone) { Ledger.month(state.records, month, zone) }
     val hidden = state.settings.hideAmounts
@@ -78,23 +81,20 @@ fun DashboardScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) 
                         headlineContent = { Text("Revisões pendentes") },
                         supportingContent = { Text("${state.pending.size} sugestão(ões) para conferir") },
                         trailingContent = { AppIcon(R.drawable.ic_chevron_right) })
-                    ListItem(modifier = Modifier.fillMaxWidth().clickableAction(onPlanning),
+                    ListItem(modifier = Modifier.fillMaxWidth().testTag("open-planning").clickableAction(onPlanning),
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
                         leadingContent = { IconBadge(R.drawable.ic_calendar) },
-                        headlineContent = { Text("Planejar limites e recorrências", style = MaterialTheme.typography.bodyMedium) },
-                        supportingContent = { Text("Orçamentos e previsões", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text("Planejamento e análises", style = MaterialTheme.typography.bodyMedium) },
+                        supportingContent = { Text("Projeções, renda e orçamentos", style = MaterialTheme.typography.bodySmall) },
                         trailingContent = { AppIcon(R.drawable.ic_chevron_right) })
                 }
             }
         }
-        if (summary.records.isNotEmpty()) {
-            item { Box(Modifier.padding(top = 8.dp)) { SectionTitle("Últimos lançamentos", "Movimentações confirmadas do período") } }
-            item {
-                Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                    Column { summary.records.take(4).forEach { RecordRow(it, hidden) } }
-                }
-            }
-        } else item { EmptyCard("Tudo pronto para começar", "Receitas, despesas e transferências podem ser registradas nas ações acima. A captura opcional fica em Ajustes.") }
+        item {
+            SectionTitle("Movimentações do mês", "Receitas, despesas, recorrências e parcelas")
+            ChoiceField("Situação", status, listOf("Todas", "Previstas", "Realizadas"), { it }) { status = it }
+        }
+        monthlyMovementItems(visible, hidden, busy, actions)
         item {
             FinanceDisclosure("Detalhes do período", "period-breakdown") {
                 val maximum = maxOf(summary.income, summary.expenses, 1)

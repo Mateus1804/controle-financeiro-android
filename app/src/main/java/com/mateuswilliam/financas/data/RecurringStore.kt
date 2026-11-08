@@ -58,7 +58,7 @@ internal class RecurringStore(private val dao: FinanceDao) {
             }
     }
 
-    suspend fun saveTemplate(plan: RecurringPlan, effectiveMonth: YearMonth) {
+    suspend fun saveTemplate(plan: RecurringPlan, effectiveMonth: YearMonth, replaceFuture: Boolean = false) {
         Recurrences.error(plan)?.let { throw IllegalArgumentException(it) }
         require(effectiveMonth.year in 1..9999) { "Use uma competência com ano entre 1 e 9999." }
         val previous = dao.recurringById(plan.id)?.let { ensureOrigin(it) }
@@ -70,11 +70,12 @@ internal class RecurringStore(private val dao: FinanceDao) {
             .takeIf { plan.movement == Movement.EXPENSE }
         val reminder = if (previous?.nextDate == plan.nextDate) previous.lastRemindedDate else ""
         dao.upsertRecurring(RecurringEntity.from(plan.copy(lastRemindedDate = reminder)).copy(startMonth = start))
+        if (replaceFuture) dao.deleteFutureRecurringRevisions(plan.id, effectiveMonth.toString())
         dao.upsertRecurringRevision(RecurringRevisionEntity.from(plan, effectiveMonth, fixed))
         if (plan.movement != Movement.EXPENSE) dao.removeFixedRecurring(plan.id)
         for (row in dao.allRecurringMonths().filter { it.recurringId == plan.id && it.month >= effectiveMonth.toString() && it.status == "PENDING" }) {
             val rule = dao.recurringRevision(plan.id, row.month) ?: continue
-            if (row.overridden) {
+            if (row.overridden && !replaceFuture) {
                 if (row.active != rule.active) dao.updateRecurringMonth(row.copy(active = rule.active, revision = Math.addExact(row.revision, 1)))
                 continue
             }
@@ -162,7 +163,7 @@ internal class RecurringStore(private val dao: FinanceDao) {
     }
 
     /** Classificação com vigência: competências anteriores mantêm inclusive regras ainda não materializadas. */
-    suspend fun setFixedFromMonth(id: String, effectiveMonth: YearMonth, enabled: Boolean) {
+    suspend fun setFixedFromMonth(id: String, effectiveMonth: YearMonth, enabled: Boolean, pendingOnly: Boolean = false) {
         CommitmentPlanning.validate(MonthlyIncomePlan(effectiveMonth, 0))
         val current = dao.recurringById(id)?.let { ensureOrigin(it) } ?: throw IllegalArgumentException("Recorrência não encontrada.")
         require(!current.archived) { "Esta previsão foi excluída." }
@@ -175,10 +176,10 @@ internal class RecurringStore(private val dao: FinanceDao) {
         }
         if (enabled && current.movement == Movement.EXPENSE) dao.upsertFixedRecurring(FixedRecurringEntity(id, effectiveMonth.toString()))
         else dao.removeFixedRecurring(id)
-        dao.allRecurringMonths().filter { it.recurringId == id && it.month >= effectiveMonth.toString() && (it.status == "PENDING" || enabled) }.forEach {
+        dao.allRecurringMonths().filter { it.recurringId == id && it.month >= effectiveMonth.toString() && (it.status == "PENDING" || (!pendingOnly && enabled)) }.forEach {
             dao.updateRecurringMonth(it.copy(fixedExpense = enabled && it.movement == Movement.EXPENSE, revision = Math.addExact(it.revision, 1)))
         }
-        if (enabled) {
+        if (enabled && !pendingOnly) {
             dao.occurrencesForRecurring(id).filter { it.status == "RECORDED" && it.dueDate.take(7) >= effectiveMonth.toString() }.forEach { occurrence ->
                 val record = occurrence.recordId?.let { dao.recordById(it) }?.takeIf { it.movement == Movement.EXPENSE } ?: return@forEach
                 val key = CommitmentPlanning.recurringId(id, LocalDate.parse(occurrence.dueDate))

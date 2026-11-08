@@ -51,9 +51,10 @@ fun PendingScreen(pending: List<DraftEntity>, hidden: Boolean, onReview: (DraftE
 }
 
 @Composable
-fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) -> Unit, hidden: Boolean,
+internal fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) -> Unit, hidden: Boolean,
                   category: Category?, onCategory: (Category?) -> Unit, onEdit: (Record) -> Unit,
-                  expenseFilter: ExpenseFilter? = null, onClearExpenseFilter: () -> Unit = {}) {
+                  expenseFilter: ExpenseFilter? = null, onClearExpenseFilter: () -> Unit = {},
+                  movements: List<MonthlyMovement>? = null, actions: MovementActions? = null, busy: Boolean = false) {
     var search by rememberSaveable { mutableStateOf("") }
     var movement by rememberSaveable { mutableStateOf<Movement?>(null) }
     LaunchedEffect(expenseFilter) { if (expenseFilter != null) movement = Movement.EXPENSE }
@@ -66,7 +67,7 @@ fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) 
     } }
     val largeText = LocalDensity.current.fontScale > 1.25f
     LazyColumn(Modifier.testTag("records-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom)) {
-        item { Box(Modifier.padding(bottom = 16.dp)) { SectionTitle("Extrato", "Lançamentos confirmados neste aparelho") } }
+        item { Box(Modifier.padding(bottom = 16.dp)) { SectionTitle("Movimentações", "Realizadas e previstas, sem duplicar pagamentos") } }
         item { Box(Modifier.padding(bottom = 16.dp)) { MonthPicker(month, onMonth) } }
         if (expenseFilter != null) item {
             InputChip(selected = true, onClick = onClearExpenseFilter, label = { Text("Despesas · ${privateDisplayText(expenseFilter.label, hidden)} · Limpar filtro") })
@@ -85,12 +86,16 @@ fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) 
             if (movement != null || category != null) Text("${movement?.label ?: "Todos os tipos"} · ${category?.label ?: "Todas as categorias"}",
                 Modifier.padding(bottom = 12.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        item { Text("${filtered.size} lançamento(s)", Modifier.padding(bottom = 12.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        if (filtered.isEmpty()) item { EmptyCard("Nenhum lançamento neste filtro", "Mude o período ou os filtros. Os lançamentos só entram aqui após a confirmação.") }
-        itemsIndexed(filtered, key = { _, it -> it.id }) { index, record ->
-            Surface(shape = groupedShape(index, filtered.size), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                RecordRow(record, hidden) { onEdit(record) }
+        if (movements != null && actions != null) {
+            val entries = movements.filter { row ->
+                val value = row.value
+                (expenseFilter == null || (row.realized && expenseFilter.matches(value))) &&
+                    (category == null || value.category == category) && (movement == null || value.movement == movement) &&
+                    (search.isBlank() || "${value.description} ${value.bank} ${value.destination}".contains(search.trim(), true))
             }
+            monthlyMovementItems(entries, hidden, busy, actions)
+        } else {
+            itemsIndexed(filtered, key = { _, it -> it.id }) { _, record -> RecordRow(record, hidden) { onEdit(record) } }
         }
     }
 }

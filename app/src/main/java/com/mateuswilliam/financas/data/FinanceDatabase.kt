@@ -117,6 +117,8 @@ interface FinanceDao {
     @Query("SELECT * FROM recurring_revisions WHERE recurringId = :id AND effectiveMonth <= :month ORDER BY effectiveMonth DESC LIMIT 1")
     suspend fun recurringRevision(id: String, month: String): RecurringRevisionEntity?
     @Upsert suspend fun upsertRecurringRevision(row: RecurringRevisionEntity)
+    @Query("DELETE FROM recurring_revisions WHERE recurringId = :id AND effectiveMonth > :month")
+    suspend fun deleteFutureRecurringRevisions(id: String, month: String)
     @Query("DELETE FROM recurring_revisions") suspend fun clearRecurringRevisions()
     @Query("SELECT * FROM recurring_months ORDER BY month, dueDate, recurringId") suspend fun allRecurringMonths(): List<RecurringMonthEntity>
     @Query("SELECT * FROM recurring_months WHERE month = :month ORDER BY dueDate, recurringId") suspend fun recurringMonths(month: String): List<RecurringMonthEntity>

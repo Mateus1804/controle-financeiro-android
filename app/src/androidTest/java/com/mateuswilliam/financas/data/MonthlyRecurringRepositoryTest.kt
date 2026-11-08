@@ -32,6 +32,35 @@ class MonthlyRecurringRepositoryTest {
     @After fun cleanup() { settings.reset(); db.close() }
     private suspend fun month(month: YearMonth) = repo.observeRecurringMonths(month).first().single()
 
+    @Test fun unifiedFutureConfigurationKeepsPaidAndSkippedClassifications() = runBlocking<Unit> {
+        repo.saveRecurring(plan)
+        val nov = month(november)
+        assertTrue(repo.confirmRecurringMonth(nov, nov.plan.proposedRecord("paid", ZoneId.of("UTC"))))
+        assertTrue(repo.skipRecurringMonth(month(december)))
+        repo.saveRecurringMovement(plan.copy(amountCents = 80000), november, true)
+        assertFalse(month(november).fixedExpense)
+        assertFalse(month(december).fixedExpense)
+        assertEquals(0L, repo.commitmentReport(november).committedCents)
+        assertEquals(RecurringMonthStatus.SKIPPED, month(december).status)
+        assertEquals(60000L, repo.exportRecords().single().amountCents)
+        assertEquals(80000L, repo.commitmentReport(december.plusMonths(1)).committedCents)
+    }
+
+    @Test fun editingAllFutureOccurrencesReplacesPendingOverridesAndKeepsPaidHistory() = runBlocking<Unit> {
+        repo.saveRecurring(plan); repo.setFixedRecurring(plan.id, november)
+        val nov = month(november)
+        assertTrue(repo.confirmRecurringMonth(nov, nov.plan.proposedRecord("history", ZoneId.of("UTC"))))
+        val dec = month(december)
+        assertTrue(repo.saveRecurringMonth(dec, dec.plan.copy(amountCents = 70000)))
+        repo.saveRecurringFromMonth(plan.copy(amountCents = 90000, nextDate = "2027-01-31"), december.plusMonths(1))
+        repo.saveRecurringFromMonth(plan.copy(amountCents = 80000, nextDate = "2026-12-31"), december)
+        assertEquals(80000L, month(december).plan.amountCents)
+        assertEquals(80000L, month(december.plusMonths(1)).plan.amountCents)
+        assertEquals(60000L, repo.exportRecords().single().amountCents)
+        assertEquals(RecurringMonthStatus.RECORDED, month(november).status)
+        assertEquals(60000L, repo.commitmentReport(november).committedCents)
+    }
+
     @Test fun monthlyAmountAndDueDateEditsKeepTheOtherCompetencesAndIdentity() = runBlocking<Unit> {
         repo.saveRecurring(plan); repo.setFixedRecurring(plan.id, november)
         val nov = month(november); val dec = month(december)

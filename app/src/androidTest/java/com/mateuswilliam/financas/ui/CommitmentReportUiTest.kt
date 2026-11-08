@@ -64,7 +64,7 @@ class CommitmentReportUiTest {
         assertTrue(repository.confirmInstallment("installment:curso:1", payment("curso-pago", 13000, month.plusMonths(1))))
         scrollToTag("commitment-card")
         assertChart("36%", "Aluguel fictício")
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasContentDescription("Próximo mês"))
+        rule.scrollAnalysisTo(hasContentDescription("Próximo mês"))
         rule.onNodeWithContentDescription("Próximo mês").performClick()
         scrollToTag("commitment-card")
         assertChart("10%", "Aluguel fictício")
@@ -144,13 +144,13 @@ class CommitmentReportUiTest {
         paymentMonth.atDay(5).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
 
     private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejar limites e recorrências"))
-        rule.onNodeWithText("Planejar limites e recorrências").performClick()
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
+        rule.onNodeWithText("Planejamento e análises").performClick()
         scrollToTag("commitment-card")
     }
 
     private fun scrollToTag(tag: String) {
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag(tag))
+        rule.scrollAnalysisTo(hasTestTag(tag))
     }
 
     private fun assertChart(percentage: String, largest: String) {
