@@ -148,7 +148,8 @@ class CommitmentJourneyTest {
         rule.waitUntil(5000) {
             rule.onAllNodes(hasTestTag("edit-monthly-income") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
         }
-        rule.onNodeWithTag("edit-monthly-income").performClick()
+        rule.onNodeWithTag("edit-monthly-income").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("monthly-income").fetchSemanticsNodes().isNotEmpty() }
         type("monthly-income", "100000")
         typeAndCloseKeyboard("monthly-commitment-limit", limit)
         rule.onNodeWithText("Salvar renda e limite").performClick()

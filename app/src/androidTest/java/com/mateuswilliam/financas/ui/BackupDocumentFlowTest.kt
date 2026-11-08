@@ -24,6 +24,8 @@ class BackupDocumentFlowTest {
     private val app get() = rule.activity.application as FinanceApplication
     private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
     private val secret = "Arquivo fictício 2026!"
+    // PBKDF2 mantém 600 mil iterações; o provedor Java da API 26 é lento sem aceleração.
+    private val cryptoWaitMillis = 300_000L
 
     @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
 
@@ -42,9 +44,10 @@ class BackupDocumentFlowTest {
             rule.onNodeWithText("Repetir senha").performTextInput(secret)
             rule.onNodeWithText("Repetir senha").performImeAction()
             waitForKeyboard()
-            rule.onNodeWithText("Preparar backup").assertIsDisplayed().performClick()
+            rule.onNodeWithText("Preparar backup").assertIsDisplayed().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
+            rule.waitForIdle()
             val fileName = "backup-ficticio-${UUID.randomUUID()}.cfbackup"
-            val name = awaitSystemNode { it.className?.toString() == "android.widget.EditText" && it.isEditable }
+            val name = awaitSystemNode(cryptoWaitMillis) { it.className?.toString() == "android.widget.EditText" && it.isEditable }
             assertTrue(name.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, fileName)
             }))
@@ -65,8 +68,9 @@ class BackupDocumentFlowTest {
             rule.onNodeWithText("Senha do backup").performTextInput(secret)
             rule.onNodeWithText("Senha do backup").performImeAction()
             waitForKeyboard()
-            rule.onNodeWithText("Conferir backup").performClick()
-            rule.waitUntil(15000) { rule.onAllNodesWithText("Conferir restauração").fetchSemanticsNodes().isNotEmpty() }
+            rule.onNodeWithText("Conferir backup").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
+            rule.waitForIdle()
+            rule.waitUntil(cryptoWaitMillis) { rule.onAllNodesWithText("Conferir restauração").fetchSemanticsNodes().isNotEmpty() }
             assertTrue(app.repository.exportRecords().isEmpty())
             val restore = rule.onNode(hasText("Restaurar backup") and hasAnyAncestor(hasTestTag("restore-preview-dialog")))
             restore.assertIsNotEnabled()
@@ -99,8 +103,8 @@ class BackupDocumentFlowTest {
         }
     }
 
-    private fun awaitSystemNode(predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo {
-        val end = SystemClock.uptimeMillis() + 15000
+    private fun awaitSystemNode(timeoutMillis: Long = 15000, predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo {
+        val end = SystemClock.uptimeMillis() + timeoutMillis
         while (SystemClock.uptimeMillis() < end) {
             val root = automation.rootInActiveWindow
             if (root != null && root.packageName?.toString() != app.packageName) {

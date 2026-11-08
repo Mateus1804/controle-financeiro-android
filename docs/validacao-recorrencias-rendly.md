@@ -56,3 +56,11 @@ As correções se concentram nas causas identificadas: projeções históricas c
 O esquema Room 8 adiciona snapshots por competência e revisões com vigência mensal; o backup de dados V5 conserva esses estados e continua lendo V1–V4. Os registros legados e pagamentos adicionais de uma mesma competência são preservados. Valores históricos que já haviam sido sobrescritos pela versão antiga não podem ser reconstruídos automaticamente.
 
 Os testes instrumentados utilizam exclusivamente emulador isolado API 26. TalkBack manual, máscaras e ícones temáticos em aparelho Android 13+, notificações bancárias reais e a suíte de atualização assinada do CI permanecem verificações separadas. Esta execução não publica APKs em lojas nem altera as configurações de assinatura.
+
+## Fechamento das três pendências de interface
+
+Os três casos anteriormente reprovados passaram após os ajustes: classificação de despesa fixa e jornada financeira completa foram aprovadas na execução dirigida; criação/restauração pelo seletor nativo foi aprovada separadamente em 216,222 segundos. As verificações de pagamentos, totais e restauração permaneceram intactas.
+
+Os testes agora acionam os controles por sua semântica de clique e aguardam a composição antes de alternar para a automação nativa. Somente as esperas de preparação/conferência criptográfica usam até 300 segundos, pois o PBKDF2 com 600 mil iterações usa o provedor Java lento da API 26 sem aceleração. As iterações e a criptografia de produção não foram alteradas.
+
+A aprovação destes três casos não equivale a uma nova execução integral dos 180 testes; o limite da tentativa integral permanece registrado acima.

@@ -1,12 +1,14 @@
 package com.mateuswilliam.financas.ui
 
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
+import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.junit4.ComposeTestRule
 
 internal fun ComposeTestRule.openPlanningActions(itemId: String) {
     val trigger = "actions-$itemId"
     scrollPlanningToTag(trigger)
-    onNodeWithTag(trigger).performScrollTo().assertIsDisplayed().performClick()
+    onNodeWithTag(trigger).assertIsDisplayed().performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
 }
 
 internal fun ComposeTestRule.performPlanningAction(tag: String) {
@@ -20,7 +22,7 @@ internal fun ComposeTestRule.performPlanningAction(tag: String) {
     }
     if (itemId == null) scrollPlanningToTag(tag)
     else openPlanningActions(itemId)
-    onNodeWithTag(tag).assertIsDisplayed().performClick()
+    onNodeWithTag(tag).assertIsDisplayed().performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
 }
 
 internal fun ComposeTestRule.scrollPlanningToTag(tag: String) {
