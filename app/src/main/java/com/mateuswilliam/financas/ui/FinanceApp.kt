@@ -70,12 +70,13 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var selectedInstallmentId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedPurchaseRevision by rememberSaveable { mutableLongStateOf(0L) }
     var managedInstallmentId by rememberSaveable { mutableStateOf<String?>(null) }
-    var cancellingPurchase by rememberSaveable { mutableStateOf(false) }
+    var installmentAction by rememberSaveable { mutableStateOf(PurchaseManagementAction.EDIT) }
     var recurringDue by rememberSaveable { mutableStateOf("") }
     var plannedRecordId by rememberSaveable { mutableStateOf("") }
     var plannedRecordAt by rememberSaveable { mutableLongStateOf(0L) }
     val recurringPlan = state.recurring.find { it.id == selectedRecurringId }
-    val recurringPreset = recurringPlan?.copy(nextDate = recurringDue)?.proposedRecord(plannedRecordId, ZoneId.systemDefault())?.copy(occurredAt = plannedRecordAt)
+    val recurringPreset = recurringPlan?.takeIf { it.active && it.nextDate == recurringDue }
+        ?.proposedRecord(plannedRecordId, ZoneId.systemDefault())?.copy(occurredAt = plannedRecordAt)
     val commitments = if (tab == 4) {
         val setup by remember(month) { model.commitmentSetup(month) }.collectAsStateWithLifecycle(initialValue = null)
         setup?.takeIf { it.month == month }
@@ -157,6 +158,10 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         plannedRecordAt = System.currentTimeMillis()
         selectedDraftId = null; selectedRecordId = null; expectedRevision = null; editing = true
     }
+    fun manageInstallment(id: String, action: PurchaseManagementAction) {
+        managedInstallmentId = id
+        installmentAction = action
+    }
     BackHandler(tab == 4 && !editing && managedInstallmentId == null) { tab = planningReturn }
 
     val captureIssue = CaptureIssue.evaluate(state.settings.consented, state.settings.enabled, state.settings.packages.isNotEmpty(), hasAccess, connected)
@@ -166,6 +171,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     }
     LaunchedEffect(commitments, selectedInstallmentId, installmentPreset) {
         if (editing && commitments != null && selectedInstallmentId != null && installmentPreset == null) editing = false
+    }
+    LaunchedEffect(state.loaded, selectedRecurringId, recurringPreset) {
+        if (state.loaded && editing && selectedRecurringId != null && recurringPreset == null) editing = false
     }
     fun resolveCapture() {
         when (captureIssue) {
@@ -252,7 +260,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         onConfirmRecurring = {
                             selectedRecurringId = it.id; recurringDue = it.nextDate; selectedInstallmentId = null
                             openPlannedRecord()
-                        }, onSkip = model::skipRecurring,
+                        }, onSkip = model::skipRecurring, onExcludeRecurring = model::excludeRecurringForecast,
                         onReminders = { model.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
                         onAlerts = ::requestAlerts, onAddAccount = model::addAccount,
                         commitments = commitments, commitmentReport = commitmentReport,
@@ -261,16 +269,17 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                             selectedInstallmentId = it.id; selectedPurchaseRevision = it.purchaseRevision; selectedRecurringId = null
                             openPlannedRecord()
                         },
-                        onEditPurchase = { managedInstallmentId = it; cancellingPurchase = false },
-                        onCancelPurchase = { managedInstallmentId = it; cancellingPurchase = true })
+                        onEditPurchase = { manageInstallment(it, PurchaseManagementAction.EDIT) },
+                        onExcludeInstallment = { manageInstallment(it, PurchaseManagementAction.EXCLUDE) },
+                        onCancelPurchase = { manageInstallment(it, PurchaseManagementAction.CANCEL_REMAINING) })
                 }
             }
         }
     }
 
     if (tab == 4) managedInstallmentId?.let { id ->
-        key(id, cancellingPurchase) {
-            PurchaseManagementDialog(model, id, cancellingPurchase, busy, state.settings.hideAmounts, state.accounts) {
+        key(id, installmentAction) {
+            PurchaseManagementDialog(model, id, installmentAction, busy, state.settings.hideAmounts, state.accounts) {
                 managedInstallmentId = null
             }
         }

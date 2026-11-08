@@ -29,7 +29,7 @@ O envelope binário versão 1 utiliza inteiros de 32 bits em ordem big-endian:
 
 A chave de 256 bits é derivada com `PBKDF2WithHmacSHA256`; a criptografia utiliza `AES/GCM/NoPadding`. Salt e nonce novos são gerados com `SecureRandom` a cada criação. O cabeçalho inteiro é autenticado como AAD. Versões e parâmetros diferentes dos suportados são recusados antes da derivação para impedir custos arbitrários definidos pelo arquivo recebido.
 
-O conteúdo autenticado é JSON UTF-8 com identificação `controle-financeiro` e versão lógica 3. O leitor aceita as versões lógicas 1 e 2. Arquivos de versão 1 inicializam as estruturas de comprometimento vazias; os de versão 2 preservam as compras existentes como ativas, sem ajustes individuais. Não contém comandos SQL ou classes a serem instanciadas dinamicamente. Os centavos são números inteiros. Números fracionários, identificadores repetidos, vínculos inconsistentes, estados desconhecidos e campos fora dos limites são recusados.
+O conteúdo autenticado é JSON UTF-8 com identificação `controle-financeiro` e versão lógica 4. O leitor aceita as versões 1, 2 e 3. As versões anteriores preservam o estado que registravam e não criam exclusões novas. O arquivo não contém comandos SQL nem classes a serem instanciadas dinamicamente. Os centavos são números inteiros. Números fracionários, identificadores repetidos, vínculos inconsistentes, estados desconhecidos e campos fora dos limites são recusados.
 
 O limite é de 16 MiB para o conteúdo e 50 mil itens no conjunto de tabelas. O envelope acrescenta 60 bytes ao tamanho do conteúdo. Versões futuras precisam de conversão explícita; arquivos desconhecidos não são abertos por tentativa ou recriação destrutiva.
 
@@ -60,7 +60,7 @@ Os resultados efetivamente executados ficam em [Qualidade e validação](qualida
 
 ## Compatibilidade entre versões
 
-O envelope criptográfico continua na versão 1. O conteúdo de dados utiliza a versão 3, separado do esquema Room 6. A versão 2 introduziu as tabelas de comprometimento; a versão 3 inclui a revisão da compra, o cancelamento das previsões restantes e os ajustes explícitos de parcela. Aplicativos que aceitam apenas os formatos 1 e 2 não leem arquivos de versão 3. Um vetor congelado em `app/src/androidTest/assets/compatibility/` conserva todos os conjuntos de dados do esquema 3 e é restaurado pelo código atual numa base temporária antes de qualquer substituição.
+O envelope criptográfico continua na versão 1. O conteúdo de dados utiliza a versão 4, separado do esquema Room 7. O formato 2 introduziu as tabelas de comprometimento, o 3 acrescentou revisão, cancelamento e ajuste de parcelas, e o 4 registra exclusões de parcelas individuais e de previsões recorrentes. Versões antigas do aplicativo precisam ser atualizadas para restaurar um arquivo V4. A prévia conta os itens no arquivo, inclusive os vínculos históricos; as previsões excluídas não voltam ao Planejamento. Um vetor congelado em `app/src/androidTest/assets/compatibility/` é restaurado numa base temporária antes de qualquer substituição.
 
 O vetor usa dados fictícios e criptografia gerada independentemente em Python. Não representa uma exportação bancária real. O teste compara todos os registros, vínculos, revisões, contas, orçamentos, recorrências e ocorrências, além da aparência. O cadastro local existente precisa permanecer intacto até a confirmação da restauração. O arquivo congelado não é regenerado durante o teste.
 

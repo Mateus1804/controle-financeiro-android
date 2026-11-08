@@ -65,7 +65,7 @@ class CommitmentBackupTest {
         repository.restore(legacy)
         assertEquals(0L, repository.commitmentReport(month).committedCents)
         val encoded = BackupSnapshot.encode(repository.snapshot())
-        assertEquals(3, JSONObject(encoded.toString(Charsets.UTF_8)).getInt("version"))
+        assertEquals(4, JSONObject(encoded.toString(Charsets.UTF_8)).getInt("version"))
         assertEquals(legacy.records.toSet(), BackupSnapshot.decode(encoded).records.toSet())
     }
     @Test fun versionTwoDefaultsToAnActiveUnchangedPurchaseAndRejectsDisguisedManagementFields() = runBlocking<Unit> {
@@ -75,7 +75,7 @@ class CommitmentBackupTest {
         assertTrue(runCatching { BackupSnapshot.decode(previous.toString().toByteArray()) }.isFailure)
         previous.getJSONArray("purchases").getJSONObject(0).apply { remove("revision"); remove("openCancelled") }
         val commitments = previous.getJSONArray("commitments")
-        repeat(commitments.length()) { commitments.getJSONObject(it).remove("adjusted") }
+        repeat(commitments.length()) { commitments.getJSONObject(it).apply { remove("adjusted"); remove("excluded") } }
         val restored = BackupSnapshot.decode(previous.toString().toByteArray())
         assertEquals(before, restored)
         repository.clear()

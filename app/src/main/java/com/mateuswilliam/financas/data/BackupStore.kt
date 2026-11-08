@@ -40,7 +40,7 @@ class BackupStore(private val context: Context, private val repository: FinanceR
             }
             val plaintext = try { BackupCrypto.decrypt(file, password) } finally { file.fill(0) }
             val snapshot = try { BackupSnapshot.decode(plaintext) } finally { plaintext.fill(0) }
-            val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6).build()
+            val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7).build()
             database = temporary
             temporary.withTransaction { insertSnapshot(temporary.financeDao(), snapshot) }
             verify(temporary)
@@ -61,7 +61,7 @@ class BackupStore(private val context: Context, private val repository: FinanceR
 
     suspend fun restore(staged: StagedRestore) = withContext(Dispatchers.IO) {
         require(staged.databaseName.startsWith("restore-stage-") && context.getDatabasePath(staged.databaseName).exists()) { "A prévia expirou. Selecione o backup novamente." }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7).build()
         try {
             verify(database)
             val snapshot = readSnapshot(database.financeDao(), staged.createdAt, staged.display)

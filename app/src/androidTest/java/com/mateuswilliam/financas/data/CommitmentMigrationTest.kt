@@ -38,7 +38,7 @@ class CommitmentMigrationTest {
             }
             finishFixture(db, schema, 4)
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7).build()
         val preferences = CapturePreferences(context)
         try {
             val dao = database.financeDao(); val expected = CompatibilityFixtures.snapshot()
@@ -54,7 +54,7 @@ class CommitmentMigrationTest {
             repo.saveMonthlyPlan(MonthlyIncomePlan(YearMonth.of(2026, 11), 300000))
             assertEquals(300000L, repo.commitmentReport(YearMonth.of(2026, 11)).incomeCents)
             assertEquals(0L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
-            assertEquals(6, database.openHelper.writableDatabase.version)
+            assertEquals(7, database.openHelper.writableDatabase.version)
             database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         } finally { database.close(); context.deleteDatabase(name) }
     }
@@ -75,7 +75,7 @@ class CommitmentMigrationTest {
             db.execSQL("INSERT INTO commitments (id,label,amountCents,dueDate,purchaseId,installmentNumber,recurringId,recordId) VALUES ('installment:compra-v5:2','Compra fictícia · 2/2',3400,'2026-12-10','compra-v5',2,NULL,NULL)")
             finishFixture(db, schema, 5)
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_5_6).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7).build()
         try {
             val dao = database.financeDao()
             val purchase = dao.allPurchases().single()
@@ -90,7 +90,39 @@ class CommitmentMigrationTest {
             assertEquals(3500L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
             assertEquals(3400L, repo.commitmentReport(YearMonth.of(2026, 12)).committedCents)
             BackupSnapshot.validate(repo.snapshot())
-            assertEquals(6, database.openHelper.writableDatabase.version)
+            assertEquals(7, database.openHelper.writableDatabase.version)
+            database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
+        } finally { database.close(); context.deleteDatabase(name) }
+    }
+
+    @Test fun schemaSixKeepsExistingForecastsAndPriorCancellation() = runBlocking<Unit> {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val name = "migration-forecast-removal-test"
+        context.deleteDatabase(name)
+        val schema = instrumentation.context.assets.open("com.mateuswilliam.financas.data.FinanceDatabase/6.json")
+            .bufferedReader().use { JSONObject(it.readText()).getJSONObject("database") }
+        val file = context.getDatabasePath(name); file.parentFile!!.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            createTables(db, schema)
+            db.execSQL("INSERT INTO recurring (id,title,amountCents,movement,method,category,bank,nextDate,dayOfMonth,active,lastRemindedDate) VALUES ('r','Conta fictícia',4000,'EXPENSE','PIX','HOME','Carteira','2026-11-10',10,1,'')")
+            db.execSQL("INSERT INTO fixed_recurring (recurringId,fromMonth) VALUES ('r','2026-11')")
+            db.execSQL("INSERT INTO purchases (id,title,bank,category,method,totalCents,installmentCount,paidInstallments,nextDueDate,dayOfMonth,sourceDraftId,revision,openCancelled) VALUES ('p','Compra fictícia','Carteira','OTHER','CARD',6800,2,0,'2026-11-12',12,NULL,1,1)")
+            db.execSQL("INSERT INTO commitments (id,label,amountCents,dueDate,purchaseId,installmentNumber,recurringId,recordId,adjusted) VALUES ('installment:p:1','Compra fictícia · 1/2',3400,'2026-11-12','p',1,NULL,NULL,0), ('installment:p:2','Compra fictícia · 2/2',3400,'2026-12-12','p',2,NULL,NULL,0)")
+            finishFixture(db, schema, 6)
+        }
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_6_7).build()
+        try {
+            val dao = database.financeDao()
+            assertFalse(dao.allRecurring().single().archived)
+            assertTrue(dao.allRecurring().single().active)
+            assertTrue(dao.allPurchases().single().openCancelled)
+            assertTrue(dao.allCommitments().none { it.excluded })
+            val repo = FinanceRepository(database, CapturePreferences(context))
+            assertEquals(4000L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
+            assertNull(repo.purchaseManagement("installment:p:1"))
+            BackupSnapshot.validate(repo.snapshot())
+            assertEquals(7, database.openHelper.writableDatabase.version)
             database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         } finally { database.close(); context.deleteDatabase(name) }
     }

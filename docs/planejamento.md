@@ -32,7 +32,7 @@ Limites mensais por categoria, previsões recorrentes e lembretes opcionais est�
 
 O fluxo de [comprometimento da renda](comprometimento.md) usa renda líquida prevista e limite informados manualmente por mês, parcelas em aberto ou registradas e recorrências explicitamente incluídas como despesas fixas. O indicador e a rosca mostram a relação entre renda, compromissos e limite.
 
-A edição e o cancelamento de compras parceladas preservam os lançamentos já confirmados. A próxima etapa desse fluxo é a validação final da interface e da recuperação dos dados.
+A edição e o cancelamento de compras parceladas preservam os lançamentos já confirmados. O Planejamento permite excluir uma parcela individual ou encerrar uma previsão recorrente. O [roteiro de teste](teste-no-celular.md) cobre o efeito no relatório, no extrato e no backup.
 
 ## Etapa 5 — Distribuição
 

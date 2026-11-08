@@ -12,3 +12,4 @@ adb install -r -t ci-apks/app-debug.apk
 adb install -r -t ci-apks/app-debug-androidTest.apk
 timeout --foreground 8m adb shell am instrument -w -r com.mateuswilliam.financas.test/com.mateuswilliam.financas.IsolatedAndroidTestRunner | tee qa/instrumented.log
 python3 scripts/verify-instrumentation.py qa/instrumented.log
+bash scripts/smoke-phone-preview.sh

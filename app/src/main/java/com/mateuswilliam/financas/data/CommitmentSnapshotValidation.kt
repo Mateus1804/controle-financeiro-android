@@ -51,9 +51,10 @@ internal object CommitmentSnapshotValidation {
                 val plan = expected[c.id] ?: throw IllegalArgumentException("Parcela não prevista na compra.")
                 require(c.id == "installment:${c.purchaseId}:${c.installmentNumber}" && c.label == plan.label)
                 require(if (c.adjusted) purchase.revision > 0 else c.toCommitment() == plan) { "Valor ou vencimento de parcela inconsistente." }
+                require(!c.excluded || (c.recordId == null && purchase.revision > 0)) { "Uma parcela excluída não pode estar registrada." }
                 require(c.recordId !in occurrenceByRecord) { "Uma despesa não pode confirmar parcela e recorrência diferentes." }
             } else {
-                require(c.recurringId in recurring && c.installmentNumber == null && !c.adjusted)
+                require(c.recurringId in recurring && c.installmentNumber == null && !c.adjusted && !c.excluded)
                 require(c.id == CommitmentPlanning.recurringId(c.recurringId!!, date))
                 val occurrence = occurrences[c.recurringId to c.dueDate] ?: throw IllegalArgumentException("Vencimento recorrente ausente.")
                 require(occurrence.status in setOf("RECORDED", "REMOVED"))

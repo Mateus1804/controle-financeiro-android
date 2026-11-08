@@ -16,7 +16,7 @@ data class FinanceSnapshot(
 
 /** JSON de dados, sem desserialização de classes arbitrárias ou SQL recebido do arquivo. */
 object BackupSnapshot {
-    const val FORMAT_VERSION = 3
+    const val FORMAT_VERSION = 4
     private const val MAX_ROWS = 50_000
     private fun json(vararg fields: Pair<String, Any?>) = JSONObject().apply { fields.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
     private fun <T> array(rows: List<T>, convert: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(convert(it)) } }
@@ -37,7 +37,8 @@ object BackupSnapshot {
             "budgets" to array(snapshot.budgets) { b -> json("month" to b.month, "category" to b.category.name, "limitCents" to b.limitCents) },
             "recurring" to array(snapshot.recurring) { r -> json("id" to r.id, "title" to r.title, "amountCents" to r.amountCents,
                 "movement" to r.movement.name, "method" to r.method.name, "category" to r.category.name, "bank" to r.bank,
-                "nextDate" to r.nextDate, "dayOfMonth" to r.dayOfMonth, "active" to r.active, "lastRemindedDate" to r.lastRemindedDate) },
+                "nextDate" to r.nextDate, "dayOfMonth" to r.dayOfMonth, "active" to r.active,
+                "lastRemindedDate" to r.lastRemindedDate, "archived" to r.archived) },
             "monthlyPlans" to array(snapshot.monthlyPlans) { p -> json("month" to p.month, "incomeCents" to p.incomeCents, "healthyLimitBasisPoints" to p.healthyLimitBasisPoints) },
             "purchases" to array(snapshot.purchases) { p -> json("id" to p.id, "title" to p.title, "bank" to p.bank,
                 "category" to p.category.name, "method" to p.method.name, "totalCents" to p.totalCents,
@@ -48,7 +49,7 @@ object BackupSnapshot {
             "commitments" to array(snapshot.commitments) { c -> json("id" to c.id, "label" to c.label,
                 "amountCents" to c.amountCents, "dueDate" to c.dueDate, "purchaseId" to c.purchaseId,
                 "installmentNumber" to c.installmentNumber, "recurringId" to c.recurringId, "recordId" to c.recordId,
-                "adjusted" to c.adjusted) },
+                "adjusted" to c.adjusted, "excluded" to c.excluded) },
             "occurrences" to array(snapshot.occurrences) { o -> json("recurringId" to o.recurringId, "dueDate" to o.dueDate, "status" to o.status, "recordId" to o.recordId) },
         ).toString().toByteArray(Charsets.UTF_8).also {
             require(it.size <= BackupCrypto.MAX_PAYLOAD_BYTES) { "O backup excede o limite de 16 MiB." }
@@ -74,9 +75,13 @@ object BackupSnapshot {
                 d.text("explanation", 2000), d.long("occurredAt"), d.long("capturedAt"), d.text("status", 30), d.long("revision").also { require(it in 1L..Int.MAX_VALUE.toLong()) }.toInt()) },
             j.rows("accounts") { a -> AccountEntity(a.text("nameKey", 160), a.text("label", 80), a.long("lastUsedAt")) },
             j.rows("budgets") { b -> BudgetEntity(b.text("month", 12), Category.valueOf(b.text("category", 30)), b.long("limitCents")) },
-            j.rows("recurring") { r -> RecurringEntity(r.text("id", 128), r.text("title", 200), r.long("amountCents"),
-                Movement.valueOf(r.text("movement", 30)), PaymentMethod.valueOf(r.text("method", 30)), Category.valueOf(r.text("category", 30)),
-                r.text("bank", 80), r.text("nextDate", 20), r.long("dayOfMonth").also { require(it in 1L..31L) }.toInt(), r.bool("active"), r.text("lastRemindedDate", 20)) },
+            j.rows("recurring") { r ->
+                require(version >= 4 || !r.has("archived")) { "Exclusão de previsões exige a versão 4 do backup." }
+                RecurringEntity(r.text("id", 128), r.text("title", 200), r.long("amountCents"),
+                    Movement.valueOf(r.text("movement", 30)), PaymentMethod.valueOf(r.text("method", 30)), Category.valueOf(r.text("category", 30)),
+                    r.text("bank", 80), r.text("nextDate", 20), r.long("dayOfMonth").also { require(it in 1L..31L) }.toInt(),
+                    r.bool("active"), r.text("lastRemindedDate", 20), archived = version >= 4 && r.bool("archived"))
+            },
             j.rows("occurrences") { o -> OccurrenceEntity(o.text("recurringId", 128), o.text("dueDate", 20), o.text("status", 30), o.nullableText("recordId", 128)) },
             BackupDisplay(Appearance.valueOf(display.text("appearance", 20)), display.bool("hideAmounts"), display.text("lastOrigin", 80)),
             if (version >= 2) j.rows("monthlyPlans") { p -> MonthlyPlanEntity(p.text("month", 12), p.long("incomeCents"), p.integer("healthyLimitBasisPoints", 0, 10000)) } else emptyList(),
@@ -91,9 +96,11 @@ object BackupSnapshot {
             if (version >= 2) j.rows("fixedRecurring") { p -> FixedRecurringEntity(p.text("recurringId", 128), p.text("fromMonth", 12)) } else emptyList(),
             if (version >= 2) j.rows("commitments") { c ->
                 require(version >= 3 || !c.has("adjusted")) { "Ajustes de parcelas exigem a versão 3 do backup." }
+                require(version >= 4 || !c.has("excluded")) { "Exclusão de parcelas exige a versão 4 do backup." }
                 CommitmentEntity(c.text("id", 256), c.text("label", 256), c.long("amountCents"),
                     c.text("dueDate", 20), c.nullableText("purchaseId", 128), if (c.isNull("installmentNumber")) null else c.integer("installmentNumber", 1, Installments.MAX_INSTALLMENTS),
-                    c.nullableText("recurringId", 128), c.nullableText("recordId", 128), adjusted = version >= 3 && c.bool("adjusted"))
+                    c.nullableText("recurringId", 128), c.nullableText("recordId", 128),
+                    adjusted = version >= 3 && c.bool("adjusted"), excluded = version >= 4 && c.bool("excluded"))
             } else emptyList(),
         )
         validate(snapshot)
@@ -125,7 +132,11 @@ object BackupSnapshot {
         }
         snapshot.accounts.forEach { a -> require(a.label.isNotBlank() && a.label.length <= 80 && a.nameKey == AccountNames.key(a.label) && a.lastUsedAt >= 0) { "Conta inválida no backup." } }
         snapshot.budgets.forEach { require(Budgets.error(it.toBudget()) == null) { "Orçamento inválido no backup." } }
-        snapshot.recurring.forEach { require(Recurrences.error(it.toPlan()) == null && (it.lastRemindedDate.isEmpty() || it.lastRemindedDate == it.nextDate)) { "Recorrência inválida no backup." } }
+        snapshot.recurring.forEach { plan ->
+            require(Recurrences.error(plan.toPlan()) == null &&
+                (plan.lastRemindedDate.isEmpty() || plan.lastRemindedDate == plan.nextDate)) { "Recorrência inválida no backup." }
+            require(!plan.archived || (!plan.active && plan.lastRemindedDate.isEmpty())) { "Uma previsão excluída não pode estar ativa." }
+        }
         val linkedRecords = snapshot.occurrences.mapNotNull { it.recordId }
         unique(linkedRecords)
         snapshot.occurrences.forEach { o ->
