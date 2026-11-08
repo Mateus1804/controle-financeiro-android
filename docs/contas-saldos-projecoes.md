@@ -22,7 +22,7 @@ Resumo e Planejamento compartilham a mesma projeção. Gráficos de despesas e o
 
 ## Cadastro rápido e recorrências
 
-O mesmo formulário oferece lançamento único, mensal ou parcelado conforme o tipo. Categorias mudam com a movimentação, o meio de pagamento fica nos detalhes e sugestões do histórico permanecem editáveis. Estornos vinculados usam a categoria original.
+O mesmo formulário oferece lançamento único, mensal ou parcelado conforme o tipo. No primeiro cadastro, Carteira é uma sugestão editável, sem saldo presumido; uma carteira arquivada não volta como sugestão. Categorias mudam com a movimentação, o meio de pagamento fica nos detalhes e sugestões do histórico permanecem editáveis. Estornos vinculados usam a categoria original.
 
 A configuração inicial é opcional. Os modelos de aluguel, energia, água, internet e telefone abrem o formulário mensal com valor vazio; só a confirmação cria a previsão. Não há valores de exemplo nem lançamentos automáticos.
 

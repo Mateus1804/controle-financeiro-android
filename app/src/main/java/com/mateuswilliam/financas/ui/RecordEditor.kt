@@ -80,7 +80,8 @@ fun RecordEditor(
     var terms by rememberSaveable(stateSaver = PurchaseTerms.Saver) { mutableStateOf(PurchaseTerms(LocalDate.now())) }
     val activeAccounts = accounts.filter { account -> balances.none { it.account.key == account.key && it.archived } }
     val defaultBank = lastOrigin.takeIf { name -> name.isNotBlank() && balances.none { it.archived && it.account.key == AccountNames.key(name) } }
-        ?: activeAccounts.firstOrNull()?.label.orEmpty()
+        ?: activeAccounts.firstOrNull()?.label
+        ?: "Carteira".takeUnless { balances.any { account -> account.archived && account.account.key == AccountNames.key("Carteira") } }.orEmpty()
     var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: defaultBank) }
     var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200) ?: initialDescription) }
     var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: initialMovement) }
@@ -265,7 +266,7 @@ fun RecordEditor(
                     if (existing == null && preset == null && draft == null && movement != Movement.TRANSFER && originalRecordId == null) {
                         history.filter { it.movement == movement && it.description.trim().equals(description.trim(), ignoreCase = true) }
                             .maxByOrNull { it.occurredAt }?.let { match ->
-                                if (!categoryEdited) category = match.category
+                                if (!categoryEdited && match.category in categoriesFor(movement, reversalMovement)) category = match.category
                                 if (!accountEdited && activeAccounts.any { AccountNames.key(it.label) == AccountNames.key(match.bank) }) bank = match.bank
                             }
                     }

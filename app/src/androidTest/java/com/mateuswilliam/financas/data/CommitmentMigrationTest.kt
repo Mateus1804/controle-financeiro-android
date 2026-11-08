@@ -54,7 +54,7 @@ class CommitmentMigrationTest {
             repo.saveMonthlyPlan(MonthlyIncomePlan(YearMonth.of(2026, 11), 300000))
             assertEquals(300000L, repo.commitmentReport(YearMonth.of(2026, 11)).incomeCents)
             assertEquals(0L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
-            assertEquals(8, database.openHelper.writableDatabase.version)
+            assertEquals(9, database.openHelper.writableDatabase.version)
             database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         } finally { database.close(); context.deleteDatabase(name) }
     }
@@ -90,7 +90,7 @@ class CommitmentMigrationTest {
             assertEquals(3500L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
             assertEquals(3400L, repo.commitmentReport(YearMonth.of(2026, 12)).committedCents)
             BackupSnapshot.validate(repo.snapshot())
-            assertEquals(8, database.openHelper.writableDatabase.version)
+            assertEquals(9, database.openHelper.writableDatabase.version)
             database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         } finally { database.close(); context.deleteDatabase(name) }
     }
@@ -122,7 +122,7 @@ class CommitmentMigrationTest {
             assertEquals(4000L, repo.commitmentReport(YearMonth.of(2026, 11)).committedCents)
             assertNull(repo.purchaseManagement("installment:p:1"))
             BackupSnapshot.validate(repo.snapshot())
-            assertEquals(8, database.openHelper.writableDatabase.version)
+            assertEquals(9, database.openHelper.writableDatabase.version)
             database.openHelper.writableDatabase.query("PRAGMA foreign_key_check").use { assertFalse(it.moveToFirst()) }
         } finally { database.close(); context.deleteDatabase(name) }
     }

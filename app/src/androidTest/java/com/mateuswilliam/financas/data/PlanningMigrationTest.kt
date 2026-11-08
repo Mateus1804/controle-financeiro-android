@@ -44,7 +44,7 @@ class PlanningMigrationTest {
             assertTrue(dao.allRecurring().isEmpty()); assertTrue(dao.allOccurrences().isEmpty())
             dao.upsertBudget(BudgetEntity("2026-10", Category.FOOD, 10000))
             assertEquals(10000L, dao.allBudgets().single().limitCents)
-            assertEquals(8, database.openHelper.writableDatabase.version)
+            assertEquals(9, database.openHelper.writableDatabase.version)
         } finally { database.close(); context.deleteDatabase(name) }
     }
 }
