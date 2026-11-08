@@ -22,4 +22,23 @@ class RecordValidationTest {
         assertNotNull(RecordValidation.error(valid.copy(description = "x".repeat(201))))
         assertNotNull(RecordValidation.error(valid.copy(occurredAt = 0)))
     }
+
+    @Test fun `identificadores precisam ser recuperaveis pelo backup`() {
+        listOf("", " ", "x".repeat(129), "registro\u0000invalido").forEach { id ->
+            assertNotNull("Identificador inválido aceito: $id", RecordValidation.error(valid.copy(id = id)))
+        }
+        assertNull(RecordValidation.error(valid.copy(id = "ç".repeat(128))))
+    }
+
+    @Test fun `texto com nul nao pode gerar backup irrecuperavel`() {
+        listOf(
+            valid.copy(bank = "Conta\u0000inválida"),
+            valid.copy(description = "Compra\u0000inválida"),
+            valid.copy(movement = Movement.TRANSFER, destination = "Destino\u0000inválido"),
+        ).forEach { assertNotNull(RecordValidation.error(it)) }
+    }
+
+    @Test fun `destino residual legado nao invalida lancamento existente`() {
+        assertNull(RecordValidation.error(valid.copy(destination = "Conta anterior")))
+    }
 }

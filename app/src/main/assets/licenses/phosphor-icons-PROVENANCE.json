@@ -1,0 +1,830 @@
+{
+  "package": "@phosphor-icons/core",
+  "version": "2.1.1",
+  "source": "https://github.com/phosphor-icons/phosphor-core",
+  "registry_metadata": "https://registry.npmjs.org/@phosphor-icons/core/2.1.1",
+  "tarball": "https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz",
+  "tarball_integrity": "sha512-v4ARvrip4qBCImOE5rmPUylOEK4iiED9ZyKjcvzuezqMaiRASCHKcRIuvvxL/twvLpkfnEODCOJp5dM4eZilxQ==",
+  "tarball_sha256": "313332be6190b724da24107addd781799b48bf76b13963f24501112ffe1baadd",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2023 Phosphor Icons",
+  "conversion": "SVG viewBox 0 0 256 256 retained as Android viewport 256 x 256. Each path d is copied verbatim to android:pathData; currentColor becomes opaque black for Compose tint. Intrinsic size: 24dp. No geometry transformations, strokes or runtime dependencies.",
+  "icons": [
+    {
+      "name": "ic_overview",
+      "phosphor": "squares-four",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_overview",
+          "drawable": "app/src/main/res/drawable/ic_overview.xml",
+          "path": "assets/regular/squares-four.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/squares-four.svg",
+          "svg_sha256": "f70d6b20e08e028ab5b1714077681910a2431092cf7a23b82366ddaec554ab87",
+          "drawable_sha256": "b2a8723b18b102aaa203cd93cd396d7cf07c8b60d4883e36856e45e1291ec461"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_overview_fill",
+          "drawable": "app/src/main/res/drawable/ic_overview_fill.xml",
+          "path": "assets/fill/squares-four-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/squares-four-fill.svg",
+          "svg_sha256": "728b2dbfa447ec3fec54f0f8b3b52cec573c51da00c00a6d73f699027758340c",
+          "drawable_sha256": "3f1008a87ebd0e3d1d0ba691a99831c385554596d119470ab3f84c261ccab2af"
+        }
+      ]
+    },
+    {
+      "name": "ic_pending",
+      "phosphor": "clock-countdown",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_pending",
+          "drawable": "app/src/main/res/drawable/ic_pending.xml",
+          "path": "assets/regular/clock-countdown.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/clock-countdown.svg",
+          "svg_sha256": "7c244c61bd1dbecc02d89ba2aed311b9ee0b24208ec5d21c8fa38194eba7ba19",
+          "drawable_sha256": "5ce28acefc983ba89943a937d3421db4e1f47214becc913b2617241ea0541fbc"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_pending_fill",
+          "drawable": "app/src/main/res/drawable/ic_pending_fill.xml",
+          "path": "assets/fill/clock-countdown-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/clock-countdown-fill.svg",
+          "svg_sha256": "36179067806606d76fe476c4244514839bdf3e804c17c3efaad56d1a00a4c17d",
+          "drawable_sha256": "18ea343d16b54127c079e651a27ef0fac2d8d9e6b7fcb08dd35f2d044f2d1f84"
+        }
+      ]
+    },
+    {
+      "name": "ic_settings",
+      "phosphor": "gear-six",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_settings",
+          "drawable": "app/src/main/res/drawable/ic_settings.xml",
+          "path": "assets/regular/gear-six.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/gear-six.svg",
+          "svg_sha256": "2bb05ec80cc37505a3f21c74989dbb297ab8442a668f5ffbd6a8f7c1d5794c7b",
+          "drawable_sha256": "0c354fb4322a218c3d546be2b64f7971b9e010b244bd30bc3884ce777c72285e"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_settings_fill",
+          "drawable": "app/src/main/res/drawable/ic_settings_fill.xml",
+          "path": "assets/fill/gear-six-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/gear-six-fill.svg",
+          "svg_sha256": "dc303bf88571d9aa8d56c30d2630303aa7aba4ca21c21010be3549d6c17666ce",
+          "drawable_sha256": "afcc2400491298ce7931600c9446484f16419fb82fd07fffd98e54f2639b96b8"
+        }
+      ]
+    },
+    {
+      "name": "ic_add",
+      "phosphor": "plus",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_add",
+          "drawable": "app/src/main/res/drawable/ic_add.xml",
+          "path": "assets/regular/plus.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/plus.svg",
+          "svg_sha256": "d688feb9dd2e41c1721d6906a05a2a42e18cd774762fe706d72b2bdfd91cddc4",
+          "drawable_sha256": "8ff9d6cd132c588b87e350fb3aec91a6ee537ec8052b2275126b23c9b9f8a9ad"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_add_fill",
+          "drawable": "app/src/main/res/drawable/ic_add_fill.xml",
+          "path": "assets/fill/plus-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/plus-fill.svg",
+          "svg_sha256": "64ef1a2c9f693a531ddb970a6c6e7c9dcd9bf36a58afec66ecb57355449ce3d2",
+          "drawable_sha256": "2b7c19f93659c98152538efbcaaeb99870d6944c4e63cf93ded3f5aaae2f68e8"
+        }
+      ]
+    },
+    {
+      "name": "ic_income",
+      "phosphor": "arrow-down",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_income",
+          "drawable": "app/src/main/res/drawable/ic_income.xml",
+          "path": "assets/regular/arrow-down.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/arrow-down.svg",
+          "svg_sha256": "cc6416ae83e20660f14b11f5525c6d05ee679c3f26cee41b696cb37aa905d4f5",
+          "drawable_sha256": "0b38620919be605167ce324a1086c0e4bb81d3401baa4f1a58ff6dd4de77d883"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_income_fill",
+          "drawable": "app/src/main/res/drawable/ic_income_fill.xml",
+          "path": "assets/fill/arrow-down-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/arrow-down-fill.svg",
+          "svg_sha256": "e01cabbc9d683e45fbfd8bde2403a213df64e3d4a3893e806b5e14656bad9767",
+          "drawable_sha256": "d77c388e7726a6eb2f3e6bf2c1af5e4ae3e30647b0b50c72238b12e0dbe849fd"
+        }
+      ]
+    },
+    {
+      "name": "ic_expense",
+      "phosphor": "arrow-up",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_expense",
+          "drawable": "app/src/main/res/drawable/ic_expense.xml",
+          "path": "assets/regular/arrow-up.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/arrow-up.svg",
+          "svg_sha256": "361aa9f9c52a759bf598faf6ed38ccd426f949f541d662c65b5b5d868fa76980",
+          "drawable_sha256": "f259f1648244684100169cda9cd30bdd316348be8d6e883dca291289615070e9"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_expense_fill",
+          "drawable": "app/src/main/res/drawable/ic_expense_fill.xml",
+          "path": "assets/fill/arrow-up-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/arrow-up-fill.svg",
+          "svg_sha256": "34268ddce0a1aed339b27cf87cb97ab8b9eece8239df016cf06f1031c3a6507e",
+          "drawable_sha256": "6fc8b6eff2b391e8dcc1bf6f81aae3bb13a2d1067b5afd9627d4d5d92a285736"
+        }
+      ]
+    },
+    {
+      "name": "ic_transfer",
+      "phosphor": "arrows-left-right",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_transfer",
+          "drawable": "app/src/main/res/drawable/ic_transfer.xml",
+          "path": "assets/regular/arrows-left-right.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/arrows-left-right.svg",
+          "svg_sha256": "84c43373542a3ac2e7de3d22ddef0c8eb61ef6ba7a270c6aca5aa493dd40f8b4",
+          "drawable_sha256": "a8c6b98f0ea3862d5a316ee4c8187ebd67bff7304bcb28226dfa7ca7950c1c7c"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_transfer_fill",
+          "drawable": "app/src/main/res/drawable/ic_transfer_fill.xml",
+          "path": "assets/fill/arrows-left-right-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/arrows-left-right-fill.svg",
+          "svg_sha256": "50016fc97b7f93c542d9e780c8d709c9873980a20935130499b1ab842364ae79",
+          "drawable_sha256": "4c6895507f83579187959cd551bc79295b26452e4fdcb9bfc86e6286396534ba"
+        }
+      ]
+    },
+    {
+      "name": "ic_refund",
+      "phosphor": "arrow-u-up-left",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_refund",
+          "drawable": "app/src/main/res/drawable/ic_refund.xml",
+          "path": "assets/regular/arrow-u-up-left.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/arrow-u-up-left.svg",
+          "svg_sha256": "37975867f2e89f745250d3601a5674ca37883a8d79f52abcb082beba4df28df7",
+          "drawable_sha256": "19ac6f777972543991abe40469eacc4afd4543d4e4423516a9ec9c8abad99af3"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_refund_fill",
+          "drawable": "app/src/main/res/drawable/ic_refund_fill.xml",
+          "path": "assets/fill/arrow-u-up-left-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/arrow-u-up-left-fill.svg",
+          "svg_sha256": "f9e8890a04c24f2f973e7ff3f764bae79df60056d654e987da351618a9cabfc4",
+          "drawable_sha256": "9000bc275e48d194154e0ec04b5357967d46ca6e1f591a7549ede20592ab5344"
+        }
+      ]
+    },
+    {
+      "name": "ic_chevron_left",
+      "phosphor": "caret-left",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_chevron_left",
+          "drawable": "app/src/main/res/drawable/ic_chevron_left.xml",
+          "path": "assets/regular/caret-left.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/caret-left.svg",
+          "svg_sha256": "623bf248fe21a8170344e168aaac2e174119cea5d7c5d0fb0dc84f581009475f",
+          "drawable_sha256": "ef2d5cc2626e8d0d91484812c01d53c29d9fd435b01312ed450fed05f1481f91"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_chevron_left_fill",
+          "drawable": "app/src/main/res/drawable/ic_chevron_left_fill.xml",
+          "path": "assets/fill/caret-left-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/caret-left-fill.svg",
+          "svg_sha256": "a6300d93ee3016043fe02af787421093bedd301a0da992337d07b16404e65fa5",
+          "drawable_sha256": "eb40350857a0f4bbb690186455c39cd6bc1605438a73c8c96107c8d521ddceb2"
+        }
+      ]
+    },
+    {
+      "name": "ic_chevron_right",
+      "phosphor": "caret-right",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_chevron_right",
+          "drawable": "app/src/main/res/drawable/ic_chevron_right.xml",
+          "path": "assets/regular/caret-right.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/caret-right.svg",
+          "svg_sha256": "e6dec01e074807965b7f3146b976a9b5e82c31d9c2c88aeb52e77cc2ab16c1d7",
+          "drawable_sha256": "f36cb4d446270a75ac13a9534c3326a0aa142a952891ce939347d106a726008e"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_chevron_right_fill",
+          "drawable": "app/src/main/res/drawable/ic_chevron_right_fill.xml",
+          "path": "assets/fill/caret-right-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/caret-right-fill.svg",
+          "svg_sha256": "c62278a701f1e4c08f424ce4b5cac69c8adb23b496dae489d5545ea7e6c019ef",
+          "drawable_sha256": "2e65b0910dc47a6e02da0d4b7bea358823a3e1b97cf04e9115fd8ac042520f4a"
+        }
+      ]
+    },
+    {
+      "name": "ic_chevron_down",
+      "phosphor": "caret-down",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_chevron_down",
+          "drawable": "app/src/main/res/drawable/ic_chevron_down.xml",
+          "path": "assets/regular/caret-down.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/caret-down.svg",
+          "svg_sha256": "53f0cf2d0b144ac3cb07e353e0cd0853ffb3ed432d741460ce288edfcb0924b1",
+          "drawable_sha256": "34421f1fae2b6b4bbcf2cea4ee89cb9a04165c2d7238e795ffb089cd919ebe0e"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_chevron_down_fill",
+          "drawable": "app/src/main/res/drawable/ic_chevron_down_fill.xml",
+          "path": "assets/fill/caret-down-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/caret-down-fill.svg",
+          "svg_sha256": "33550432966b277d6cf891f4db186357f4a83b1f8a5c7770c6ad6f5dee9b0b34",
+          "drawable_sha256": "121a303a0c751fa799fe8a4673743dedbe9bc59bb6d399e0904eaf8f3085e7fd"
+        }
+      ]
+    },
+    {
+      "name": "ic_wallet",
+      "phosphor": "wallet",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_wallet",
+          "drawable": "app/src/main/res/drawable/ic_wallet.xml",
+          "path": "assets/regular/wallet.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/wallet.svg",
+          "svg_sha256": "9ae5c252608e1bda6dfe75f23599b1881a9476f8cc2069cd9083136fafe664f0",
+          "drawable_sha256": "233867d4218c2d550c54877093cbd8288f41d66323a8dcbdf13a8cf8bb9362a6"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_wallet_fill",
+          "drawable": "app/src/main/res/drawable/ic_wallet_fill.xml",
+          "path": "assets/fill/wallet-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/wallet-fill.svg",
+          "svg_sha256": "e419d13382b85966f1261978c5d6264589d837afd7f40329dfb21e9295c2a888",
+          "drawable_sha256": "57453f669b2736e84dd36053b3c3d8f7a522c4c2d5bdec8384f36cc0bbedb67e"
+        }
+      ]
+    },
+    {
+      "name": "ic_calendar",
+      "phosphor": "calendar-blank",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_calendar",
+          "drawable": "app/src/main/res/drawable/ic_calendar.xml",
+          "path": "assets/regular/calendar-blank.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/calendar-blank.svg",
+          "svg_sha256": "6268583ae0ea04e93fd24f1e70d47a8e8d79c88fc304af397b95b318980215d6",
+          "drawable_sha256": "b51d10124ac233e7d47d434a6cb8e1bc5c39071279b55c547572e3361f4bb85f"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_calendar_fill",
+          "drawable": "app/src/main/res/drawable/ic_calendar_fill.xml",
+          "path": "assets/fill/calendar-blank-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/calendar-blank-fill.svg",
+          "svg_sha256": "405596825bf3705baa7d289ed1242106fded80e34967927549a0413f4303a0ac",
+          "drawable_sha256": "1a2069d1bdacb12a1d3236a0134ef4ce15ae13610119200a6bea903adce346ad"
+        }
+      ]
+    },
+    {
+      "name": "ic_food",
+      "phosphor": "fork-knife",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_food",
+          "drawable": "app/src/main/res/drawable/ic_food.xml",
+          "path": "assets/regular/fork-knife.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/fork-knife.svg",
+          "svg_sha256": "24388d27ec51856a899b2ba8a1f68b1c31b385ed1f27eb275d5685ebf951b80f",
+          "drawable_sha256": "2c91b77dc5526e0734e0709680798c498902a1423287e06bbe414801814c791e"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_food_fill",
+          "drawable": "app/src/main/res/drawable/ic_food_fill.xml",
+          "path": "assets/fill/fork-knife-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/fork-knife-fill.svg",
+          "svg_sha256": "ff917789bb287fb51e80f346f5bf5cf96e2c4cf56d2637c4fe1d0b1238694024",
+          "drawable_sha256": "be4122f662b83cbafc3d107ca7a131c896a7a247192142109c1d63304557d032"
+        }
+      ]
+    },
+    {
+      "name": "ic_home",
+      "phosphor": "house",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_home",
+          "drawable": "app/src/main/res/drawable/ic_home.xml",
+          "path": "assets/regular/house.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/house.svg",
+          "svg_sha256": "180e9259e99e23da197b59b19394d006d6a5d33e384cc2b9c8381cb0214a5716",
+          "drawable_sha256": "bd2126ae3f444e5131159a1d8206be296f3d295da3cee430b7375bd5a3823d85"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_home_fill",
+          "drawable": "app/src/main/res/drawable/ic_home_fill.xml",
+          "path": "assets/fill/house-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/house-fill.svg",
+          "svg_sha256": "4783cdf0ae5f5ec363df6f77167a41642aac42fe8d73251b9a61232ab43f355d",
+          "drawable_sha256": "4a7ee1676becbf9abe1153f7409b592728e4432badb58d8c91ad3ac0d77e30d5"
+        }
+      ]
+    },
+    {
+      "name": "ic_transport",
+      "phosphor": "bus",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_transport",
+          "drawable": "app/src/main/res/drawable/ic_transport.xml",
+          "path": "assets/regular/bus.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/bus.svg",
+          "svg_sha256": "f9305d6a46e3e4e0844e1d92be64e47294654c2e70beab1afae0b26a84cc8477",
+          "drawable_sha256": "ef9bef08f320a7db573c52644df73ce74560fd1328c2271ef445a23dac7dac67"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_transport_fill",
+          "drawable": "app/src/main/res/drawable/ic_transport_fill.xml",
+          "path": "assets/fill/bus-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/bus-fill.svg",
+          "svg_sha256": "d36c30da3073ef26da10b246c8017e73ed0ed51e95e9e87a3bb1de8fb1db2247",
+          "drawable_sha256": "d3409c247eff320a51c29918564f6ae3c76f6dc723ec0f47c606935aa8126948"
+        }
+      ]
+    },
+    {
+      "name": "ic_health",
+      "phosphor": "first-aid",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_health",
+          "drawable": "app/src/main/res/drawable/ic_health.xml",
+          "path": "assets/regular/first-aid.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/first-aid.svg",
+          "svg_sha256": "a96afdc52d820f85d45cd799263c2faf2cbbe2931a447e3012b1b0b8036daf3f",
+          "drawable_sha256": "373d5aa094194d6a7dd42a9786a8c07042da4739aefbae888b7c4a89b1a83e67"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_health_fill",
+          "drawable": "app/src/main/res/drawable/ic_health_fill.xml",
+          "path": "assets/fill/first-aid-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/first-aid-fill.svg",
+          "svg_sha256": "c7fe94b212a603baa2c55445b11cec26651300c2cd6f0275db7763d078ac1a40",
+          "drawable_sha256": "1ddfa06ac6070caa4a9fa7bc61a899ec06bc0a40ac28561cc9245c8cb86861b2"
+        }
+      ]
+    },
+    {
+      "name": "ic_education",
+      "phosphor": "graduation-cap",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_education",
+          "drawable": "app/src/main/res/drawable/ic_education.xml",
+          "path": "assets/regular/graduation-cap.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/graduation-cap.svg",
+          "svg_sha256": "855b9f61c75900768c0265f671456554215e37b5bf15af9afa7acef36ec31c48",
+          "drawable_sha256": "584df6c2913e062d7ee35c52d3c16f80c5388e6a9d7d8f6658ca2a49fc7a8694"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_education_fill",
+          "drawable": "app/src/main/res/drawable/ic_education_fill.xml",
+          "path": "assets/fill/graduation-cap-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/graduation-cap-fill.svg",
+          "svg_sha256": "0324f19528344327607dd2ee731d1313f4bb7d40086c81e5c5305c8214a39975",
+          "drawable_sha256": "e2ab316c4762b18c2f38f5d3f4e8db7c0efca63572f9415798bb6a729c031fad"
+        }
+      ]
+    },
+    {
+      "name": "ic_leisure",
+      "phosphor": "ticket",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_leisure",
+          "drawable": "app/src/main/res/drawable/ic_leisure.xml",
+          "path": "assets/regular/ticket.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/ticket.svg",
+          "svg_sha256": "1e168a9edcbdda845cbc2a9a1eb5dfa1499bf7974351750e81ea142ecdde7335",
+          "drawable_sha256": "af52977d8feb437986af678654c937230444a5d8ca0b6eb52492860e86932076"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_leisure_fill",
+          "drawable": "app/src/main/res/drawable/ic_leisure_fill.xml",
+          "path": "assets/fill/ticket-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/ticket-fill.svg",
+          "svg_sha256": "05d5f1f92438ec68001c936f5c6c9bd6a95aa2719b6ad61e499be4733960353d",
+          "drawable_sha256": "368e517bf924929ac6e36ebb49671fd2579a7abc72cc441e2bf79e43a9e15ffc"
+        }
+      ]
+    },
+    {
+      "name": "ic_category",
+      "phosphor": "shapes",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_category",
+          "drawable": "app/src/main/res/drawable/ic_category.xml",
+          "path": "assets/regular/shapes.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/shapes.svg",
+          "svg_sha256": "c75e2c304e0383be46b1b8e8895baf8d17ef656c9c9a72cb29a3fb95216853df",
+          "drawable_sha256": "b65d97b0b2f882a9c1489edcf4022e26b74c705a990d571eaf11eb5220d46a7c"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_category_fill",
+          "drawable": "app/src/main/res/drawable/ic_category_fill.xml",
+          "path": "assets/fill/shapes-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/shapes-fill.svg",
+          "svg_sha256": "f271aed310730de556cca69e12b6c5ba64becb0c4bdc398d2d8ff330197eca32",
+          "drawable_sha256": "fd1c406db5417484f32a5020e72e66149128a3eb2bad05dc800a164440d78a64"
+        }
+      ]
+    },
+    {
+      "name": "ic_bank",
+      "phosphor": "bank",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_bank",
+          "drawable": "app/src/main/res/drawable/ic_bank.xml",
+          "path": "assets/regular/bank.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/bank.svg",
+          "svg_sha256": "d52f812b44373ca15c1a8050ba27b35b8f4e014f1fcfe5fbaf9ee84d736b0c43",
+          "drawable_sha256": "aba34213e21c3ee94e9e15951ae5517c96fb7c0efad885b25b0473036096a9f3"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_bank_fill",
+          "drawable": "app/src/main/res/drawable/ic_bank_fill.xml",
+          "path": "assets/fill/bank-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/bank-fill.svg",
+          "svg_sha256": "2c223fc8f62ed7df0f45cdfe47808dda2833a01c23402b134684a3de3857b85f",
+          "drawable_sha256": "f002594ba14c819ce993465f25f52534d129bc110d3b755ea8eac1cc51862454"
+        }
+      ]
+    },
+    {
+      "name": "ic_card",
+      "phosphor": "credit-card",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_card",
+          "drawable": "app/src/main/res/drawable/ic_card.xml",
+          "path": "assets/regular/credit-card.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/credit-card.svg",
+          "svg_sha256": "15aa383eedde1f3d95df3749b30ad1ba986f0522ef8784a68f9039f18efdc5eb",
+          "drawable_sha256": "76433bd36abae6c45969bd0b2335f0978d6b07d47d8b4347ad89656e6ffa4278"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_card_fill",
+          "drawable": "app/src/main/res/drawable/ic_card_fill.xml",
+          "path": "assets/fill/credit-card-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/credit-card-fill.svg",
+          "svg_sha256": "65f1fb499538f5743e257c6788afc61ae16af5ec0f405eac2cf5d9bf9b93b768",
+          "drawable_sha256": "7adab7761daaa230c560c98b380c8ea82b20413cc3f4980eff3f363900be3f43"
+        }
+      ]
+    },
+    {
+      "name": "ic_lock",
+      "phosphor": "lock-key",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_lock",
+          "drawable": "app/src/main/res/drawable/ic_lock.xml",
+          "path": "assets/regular/lock-key.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/lock-key.svg",
+          "svg_sha256": "a8177687fb7b376afa1cf3bc0b16599c91b96a323687e2145f772b93ed0f2c95",
+          "drawable_sha256": "32fbb45b2e1128d35f0686602fb5fdda1af0e9848d24bf77744cb93a0872fd2e"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_lock_fill",
+          "drawable": "app/src/main/res/drawable/ic_lock_fill.xml",
+          "path": "assets/fill/lock-key-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/lock-key-fill.svg",
+          "svg_sha256": "0a12a30d74b447649cd0e3855b9a5131629e8c2cd499f58106c7a398d8dff0ca",
+          "drawable_sha256": "3e65eb3cf66545ce18f5c3e86b795fc0ca14df3bd7448c4808aad780a8488200"
+        }
+      ]
+    },
+    {
+      "name": "ic_backup",
+      "phosphor": "archive",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_backup",
+          "drawable": "app/src/main/res/drawable/ic_backup.xml",
+          "path": "assets/regular/archive.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/archive.svg",
+          "svg_sha256": "bde81c0c44e80a7b8bf97f29ec11488c1b48998f2f74b2eb29e13ef8c1975e75",
+          "drawable_sha256": "c459ec210a57939441297ebda98936f3184625ae86946ae34d9e519d7efd2f64"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_backup_fill",
+          "drawable": "app/src/main/res/drawable/ic_backup_fill.xml",
+          "path": "assets/fill/archive-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/archive-fill.svg",
+          "svg_sha256": "a8df0d704e55ecc356f323f23e659c67ea271fe2036f30543d6f2534b7024339",
+          "drawable_sha256": "81d7aad089405c8e5096b8c55fb1fe1c3aade9abfca0a3d2681ab5ba7506845d"
+        }
+      ]
+    },
+    {
+      "name": "ic_restore",
+      "phosphor": "clock-counter-clockwise",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_restore",
+          "drawable": "app/src/main/res/drawable/ic_restore.xml",
+          "path": "assets/regular/clock-counter-clockwise.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/clock-counter-clockwise.svg",
+          "svg_sha256": "06aa1cb0d2664789232f4addb1c5932c8ce14e48465c8e8fb09a651b619b44e3",
+          "drawable_sha256": "3830946ff81467d8c83ad682ef7565fe2d4cec0fd51c6f24e78ec702a4a0cad0"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_restore_fill",
+          "drawable": "app/src/main/res/drawable/ic_restore_fill.xml",
+          "path": "assets/fill/clock-counter-clockwise-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/clock-counter-clockwise-fill.svg",
+          "svg_sha256": "618d6c238df479c26b40aab3271602a801797338d5521a28a1b254a86edf5398",
+          "drawable_sha256": "7d0eedf09a0980e669fe3e910d3536efb4548b26ff6e49cfc11478d64419036b"
+        }
+      ]
+    },
+    {
+      "name": "ic_visibility",
+      "phosphor": "eye",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_visibility",
+          "drawable": "app/src/main/res/drawable/ic_visibility.xml",
+          "path": "assets/regular/eye.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/eye.svg",
+          "svg_sha256": "91d39f20bf95e0f36c07bd79b83a85fe6ff4ca20e2759c4afee7419ef80403fe",
+          "drawable_sha256": "9b4697dfe47ad347cdb899ee7ca326869d8d7eb7ac554863443dd724ef580b16"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_visibility_fill",
+          "drawable": "app/src/main/res/drawable/ic_visibility_fill.xml",
+          "path": "assets/fill/eye-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/eye-fill.svg",
+          "svg_sha256": "86381b51cb6f305019503b4c5d4b02fe8df5941bab3f1475ee873006a8708420",
+          "drawable_sha256": "7c5536f8c5e2851c4c5dcc3fe348466ed86d8f88c8afd84d601cb3289ecd1233"
+        }
+      ]
+    },
+    {
+      "name": "ic_visibility_off",
+      "phosphor": "eye-slash",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_visibility_off",
+          "drawable": "app/src/main/res/drawable/ic_visibility_off.xml",
+          "path": "assets/regular/eye-slash.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/eye-slash.svg",
+          "svg_sha256": "070b0296a7df89ebf4cec12436e323b5531d458aa9aed3608924085889e1fd17",
+          "drawable_sha256": "17b1600ac3c9d045a05c8cf3e81a0e97af70bfb35b8f506aa7b09d8920814d03"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_visibility_off_fill",
+          "drawable": "app/src/main/res/drawable/ic_visibility_off_fill.xml",
+          "path": "assets/fill/eye-slash-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/eye-slash-fill.svg",
+          "svg_sha256": "fc34ad807da63ae5f99a235618cddc1b2bef8d98d7c95004d38b61312540b90d",
+          "drawable_sha256": "618dfbe960a6e42d2a82a4c7fc17563d1d29920f074543f3447a898ada260345"
+        }
+      ]
+    },
+    {
+      "name": "ic_close",
+      "phosphor": "x",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_close",
+          "drawable": "app/src/main/res/drawable/ic_close.xml",
+          "path": "assets/regular/x.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/x.svg",
+          "svg_sha256": "7397b15e1fa66eaf6ff9b59fe91d483cb5c3bcf75b2fe052097ab6f0593b513a",
+          "drawable_sha256": "309026d7201a0647aa4f875aa706ebbdb62d618c3eded656f79c0827a254746c"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_close_fill",
+          "drawable": "app/src/main/res/drawable/ic_close_fill.xml",
+          "path": "assets/fill/x-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/x-fill.svg",
+          "svg_sha256": "6ec0689770c1fb1dc7018039bef101079d2d20931c4661c3981cbe956f20c872",
+          "drawable_sha256": "2ef8b482b537ffac47fb2e66d0ad48c6bd0fa4d9b851ffa9de24065babb02fbe"
+        }
+      ]
+    },
+    {
+      "name": "ic_search",
+      "phosphor": "magnifying-glass",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_search",
+          "drawable": "app/src/main/res/drawable/ic_search.xml",
+          "path": "assets/regular/magnifying-glass.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/magnifying-glass.svg",
+          "svg_sha256": "f9fa2561978a9a3291e8ae0ebfcb651104f5069fade8f84871627bca68889cde",
+          "drawable_sha256": "88e65b59adcc63474d34612a80c39aae8be119bea8c11db61e73c2a7b41870c3"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_search_fill",
+          "drawable": "app/src/main/res/drawable/ic_search_fill.xml",
+          "path": "assets/fill/magnifying-glass-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/magnifying-glass-fill.svg",
+          "svg_sha256": "e7cf953bb787af2a4b11f8a248f35b56aab2f2b44f535d03593f490a4a633244",
+          "drawable_sha256": "60c71d2757703dec4e3c74a97779c15c3930b4f83b9d9bdb8a3cd0e160a7bf77"
+        }
+      ]
+    },
+    {
+      "name": "ic_check",
+      "phosphor": "check",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_check",
+          "drawable": "app/src/main/res/drawable/ic_check.xml",
+          "path": "assets/regular/check.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/check.svg",
+          "svg_sha256": "cbb89a8c42f283d4f846eb935e05d88c1be04462f16480e068c0f82b9ce40b12",
+          "drawable_sha256": "6a445da5a828d66f225d3a65ca52982a4187d1a8f16288cb053fa72c008b30bd"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_check_fill",
+          "drawable": "app/src/main/res/drawable/ic_check_fill.xml",
+          "path": "assets/fill/check-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/check-fill.svg",
+          "svg_sha256": "d114007dc371976dc3e8f4ebc59c5aef429fae59ae58d56acdf231a52b4700be",
+          "drawable_sha256": "65fd2e5d5b817f6ed1b50b0006b9c465ba6f13e070d5e4058bc3414f7468cb48"
+        }
+      ]
+    },
+    {
+      "name": "ic_notification",
+      "phosphor": "bell",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_notification",
+          "drawable": "app/src/main/res/drawable/ic_notification.xml",
+          "path": "assets/regular/bell.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/bell.svg",
+          "svg_sha256": "439b02c746ff59945b6175c6d327113ca3f7a729a43d5bcafb278a0f11ee34b5",
+          "drawable_sha256": "e6069ecb27959c6a39c27f6ed67d3383efb594424bde7165a0f1397fa2268a00"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_notification_fill",
+          "drawable": "app/src/main/res/drawable/ic_notification_fill.xml",
+          "path": "assets/fill/bell-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/bell-fill.svg",
+          "svg_sha256": "26437565edc7418a2c326a74078fb4519aa2316e84fcf1adefbdd1b2c89f4ac5",
+          "drawable_sha256": "c49ad478c1b58184a41e8f01e048b2d5e7e030c9c65ceba421a71384b77e120a"
+        }
+      ]
+    },
+    {
+      "name": "ic_records",
+      "phosphor": "receipt",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_records",
+          "drawable": "app/src/main/res/drawable/ic_records.xml",
+          "path": "assets/regular/receipt.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/receipt.svg",
+          "svg_sha256": "7e3473e35fc2b7b9b66032aef0b19fc22e947d10472b67da0b38fb29d84af7ea",
+          "drawable_sha256": "1dc2e976cf5ae1eb2d57bd6fc9f95b056013cb34768493ef7f13e49f2fc4cee7"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_records_fill",
+          "drawable": "app/src/main/res/drawable/ic_records_fill.xml",
+          "path": "assets/fill/receipt-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/receipt-fill.svg",
+          "svg_sha256": "c8ea3afaa7142f69d8b40ee939390b34ef85c10dd932820bd5f145c6ccccba9f",
+          "drawable_sha256": "e5824b1b274df9c769425ede993af1359c86ceb1be5513cce763dfe82132aeb1"
+        }
+      ]
+    },
+    {
+      "name": "ic_more",
+      "phosphor": "dots-three-vertical",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_more",
+          "drawable": "app/src/main/res/drawable/ic_more.xml",
+          "path": "assets/regular/dots-three-vertical.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/dots-three-vertical.svg",
+          "svg_sha256": "85fdecd2193efcd7e80a83607b66d2680fef8f3d1e93380c26f9851b24edbd01",
+          "drawable_sha256": "9071cb0762fd0b77d9a94952a7215eb0e6ea78f413b13b249c76db9e73202bb9"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_more_fill",
+          "drawable": "app/src/main/res/drawable/ic_more_fill.xml",
+          "path": "assets/fill/dots-three-vertical-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/dots-three-vertical-fill.svg",
+          "svg_sha256": "16ed29e032fff6d9744c64521cf793a68e15f00ceb72efd4286bf40bc87a2530",
+          "drawable_sha256": "215db1df57e915fdb9ddf9e120edcdd972adcd4ea1b20d6975d95833c52d5d47"
+        }
+      ]
+    },
+    {
+      "name": "ic_filter",
+      "phosphor": "funnel-simple",
+      "variants": [
+        {
+          "style": "regular",
+          "resource": "ic_filter",
+          "drawable": "app/src/main/res/drawable/ic_filter.xml",
+          "path": "assets/regular/funnel-simple.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/regular/funnel-simple.svg",
+          "svg_sha256": "84231c41ad9b9c962f468c184663e2ae5f7ea691d897bf39c5169a753fa7cfa9",
+          "drawable_sha256": "53274d7fcb7d0dad68ff7780123ac4160bc3bf52c42deabb70ab1db1ff8b9752"
+        },
+        {
+          "style": "fill",
+          "resource": "ic_filter_fill",
+          "drawable": "app/src/main/res/drawable/ic_filter_fill.xml",
+          "path": "assets/fill/funnel-simple-fill.svg",
+          "url": "https://unpkg.com/@phosphor-icons/core@2.1.1/assets/fill/funnel-simple-fill.svg",
+          "svg_sha256": "c09610450271deb22523ca237e2e4cd610481c2347751f2034e33e24b45a7c2a",
+          "drawable_sha256": "8cc7e320b44377cd5bfb2d4b5e081aeefbf85aae6e1ace02aad99f5e622d839f"
+        }
+      ]
+    }
+  ]
+}

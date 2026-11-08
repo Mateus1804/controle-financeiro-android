@@ -2,7 +2,7 @@
 
 ## Escopo
 
-O backup é um arquivo de dados do Controle Financeiro, protegido por senha. Inclui lançamentos confirmados, pendências com seus estados de revisão, identificadores para impedir reprocessamento, contas cadastradas, orçamentos mensais, recorrências e histórico dos vencimentos tratados, compras parceladas, compromissos, marcações de despesas fixas e renda/limite de cada mês. Também inclui aparência, ocultação de valores e última origem utilizada manualmente.
+O backup é um arquivo de dados do Controle Financeiro, protegido por senha. Inclui lançamentos confirmados, pendências com seus estados de revisão, identificadores para impedir reprocessamento, contas cadastradas, orçamentos mensais, recorrências e histórico dos vencimentos tratados, compras parceladas, compromissos, marcações de despesas fixas e renda/limite de cada mês. Também inclui as competências recorrentes e as configurações com vigência mensal, além de aparência, ocultação de valores e última origem utilizada manualmente.
 
 O CSV continua sendo um relatório dos lançamentos confirmados e não é aceito como arquivo de restauração. O backup não inclui arquivos de assinatura, senhas bancárias, autorizações do Android, seleção de aplicativos, consentimento da captura ou configurações de bloqueio do aparelho.
 
@@ -29,7 +29,7 @@ O envelope binário versão 1 utiliza inteiros de 32 bits em ordem big-endian:
 
 A chave de 256 bits é derivada com `PBKDF2WithHmacSHA256`; a criptografia utiliza `AES/GCM/NoPadding`. Salt e nonce novos são gerados com `SecureRandom` a cada criação. O cabeçalho inteiro é autenticado como AAD. Versões e parâmetros diferentes dos suportados são recusados antes da derivação para impedir custos arbitrários definidos pelo arquivo recebido.
 
-O conteúdo autenticado é JSON UTF-8 com identificação `controle-financeiro` e versão lógica 4. O leitor aceita as versões 1, 2 e 3. As versões anteriores preservam o estado que registravam e não criam exclusões novas. O arquivo não contém comandos SQL nem classes a serem instanciadas dinamicamente. Os centavos são números inteiros. Números fracionários, identificadores repetidos, vínculos inconsistentes, estados desconhecidos e campos fora dos limites são recusados.
+O conteúdo autenticado é JSON UTF-8 com identificação `controle-financeiro` e versão lógica 5. O leitor aceita também as versões 1, 2, 3 e 4. As versões anteriores preservam o estado que registravam e não criam exclusões novas. O arquivo não contém comandos SQL nem classes a serem instanciadas dinamicamente. Os centavos são números inteiros. Números fracionários, identificadores repetidos, vínculos inconsistentes, estados desconhecidos e campos fora dos limites são recusados.
 
 O limite é de 16 MiB para o conteúdo e 50 mil itens no conjunto de tabelas. O envelope acrescenta 60 bytes ao tamanho do conteúdo. Versões futuras precisam de conversão explícita; arquivos desconhecidos não são abertos por tentativa ou recriação destrutiva.
 
@@ -60,7 +60,7 @@ Os resultados efetivamente executados ficam em [Qualidade e validação](qualida
 
 ## Compatibilidade entre versões
 
-O envelope criptográfico continua na versão 1. O conteúdo de dados utiliza a versão 4, separado do esquema Room 7. O formato 2 introduziu as tabelas de comprometimento, o 3 acrescentou revisão, cancelamento e ajuste de parcelas, e o 4 registra exclusões de parcelas individuais e de previsões recorrentes. Versões antigas do aplicativo precisam ser atualizadas para restaurar um arquivo V4. A prévia conta os itens no arquivo, inclusive os vínculos históricos; as previsões excluídas não voltam ao Planejamento. Um vetor congelado em `app/src/androidTest/assets/compatibility/` é restaurado numa base temporária antes de qualquer substituição.
+O envelope criptográfico continua na versão 1. O conteúdo de dados utiliza a versão 5, separado do esquema Room 8. O formato 2 introduziu as tabelas de comprometimento, o 3 acrescentou revisão, cancelamento e ajuste de parcelas, o 4 registra exclusões de parcelas individuais e de previsões recorrentes, e o 5 acrescenta snapshots por competência e revisões da configuração recorrente. Versões antigas do aplicativo precisam ser atualizadas para restaurar um arquivo V5. A prévia conta os itens no arquivo, inclusive os vínculos históricos; as previsões excluídas não voltam ao Planejamento. Um vetor congelado em `app/src/androidTest/assets/compatibility/` é restaurado numa base temporária antes de qualquer substituição.
 
 O vetor usa dados fictícios e criptografia gerada independentemente em Python. Não representa uma exportação bancária real. O teste compara todos os registros, vínculos, revisões, contas, orçamentos, recorrências e ocorrências, além da aparência. O cadastro local existente precisa permanecer intacto até a confirmação da restauração. O arquivo congelado não é regenerado durante o teste.
 

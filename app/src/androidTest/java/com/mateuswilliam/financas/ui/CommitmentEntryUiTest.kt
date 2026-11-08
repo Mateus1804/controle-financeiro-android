@@ -49,9 +49,7 @@ class CommitmentEntryUiTest {
         assertEquals(month.plusMonths(3), YearMonth.from(LocalDate.parse(obligations.last().dueDate)))
         assertTrue(app.repository.exportRecords().isEmpty())
 
-        rule.waitUntil(8000) {
-            rule.onAllNodesWithText("Compra salva.", substring = true).fetchSemanticsNodes().isEmpty()
-        }
+        rule.dismissFeedback("Compra salva.")
         openPlanning()
         val first = obligations.first().id
         scrollPlanningTo("installment-$first")
@@ -138,15 +136,15 @@ class CommitmentEntryUiTest {
         app.repository.saveRecurring(expense)
         app.repository.saveRecurring(expense.copy(id = "salario-teste", title = "Salário fictício", movement = Movement.INCOME))
         openPlanning()
-        scrollPlanningTo("fixed-${expense.id}")
-        rule.onNodeWithTag("fixed-${expense.id}").performScrollTo().performClick()
+        rule.performPlanningAction("fixed-${expense.id}")
         rule.waitUntil(5000) { runBlocking { dao.fixedRecurringById(expense.id) != null } }
         assertEquals(month.toString(), dao.fixedRecurringById(expense.id)?.fromMonth)
         assertEquals(65000L, app.repository.commitmentReport(month).committedCents)
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasText("Salário fictício"))
+        rule.openPlanningActions("recurring-salario-teste")
         rule.onNodeWithTag("fixed-salario-teste").assertDoesNotExist()
-        scrollPlanningTo("fixed-${expense.id}")
-        rule.onNodeWithTag("fixed-${expense.id}").performScrollTo().performClick()
+        androidx.test.espresso.Espresso.pressBack()
+        rule.waitForIdle()
+        rule.performPlanningAction("fixed-${expense.id}")
         rule.waitUntil(5000) { runBlocking { dao.fixedRecurringById(expense.id) == null } }
         assertEquals(0L, app.repository.commitmentReport(month).committedCents)
         assertTrue(app.repository.exportRecords().isEmpty())

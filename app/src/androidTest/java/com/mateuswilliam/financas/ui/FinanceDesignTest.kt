@@ -98,4 +98,21 @@ class FinanceDesignTest {
         rule.onNodeWithText("Ocultar novamente").performClick()
         rule.onAllNodesWithText(Money.format(4290)).assertCountEquals(0)
     }
+
+    @Test fun optionalInformationHasAnAccessibleExpandableControl() {
+        rule.setContent { FinanceTheme {
+            FinanceDisclosure("Como funciona", "optional-details") {
+                androidx.compose.material3.Text("Detalhe opcional")
+            }
+        } }
+        rule.onNodeWithText("Detalhe opcional").assertDoesNotExist()
+        rule.onNodeWithTag("optional-details").assertHeightIsAtLeast(48.dp)
+            .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Recolhido"))
+            .performClick()
+        rule.onNodeWithText("Detalhe opcional").assertIsDisplayed()
+        rule.onNodeWithTag("optional-details")
+            .assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Expandido"))
+            .performClick()
+        rule.onNodeWithText("Detalhe opcional").assertDoesNotExist()
+    }
 }

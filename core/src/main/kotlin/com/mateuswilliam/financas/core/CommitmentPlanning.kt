@@ -41,7 +41,6 @@ object CommitmentPlanning {
         Recurrences.error(plan)?.let { throw IllegalArgumentException(it) }
         val next = LocalDate.parse(plan.nextDate)
         val due = if (YearMonth.from(next) == month) next else month.atDay(minOf(plan.dayOfMonth, month.lengthOfMonth()))
-        if (due < next) return null
         return FixedCommitment(recurringId(plan.id, due), plan.title, plan.amountCents, due)
     }
 

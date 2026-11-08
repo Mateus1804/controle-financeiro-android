@@ -1,0 +1,13 @@
+Phosphor Icons — @phosphor-icons/core 2.1.1
+Copyright (c) 2023 Phosphor Icons
+License: MIT, reproduced in phosphor-icons-LICENSE.txt in this directory.
+Source: https://github.com/phosphor-icons/phosphor-core
+Package: https://www.npmjs.com/package/@phosphor-icons/core/v/2.1.1
+Archive: https://registry.npmjs.org/@phosphor-icons/core/-/core-2.1.1.tgz
+Archive integrity: sha512-v4ARvrip4qBCImOE5rmPUylOEK4iiED9ZyKjcvzuezqMaiRASCHKcRIuvvxL/twvLpkfnEODCOJp5dM4eZilxQ==
+
+Official Regular and Fill SVG paths were converted to Android VectorDrawable
+without redrawing or changing geometry. The 256 x 256 viewBox is preserved;
+currentColor is represented by opaque black and tinted by the application's UI.
+Resource inventory and per-file provenance: docs/icones-phosphor.json in the
+source repository, and phosphor-icons-PROVENANCE.json in this directory.

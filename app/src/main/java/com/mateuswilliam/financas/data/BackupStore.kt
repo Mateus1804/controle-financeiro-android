@@ -40,7 +40,7 @@ class BackupStore(private val context: Context, private val repository: FinanceR
             }
             val plaintext = try { BackupCrypto.decrypt(file, password) } finally { file.fill(0) }
             val snapshot = try { BackupSnapshot.decode(plaintext) } finally { plaintext.fill(0) }
-            val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7).build()
+            val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8).build()
             database = temporary
             temporary.withTransaction { insertSnapshot(temporary.financeDao(), snapshot) }
             verify(temporary)
@@ -51,7 +51,8 @@ class BackupStore(private val context: Context, private val repository: FinanceR
                 copy.accounts.toSet() == snapshot.accounts.toSet() && copy.budgets.toSet() == snapshot.budgets.toSet() &&
                 copy.recurring.toSet() == snapshot.recurring.toSet() && copy.occurrences.toSet() == snapshot.occurrences.toSet() &&
                 copy.monthlyPlans.toSet() == snapshot.monthlyPlans.toSet() && copy.purchases.toSet() == snapshot.purchases.toSet() &&
-                copy.fixedRecurring.toSet() == snapshot.fixedRecurring.toSet() && copy.commitments.toSet() == snapshot.commitments.toSet()) { "A conferência da base temporária falhou." }
+                copy.fixedRecurring.toSet() == snapshot.fixedRecurring.toSet() && copy.commitments.toSet() == snapshot.commitments.toSet() &&
+                copy.recurringRevisions.toSet() == snapshot.recurringRevisions.toSet() && copy.recurringMonths.toSet() == snapshot.recurringMonths.toSet()) { "A conferência da base temporária falhou." }
             StagedRestore(name, snapshot.createdAt, copy.records.size, copy.drafts.count { it.status == "PENDING" },
                 copy.accounts.size, copy.budgets.size, copy.recurring.size, copy.display, copy.monthlyPlans.size, copy.purchases.size, copy.commitments.size, copy.fixedRecurring.size)
         } catch (exception: Exception) {
@@ -61,7 +62,7 @@ class BackupStore(private val context: Context, private val repository: FinanceR
 
     suspend fun restore(staged: StagedRestore) = withContext(Dispatchers.IO) {
         require(staged.databaseName.startsWith("restore-stage-") && context.getDatabasePath(staged.databaseName).exists()) { "A prévia expirou. Selecione o backup novamente." }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8).build()
         try {
             verify(database)
             val snapshot = readSnapshot(database.financeDao(), staged.createdAt, staged.display)
@@ -89,9 +90,10 @@ class BackupStore(private val context: Context, private val repository: FinanceR
 
 internal suspend fun readSnapshot(dao: FinanceDao, createdAt: Long, display: BackupDisplay) = FinanceSnapshot(createdAt,
     dao.allRecords(), dao.allDrafts(), dao.allAccounts(), dao.allBudgets(), dao.allRecurring(), dao.allOccurrences(), display,
-    dao.allMonthlyPlans(), dao.allPurchases(), dao.allFixedRecurring(), dao.allCommitments())
+    dao.allMonthlyPlans(), dao.allPurchases(), dao.allFixedRecurring(), dao.allCommitments(), dao.allRecurringRevisions(), dao.allRecurringMonths())
 
-internal suspend fun insertSnapshot(dao: FinanceDao, snapshot: FinanceSnapshot) {
+internal suspend fun insertSnapshot(dao: FinanceDao, original: FinanceSnapshot) {
+    val snapshot = RecurringSnapshots.upgrade(original)
     snapshot.accounts.forEach { dao.insertAccount(it) }
     snapshot.drafts.forEach { dao.insertDraft(it) }
     snapshot.records.forEach { dao.insertRecord(it) }
@@ -102,4 +104,6 @@ internal suspend fun insertSnapshot(dao: FinanceDao, snapshot: FinanceSnapshot) 
     snapshot.purchases.forEach { dao.insertPurchase(it) }
     snapshot.fixedRecurring.forEach { dao.upsertFixedRecurring(it) }
     snapshot.commitments.forEach { dao.insertCommitment(it) }
+    snapshot.recurringRevisions.forEach { dao.upsertRecurringRevision(it) }
+    snapshot.recurringMonths.forEach { dao.insertRecurringMonth(it) }
 }

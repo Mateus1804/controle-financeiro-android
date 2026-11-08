@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
@@ -92,7 +93,8 @@ fun RecordEditor(
     val schedule = scheduleResult?.getOrNull()
     val record = Record(id, (if (purchaseMode) schedule?.totalCents else cents) ?: 0, movement,
         if (purchaseMode) PaymentMethod.CARD else method, category, bank, description,
-        LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), destination)
+        LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+        if (movement == Movement.TRANSFER) destination else "")
     val error = scheduleResult?.exceptionOrNull()?.message ?: RecordValidation.error(record)
     val duplicates = remember(duplicateIndex, record, draft?.id) { if (draft != null) duplicateIndex?.find(record).orEmpty() else emptyList() }
 
@@ -165,8 +167,8 @@ fun RecordEditor(
                 } else PrivateValueGate(hideAmounts, "Mostrar valor para edição") {
                     MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
                 }
-                if (!installmentConfirmation) ChoiceField("Movimentação", movement,
-                    if (preset != null) listOf(Movement.EXPENSE, Movement.INCOME) else Movement.entries.toList(), { it.label }) {
+                if (preset == null && !installmentConfirmation) ChoiceField("Movimentação", movement,
+                    Movement.entries.toList(), { it.label }) {
                     movement = it
                     if (it != Movement.EXPENSE) installmentMode = false
                 }
@@ -225,7 +227,13 @@ fun <T> ChoiceField(label: String, value: T, options: List<T>, text: (T) -> Stri
                 }
             }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
-                options.forEach { option -> DropdownMenuItem(text = { Text(text(option)) }, onClick = { onChange(option); expanded = false }) }
+                options.forEach { option ->
+                    val isSelected = option == value
+                    DropdownMenuItem(text = { Text(text(option)) },
+                        leadingIcon = if (icon != null) { { AppIcon(selectedIcon(icon, isSelected)) } } else null,
+                        modifier = Modifier.semantics { selected = isSelected },
+                        onClick = { onChange(option); expanded = false })
+                }
             }
         }
     }

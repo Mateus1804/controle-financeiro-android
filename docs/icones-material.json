@@ -1,4 +1,5 @@
 {
+  "scope": "Historical screenshots in docs/imagens/. These drawable names identify the previous Material assets, which are no longer distributed as current UI vectors.",
   "source": "https://github.com/google/material-design-icons",
   "commit": "10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7",
   "license": "Apache-2.0",

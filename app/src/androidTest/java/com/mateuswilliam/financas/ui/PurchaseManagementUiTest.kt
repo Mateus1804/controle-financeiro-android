@@ -107,8 +107,7 @@ class PurchaseManagementUiTest {
     }
 
     private fun tapRowAction(tag: String) {
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag(tag))
-        rule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()
+        rule.performPlanningAction(tag)
     }
 
     private fun awaitDialog(title: String) {

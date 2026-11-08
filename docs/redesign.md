@@ -34,7 +34,7 @@ Com a ocultação ativa, a rosca utiliza um anel neutro e as barras de proporç�
 
 ## Ícones e dependências
 
-São utilizados vetores oficiais **Google Material Icons Round**, convertidos de SVG para VectorDrawable. A fonte foi fixada na revisão `10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7`. Os caminhos e a licença Apache-2.0 estão registrados em [icones-material.json](icones-material.json), [avisos de terceiros](../THIRD_PARTY_NOTICES.md) e `licenses/material-icons-LICENSE.txt`.
+As capturas desta revisão de outubro utilizam o conjunto anterior Google Material Icons Round, da revisão oficial `10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7`. Sua [procedência histórica](icones-material.json) e a licença `licenses/material-icons-LICENSE.txt` são preservadas para as imagens. Em novembro, os ícones internos foram substituídos pelos vetores oficiais **Phosphor Icons Regular e Fill**, do pacote `@phosphor-icons/core` 2.1.1. A [documentação atual](icones-phosphor.md), o [inventário de procedência](icones-phosphor.json) e os [avisos de terceiros](../THIRD_PARTY_NOTICES.md) registram o conjunto distribuído e a licença MIT.
 
 Não foram adicionadas dependências de execução nem atualizadas as versões de Kotlin, Compose, Material 3 ou Room. A fonte e as imagens não exigem acesso à rede.
 

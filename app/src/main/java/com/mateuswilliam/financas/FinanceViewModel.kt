@@ -14,6 +14,7 @@ import com.mateuswilliam.financas.core.MonthlyIncomePlan
 import com.mateuswilliam.financas.core.InstallmentPurchase
 import com.mateuswilliam.financas.core.InstallmentAdjustment
 import com.mateuswilliam.financas.core.RecurringPlan
+import com.mateuswilliam.financas.core.RecurringMonth
 import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.core.CommitmentReport
 import com.mateuswilliam.financas.data.StagedRestore
@@ -144,6 +145,15 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         if (fromMonth != null) "Despesa fixa incluída no planejamento."
         else "A recorrência saiu das previsões de despesas fixas. O histórico foi mantido."
     }
+    fun setFixedRecurringFromMonth(id: String, effectiveMonth: YearMonth, enabled: Boolean) = action {
+        repository.setFixedRecurringFromMonth(id, effectiveMonth, enabled)
+        if (enabled) "Despesa fixa incluída a partir de $effectiveMonth." else "Projeções fixas interrompidas a partir de $effectiveMonth. O histórico foi mantido."
+    }
+    fun setRecurringActiveFromMonth(id: String, effectiveMonth: YearMonth, active: Boolean) = action {
+        repository.setRecurringActiveFromMonth(id, effectiveMonth, active)
+        RecurringReminders.cancelForRecurring(app, id, effectiveMonth)
+        if (active) "Recorrência retomada a partir de $effectiveMonth." else "Recorrência pausada a partir de $effectiveMonth. Os meses anteriores foram mantidos."
+    }
     fun saveRecurring(plan: RecurringPlan, onSaved: () -> Unit) = action {
         val old = state.value.recurring.find { it.id == plan.id }
         repository.saveRecurring(plan)
@@ -151,9 +161,35 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         onSaved()
         "Previsão mensal salva. Nenhum lançamento foi criado."
     }
+    fun recurringMonths(month: YearMonth) = repository.observeRecurringMonths(month)
+    suspend fun recurringConfiguration(id: String, month: YearMonth) = repository.recurringConfiguration(id, month)
+    fun saveRecurringMonth(expected: RecurringMonth, edited: RecurringPlan, onSaved: () -> Unit) = action {
+        val saved = repository.saveRecurringMonth(expected, edited)
+        if (saved) {
+            RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate)
+            onSaved()
+        }
+        if (saved) "Previsão corrigida somente nesta competência." else "A competência mudou. Abra novamente para conferir."
+    }
+    fun saveRecurringFromMonth(plan: RecurringPlan, effectiveMonth: YearMonth, onSaved: () -> Unit) = action {
+        repository.saveRecurringFromMonth(plan, effectiveMonth)
+        RecurringReminders.cancelForRecurring(app, plan.id, effectiveMonth)
+        onSaved()
+        "Configuração salva a partir de $effectiveMonth. Os meses anteriores foram mantidos."
+    }
+    fun confirmRecurringMonth(expected: RecurringMonth, record: Record, onSaved: () -> Unit) = action {
+        val saved = repository.confirmRecurringMonth(expected, record)
+        if (saved) { RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate); onSaved() }
+        if (saved) "Lançamento confirmado nesta competência." else "A competência mudou ou já foi tratada. Confira o Planejamento."
+    }
+    fun skipRecurringMonth(expected: RecurringMonth) = action {
+        val skipped = repository.skipRecurringMonth(expected)
+        if (skipped) RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate)
+        if (skipped) "Vencimento pulado somente nesta competência." else "A competência mudou ou já foi tratada. Confira o Planejamento."
+    }
     fun excludeRecurringForecast(plan: RecurringPlan, onFinished: () -> Unit) = action {
         val removed = repository.archiveRecurringForecast(plan)
-        if (removed) RecurringReminders.cancel(app, plan.id, plan.nextDate)
+        if (removed) RecurringReminders.cancelForRecurring(app, plan.id)
         onFinished()
         if (removed) "Previsão mensal excluída." else "A previsão mudou. Abra novamente para conferir."
     }

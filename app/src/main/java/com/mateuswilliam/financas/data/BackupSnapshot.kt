@@ -12,16 +12,18 @@ data class FinanceSnapshot(
     val occurrences: List<OccurrenceEntity>, val display: BackupDisplay,
     val monthlyPlans: List<MonthlyPlanEntity> = emptyList(), val purchases: List<PurchaseEntity> = emptyList(),
     val fixedRecurring: List<FixedRecurringEntity> = emptyList(), val commitments: List<CommitmentEntity> = emptyList(),
+    val recurringRevisions: List<RecurringRevisionEntity> = emptyList(), val recurringMonths: List<RecurringMonthEntity> = emptyList(),
 )
 
 /** JSON de dados, sem desserialização de classes arbitrárias ou SQL recebido do arquivo. */
 object BackupSnapshot {
-    const val FORMAT_VERSION = 4
+    const val FORMAT_VERSION = 5
     private const val MAX_ROWS = 50_000
     private fun json(vararg fields: Pair<String, Any?>) = JSONObject().apply { fields.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
     private fun <T> array(rows: List<T>, convert: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(convert(it)) } }
 
-    fun encode(snapshot: FinanceSnapshot): ByteArray {
+    fun encode(original: FinanceSnapshot): ByteArray {
+        val snapshot = RecurringSnapshots.upgrade(original)
         validate(snapshot)
         return json(
             "format" to "controle-financeiro", "version" to FORMAT_VERSION, "createdAt" to snapshot.createdAt,
@@ -38,7 +40,19 @@ object BackupSnapshot {
             "recurring" to array(snapshot.recurring) { r -> json("id" to r.id, "title" to r.title, "amountCents" to r.amountCents,
                 "movement" to r.movement.name, "method" to r.method.name, "category" to r.category.name, "bank" to r.bank,
                 "nextDate" to r.nextDate, "dayOfMonth" to r.dayOfMonth, "active" to r.active,
-                "lastRemindedDate" to r.lastRemindedDate, "archived" to r.archived) },
+                "lastRemindedDate" to r.lastRemindedDate, "archived" to r.archived, "startMonth" to r.startMonth) },
+            "recurringRevisions" to array(snapshot.recurringRevisions) { r -> json("recurringId" to r.recurringId,
+                "effectiveMonth" to r.effectiveMonth, "title" to r.title, "amountCents" to r.amountCents,
+                "movement" to r.movement.name, "method" to r.method.name, "category" to r.category.name,
+                "bank" to r.bank, "anchorDate" to r.anchorDate, "dayOfMonth" to r.dayOfMonth,
+                "active" to r.active, "fixedFromMonth" to r.fixedFromMonth) },
+            "recurringMonths" to array(snapshot.recurringMonths) { r -> json("recurringId" to r.recurringId,
+                "month" to r.month, "title" to r.title, "amountCents" to r.amountCents,
+                "movement" to r.movement.name, "method" to r.method.name, "category" to r.category.name,
+                "bank" to r.bank, "dueDate" to r.dueDate, "dayOfMonth" to r.dayOfMonth,
+                "active" to r.active, "status" to r.status, "recordId" to r.recordId,
+                "fixedExpense" to r.fixedExpense, "revision" to r.revision, "overridden" to r.overridden,
+                "lastRemindedDate" to r.lastRemindedDate) },
             "monthlyPlans" to array(snapshot.monthlyPlans) { p -> json("month" to p.month, "incomeCents" to p.incomeCents, "healthyLimitBasisPoints" to p.healthyLimitBasisPoints) },
             "purchases" to array(snapshot.purchases) { p -> json("id" to p.id, "title" to p.title, "bank" to p.bank,
                 "category" to p.category.name, "method" to p.method.name, "totalCents" to p.totalCents,
@@ -61,6 +75,7 @@ object BackupSnapshot {
         val j = try { JSONObject(bytes.toString(Charsets.UTF_8)) } catch (_: Exception) { throw IllegalArgumentException("Conteúdo de backup inválido.") }
         val version = j.long("version")
         require(j.text("format", 40) == "controle-financeiro" && version in 1L..FORMAT_VERSION.toLong()) { "Formato ou versão de dados não suportado." }
+        require(version >= 5 || (!j.has("recurringRevisions") && !j.has("recurringMonths"))) { "Competências mensais exigem a versão 5 do backup." }
         if (version == 1L) require(listOf("monthlyPlans", "purchases", "fixedRecurring", "commitments").none { j.has(it) }) {
             "Dados de comprometimento exigem a versão 2 do backup."
         }
@@ -77,10 +92,12 @@ object BackupSnapshot {
             j.rows("budgets") { b -> BudgetEntity(b.text("month", 12), Category.valueOf(b.text("category", 30)), b.long("limitCents")) },
             j.rows("recurring") { r ->
                 require(version >= 4 || !r.has("archived")) { "Exclusão de previsões exige a versão 4 do backup." }
+                require(version >= 5 || !r.has("startMonth")) { "Competências mensais exigem a versão 5 do backup." }
                 RecurringEntity(r.text("id", 128), r.text("title", 200), r.long("amountCents"),
                     Movement.valueOf(r.text("movement", 30)), PaymentMethod.valueOf(r.text("method", 30)), Category.valueOf(r.text("category", 30)),
                     r.text("bank", 80), r.text("nextDate", 20), r.long("dayOfMonth").also { require(it in 1L..31L) }.toInt(),
-                    r.bool("active"), r.text("lastRemindedDate", 20), archived = version >= 4 && r.bool("archived"))
+                    r.bool("active"), r.text("lastRemindedDate", 20), archived = version >= 4 && r.bool("archived"),
+                    startMonth = if (version >= 5) r.text("startMonth", 7) else "")
             },
             j.rows("occurrences") { o -> OccurrenceEntity(o.text("recurringId", 128), o.text("dueDate", 20), o.text("status", 30), o.nullableText("recordId", 128)) },
             BackupDisplay(Appearance.valueOf(display.text("appearance", 20)), display.bool("hideAmounts"), display.text("lastOrigin", 80)),
@@ -102,14 +119,24 @@ object BackupSnapshot {
                     c.nullableText("recurringId", 128), c.nullableText("recordId", 128),
                     adjusted = version >= 3 && c.bool("adjusted"), excluded = version >= 4 && c.bool("excluded"))
             } else emptyList(),
+            if (version >= 5) j.rows("recurringRevisions") { r -> RecurringRevisionEntity(r.text("recurringId", 128), r.text("effectiveMonth", 7),
+                r.text("title", 200), r.long("amountCents"), Movement.valueOf(r.text("movement", 30)), PaymentMethod.valueOf(r.text("method", 30)),
+                Category.valueOf(r.text("category", 30)), r.text("bank", 80), r.text("anchorDate", 20), r.integer("dayOfMonth", 1, 31),
+                r.bool("active"), r.nullableText("fixedFromMonth", 7)) } else emptyList(),
+            if (version >= 5) j.rows("recurringMonths") { r -> RecurringMonthEntity(r.text("recurringId", 128), r.text("month", 7),
+                r.text("title", 200), r.long("amountCents"), Movement.valueOf(r.text("movement", 30)), PaymentMethod.valueOf(r.text("method", 30)),
+                Category.valueOf(r.text("category", 30)), r.text("bank", 80), r.text("dueDate", 20), r.integer("dayOfMonth", 1, 31),
+                r.bool("active"), r.text("status", 20), r.nullableText("recordId", 128), r.bool("fixedExpense"), r.long("revision"),
+                r.bool("overridden"), r.text("lastRemindedDate", 20)) } else emptyList(),
         )
-        validate(snapshot)
-        return snapshot
+        val upgraded = if (version < 5) RecurringSnapshots.upgrade(snapshot) else snapshot
+        validate(upgraded)
+        return upgraded
     }
 
     fun validate(snapshot: FinanceSnapshot) {
         require(snapshot.createdAt > 0) { "Data de backup inválida." }
-        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size, snapshot.monthlyPlans.size, snapshot.purchases.size, snapshot.fixedRecurring.size, snapshot.commitments.size).sum()
+        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size, snapshot.monthlyPlans.size, snapshot.purchases.size, snapshot.fixedRecurring.size, snapshot.commitments.size, snapshot.recurringRevisions.size, snapshot.recurringMonths.size).sum()
         require(total <= MAX_ROWS) { "O backup excede o limite de 50 mil itens." }
         fun unique(values: List<String>) { require(values.all { it.isNotBlank() } && values.distinct().size == values.size) { "Identificadores repetidos ou vazios no backup." } }
         unique(snapshot.records.map { it.id }); unique(snapshot.drafts.map { it.id }); unique(snapshot.drafts.map { it.sourceKey })
@@ -145,6 +172,7 @@ object BackupSnapshot {
             require(if (o.status == "RECORDED") o.recordId in recordIds else o.recordId == null) { "Vínculo de lançamento recorrente inválido." }
         }
         CommitmentSnapshotValidation.validate(snapshot)
+        RecurringSnapshots.validate(snapshot)
         require(snapshot.display.lastOrigin.length <= 80) { "Preferência de origem inválida." }
     }
 

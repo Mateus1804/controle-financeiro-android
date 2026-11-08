@@ -41,13 +41,13 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
     val chartTrack = MaterialTheme.colorScheme.surfaceContainerHigh
     val chartAlpha by androidx.compose.animation.core.animateFloatAsState(if (report.total > 0L) 1f else 0f, label = "Entrada do gráfico")
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest), shape = MaterialTheme.shapes.extraLarge) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionTitle("Mapa de gastos", "Despesas confirmadas antes dos estornos")
             ChoiceField("Agrupar por", dimension, ExpenseDimension.entries.toList(), { it.label }) { dimension = it }
             if (report.total == 0L) Text("Nenhuma despesa confirmada neste período.")
             else {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.size(208.dp).graphicsLayer { alpha = chartAlpha }.clearAndSetSemantics { }) {
+                    Canvas(Modifier.size(192.dp).graphicsLayer { alpha = chartAlpha }.clearAndSetSemantics { }) {
                         val stroke = 18.dp.toPx()
                         var start = -90f
                         if (hidden) drawCircle(chartTrack, radius = (size.minDimension - stroke) / 2, style = Stroke(stroke))
@@ -62,7 +62,7 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
                     }
                     Column(Modifier.width(148.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Despesas brutas", style = MaterialTheme.typography.labelMedium)
-                        Amount(report.total, hidden, size = 23)
+                        Amount(report.total, hidden, size = 18)
                     }
                 }
                 visible.forEachIndexed { index, group ->
@@ -73,8 +73,10 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
                 }
                 if (report.groups.size > 5) TextButton(onClick = { allGroups = true }) { Text("Ver todos os ${report.groups.size} grupos") }
             }
-            Text("Estornos do período: ${if (hidden) "••••" else Money.format(report.refunds)}. Eles reduzem as despesas líquidas do resumo.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FinanceDisclosure("Sobre os estornos do período", "expense-refunds") {
+                Text("Estornos do período: ${if (hidden) "••••" else Money.format(report.refunds)}. Eles reduzem as despesas líquidas do resumo.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
     if (allGroups) ModalBottomSheet(onDismissRequest = { allGroups = false }) {

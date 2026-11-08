@@ -148,7 +148,8 @@ class CommitmentJourneyTest {
         rule.waitUntil(5000) {
             rule.onAllNodes(hasTestTag("edit-monthly-income") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
         }
-        rule.onNodeWithTag("edit-monthly-income").performClick()
+        rule.onNodeWithTag("edit-monthly-income").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("monthly-income").fetchSemanticsNodes().isNotEmpty() }
         type("monthly-income", "100000")
         typeAndCloseKeyboard("monthly-commitment-limit", limit)
         rule.onNodeWithText("Salvar renda e limite").performClick()
@@ -167,8 +168,7 @@ class CommitmentJourneyTest {
     }
 
     private fun tapPlanning(tag: String) {
-        scrollTo(tag)
-        rule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick()
+        rule.performPlanningAction(tag)
     }
 
     private fun scrollTo(tag: String) {
@@ -192,9 +192,7 @@ class CommitmentJourneyTest {
     }
 
     private fun waitForMessageToClose(prefix: String) {
-        rule.waitUntil(8000) {
-            rule.onAllNodesWithText(prefix, substring = true).fetchSemanticsNodes().isEmpty()
-        }
+        rule.dismissFeedback(prefix)
     }
 
     private fun testPassword() = "Senha fictícia de teste 2026!".toCharArray()

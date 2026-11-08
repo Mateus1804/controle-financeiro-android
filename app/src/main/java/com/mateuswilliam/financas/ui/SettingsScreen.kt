@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.BuildConfig
@@ -35,7 +36,7 @@ fun SettingsScreen(
     onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit,
 ) {
     var privacy by remember { mutableStateOf(false) }
-    LazyColumn(Modifier.testTag("settings-list"), contentPadding = PaddingValues(FinanceSpacing.page, 20.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(Modifier.testTag("settings-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
         item { SectionTitle("Ajustes", "Preferências, captura e proteção dos dados") }
         item {
             SettingsCard {
@@ -58,6 +59,8 @@ fun SettingsScreen(
                             selected = settings.appearance == appearance,
                             onClick = { onAppearance(appearance) },
                             shape = SegmentedButtonDefaults.itemShape(index, Appearance.entries.size),
+                            icon = { if (settings.appearance == appearance) AppIcon(selectedIcon(R.drawable.ic_check, true), Modifier.size(18.dp)) },
+                            modifier = Modifier.heightIn(min = FinanceSpacing.touch),
                         ) { Text(appearance.label) }
                     }
                 }
@@ -82,37 +85,46 @@ fun SettingsScreen(
                 }
                 Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (captureError) Text("Uma notificação não pôde ser processada. Confira seus lançamentos e o espaço disponível no aparelho.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                Button(onClick = onApps, modifier = Modifier.fillMaxWidth()) { Text("Escolher aplicativos") }
+                Button(onClick = onApps, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Escolher aplicativos") }
                 if (settings.consented && settings.packages.isNotEmpty()) {
-                    OutlinedButton(onClick = onAccess, modifier = Modifier.fillMaxWidth()) { Text(if (hasAccess) "Gerenciar acesso no Android" else "Autorizar no Android") }
+                    OutlinedButton(onClick = onAccess, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text(if (hasAccess) "Gerenciar acesso no Android" else "Autorizar no Android") }
                     if (hasAccess && !connected && settings.enabled) TextButton(onClick = onReconnect) { Text("Solicitar reconexão") }
                 }
-                if (settings.enabled && !canAlert) OutlinedButton(onClick = onAlerts, modifier = Modifier.fillMaxWidth()) { Text("Permitir alertas de revisão") }
-                Text("A interpretação depende do texto disponível. O valor, a movimentação, o meio e a categoria podem ser corrigidos antes da confirmação.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (settings.enabled && !canAlert) OutlinedButton(onClick = onAlerts, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Permitir alertas de revisão") }
+                FinanceDisclosure("Sobre a captura", "capture-explanation") {
+                    Text("A interpretação depende do texto disponível. O valor, a movimentação, o meio e a categoria podem ser corrigidos antes da confirmação.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         item {
             SettingsCard {
-                SettingsHeading("Dados do aplicativo", R.drawable.ic_records)
-                Text("Os registros ficam neste aparelho. O CSV é um relatório; o backup criptografado permite recuperar os dados do aplicativo.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Exportar lançamentos em CSV") }
-                TextButton(onClick = { privacy = true }) { Text("Privacidade e uso dos dados") }
-                TextButton(onClick = onClear, enabled = !busy) { Text("Apagar todos os dados", color = MaterialTheme.colorScheme.error) }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { SettingsHeading("Dados do aplicativo", R.drawable.ic_records) }
+                    ContextualActions("Dados do aplicativo", "actions-app-data", !busy, listOf(
+                        FinanceAction("Privacidade e uso dos dados", { privacy = true }),
+                        FinanceAction("Apagar todos os dados", onClear, destructive = true),
+                    ))
+                }
+                Text("Os registros ficam neste aparelho. O CSV é um relatório; o backup permite recuperar os dados do aplicativo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Exportar lançamentos em CSV") }
             }
         }
         item {
             SettingsCard {
                 SettingsHeading("Backup e recuperação", R.drawable.ic_backup)
-                Text("Arquivo criptografado com senha, conferência em base temporária e confirmação antes de substituir os dados. A senha não pode ser recuperada.")
-                OutlinedButton(onClick = onBackup, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Criar backup criptografado") }
-                OutlinedButton(onClick = onRestore, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Restaurar backup") }
+                Text("Protegido por senha. A senha não pode ser recuperada.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = onBackup, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Criar backup criptografado") }
+                OutlinedButton(onClick = onRestore, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Restaurar backup") }
+                FinanceDisclosure("Sobre o backup e a restauração", "backup-explanation") {
+                    Text("O backup guarda os dados do aplicativo. A restauração apresenta uma conferência e pede confirmação antes de substituir os dados atuais.", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
         item {
             SettingsCard {
                 SettingsHeading("Planejamento", R.drawable.ic_calendar)
-                Text("Limites mensais por categoria e previsões recorrentes. Uma previsão só entra nos totais após confirmação.")
-                OutlinedButton(onClick = onPlanning, modifier = Modifier.fillMaxWidth()) { Text("Orçamentos e recorrências") }
+                Text("Limites e previsões com confirmação manual.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = onPlanning, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Orçamentos e recorrências") }
             }
         }
         item {
@@ -122,19 +134,23 @@ fun SettingsScreen(
                     Text("Autenticar ao abrir", Modifier.weight(1f))
                     Switch(settings.lockEnabled, onLockChange, modifier = Modifier.semantics { contentDescription = "Autenticar ao abrir" })
                 }
-                Text("Biometria ou credencial do aparelho ao iniciar e após 30 segundos em segundo plano. Alterar este controle exige autenticação. O banco local não recebe criptografia adicional.", style = MaterialTheme.typography.bodySmall)
+                FinanceDisclosure("Sobre a autenticação", "lock-explanation") {
+                    Text("Biometria ou credencial do aparelho ao iniciar e após 30 segundos em segundo plano. Alterar este controle exige autenticação. O banco local não recebe criptografia adicional.", style = MaterialTheme.typography.bodySmall)
+                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Ocultar no seletor e bloquear capturas", Modifier.weight(1f))
                     Switch(settings.secureScreen, onSecureScreen, modifier = Modifier.semantics { contentDescription = "Ocultar no seletor e bloquear capturas" })
                 }
-                Text("Protege a imagem no seletor de aplicativos e impede capturas e compartilhamento da tela quando respeitado pelo Android. A proteção é ativada junto com o bloqueio e pode ser ajustada separadamente.", style = MaterialTheme.typography.bodySmall)
+                FinanceDisclosure("Sobre a proteção da tela", "screen-protection-explanation") {
+                    Text("Protege a imagem no seletor de aplicativos e impede capturas e compartilhamento da tela quando respeitado pelo Android. A proteção é ativada junto com o bloqueio e pode ser ajustada separadamente.", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
         if (BuildConfig.DEBUG) item {
             SettingsCard {
                 SettingsHeading("Experimentar a revisão", R.drawable.ic_pending)
-                Text("Exemplos fictícios mostram o preenchimento e a confirmação, sem acessar bancos. Eles ficam identificados como simulação.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = onSimulate, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Criar notificações fictícias") }
+                Text("Exemplos fictícios, identificados como simulação.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = onSimulate, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Criar notificações fictícias") }
             }
         }
         item { Text("Controle Financeiro · ${BuildConfig.VERSION_NAME}\nDados locais · revisão obrigatória das sugestões", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -147,7 +163,7 @@ fun SettingsScreen(
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
+        Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
 
@@ -180,7 +196,7 @@ fun AppPickerDialog(apps: List<SelectableApp>, loading: Boolean, selected: Set<S
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(visible, key = { it.packageName }) { app ->
-                        Row(Modifier.fillMaxWidth().toggleable(value = app.packageName in selection, role = Role.Checkbox) {
+                        Row(Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch).toggleable(value = app.packageName in selection, role = Role.Checkbox) {
                             selection = if (it) selection + app.packageName else selection - app.packageName
                         }.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(app.packageName in selection, onCheckedChange = null)
@@ -199,6 +215,6 @@ fun AppPickerDialog(apps: List<SelectableApp>, loading: Boolean, selected: Set<S
 private fun SettingsHeading(title: String, icon: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         IconBadge(icon)
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(title, Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleMedium)
     }
 }
