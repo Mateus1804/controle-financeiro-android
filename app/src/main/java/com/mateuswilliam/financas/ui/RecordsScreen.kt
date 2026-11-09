@@ -18,10 +18,10 @@ import java.time.YearMonth
 import java.time.ZoneId
 
 @Composable
-fun PendingScreen(pending: List<DraftEntity>, hidden: Boolean, onReview: (DraftEntity) -> Unit, onIgnore: (String) -> Unit, busy: Boolean) {
+fun PendingScreen(pending: List<DraftEntity>, hidden: Boolean, onReview: (DraftEntity) -> Unit, onIgnore: (String) -> Unit, busy: Boolean, captureEnabled: Boolean = true) {
     LazyColumn(Modifier.testTag("pending-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom)) {
         item { Box(Modifier.padding(bottom = 12.dp)) { SectionTitle("Caixa de revisão", "Sugestões locais. Nenhum lançamento é registrado sem confirmação.") } }
-        if (pending.isEmpty()) item { EmptyCard("Tudo em dia", "As notificações dos aplicativos selecionados aparecem aqui. A captura opcional pode ser configurada em Ajustes.") }
+        if (pending.isEmpty()) item { EmptyCard(if (captureEnabled) "Nenhuma notificação para revisar" else "Captura desativada", "As sugestões dos aplicativos autorizados aparecem aqui. Configure a captura em Ajustes.") }
         itemsIndexed(pending, key = { _, it -> it.id }) { index, draft ->
             Surface(shape = groupedShape(index, pending.size), color = MaterialTheme.colorScheme.surfaceContainerLowest) {
                 Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
@@ -32,9 +32,9 @@ fun PendingScreen(pending: List<DraftEntity>, hidden: Boolean, onReview: (DraftE
                         headlineContent = { Text(privateDisplayText(draft.sourceTitle.ifBlank { "Nova notificação" }, hidden)) },
                         trailingContent = { ContextualActions(privateDisplayText(draft.sourceTitle.ifBlank { "Nova notificação" }, hidden),
                             "actions-pending-${draft.id}", !busy,
-                            listOf(FinanceAction("Ignorar sugestão", { onIgnore(draft.id) }, "ignore-${draft.id}"))) },
+                            listOf(FinanceAction("Descartar", { onIgnore(draft.id) }, "ignore-${draft.id}"))) },
                         supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("${draft.movement.label} · ${draft.method.label}", style = MaterialTheme.typography.bodySmall)
+                            Text("${draft.movement.label} · ${draft.method.label} · ${shortDate(draft.occurredAt)}", style = MaterialTheme.typography.bodySmall)
                             if (draft.amountCents != null) Amount(draft.amountCents, hidden, size = 18) else Text("Valor a preencher")
                             FinanceDisclosure("Detalhes da sugestão", "pending-details-${draft.id}") {
                                 Text(privateDisplayText(draft.explanation, hidden), style = MaterialTheme.typography.bodySmall)
@@ -55,7 +55,7 @@ internal fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (Ye
                   category: Category?, onCategory: (Category?) -> Unit, onEdit: (Record) -> Unit,
                   expenseFilter: ExpenseFilter? = null, onClearExpenseFilter: () -> Unit = {},
                   movements: List<MonthlyMovement>? = null, actions: MovementActions? = null, busy: Boolean = false,
-                  accountFilter: AccountOption? = null, onClearAccount: () -> Unit = {}) {
+                  accountFilter: AccountOption? = null, onClearAccount: () -> Unit = {}, realizedOnly: Boolean = false) {
     var search by rememberSaveable { mutableStateOf("") }
     var movement by rememberSaveable { mutableStateOf<Movement?>(null) }
     LaunchedEffect(expenseFilter) { if (expenseFilter != null) movement = Movement.EXPENSE }
@@ -70,7 +70,7 @@ internal fun RecordsScreen(records: List<Record>, month: YearMonth, onMonth: (Ye
     } }
     val largeText = LocalDensity.current.fontScale > 1.25f
     LazyColumn(Modifier.testTag("records-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom)) {
-        item { Box(Modifier.padding(bottom = 16.dp)) { SectionTitle("Movimentações", "Realizadas e previstas, sem duplicar pagamentos") } }
+        item { Box(Modifier.padding(bottom = 16.dp)) { SectionTitle("Movimentações", if (realizedOnly) "Somente lançamentos já ocorridos" else "Realizadas e previstas, sem duplicar pagamentos") } }
         item { Box(Modifier.padding(bottom = 16.dp)) { MonthPicker(month, onMonth) } }
         if (accountFilter != null) item {
             InputChip(selected = true, onClick = onClearAccount, label = { Text("Conta: ${privateDisplayText(accountFilter.label, hidden)} · Limpar filtro") })

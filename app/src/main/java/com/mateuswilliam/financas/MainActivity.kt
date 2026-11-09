@@ -94,6 +94,8 @@ class MainActivity : ComponentActivity() {
                         consumePlanning = { planningFromNotification = false; intent.removeExtra(RecurringReminders.EXTRA_PLANNING) },
                         onLockChange = { authenticate(if (it) AuthenticationAction.ENABLE else AuthenticationAction.DISABLE) })
                     else ForecastApp(financeModel, ViewModelProvider(this@MainActivity)[ForecastViewModel::class.java], resumeCount,
+                        incomingDraft = draftFromNotification,
+                        consumeDraft = { draftFromNotification = null; intent.removeExtra(ReviewNotifications.EXTRA_DRAFT_ID) },
                         onLockChange = { authenticate(if (it) AuthenticationAction.ENABLE else AuthenticationAction.DISABLE) },
                         incomingPlanning = planningFromNotification,
                         consumePlanning = { planningFromNotification = false; intent.removeExtra(RecurringReminders.EXTRA_PLANNING) })

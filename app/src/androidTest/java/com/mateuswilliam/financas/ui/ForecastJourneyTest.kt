@@ -24,7 +24,10 @@ class ForecastJourneyTest {
     private val today get() = LocalDate.now()
     private fun current() = runBlocking { app.forecasts.dataset.first() }
     private fun period() = CycleCalendar.periodContaining(today, current().cycleRules)
-    private fun clickTag(tag: String) = rule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+    private fun clickTag(tag: String) {
+        if (tag.startsWith("forecast-cycle-") || tag == "forecast-add-income" || tag == "forecast-add-expense") scroll(tag)
+        rule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+    }
     private fun clickText(text: String) = rule.onNode(hasText(text) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
     private fun scroll(tag: String) = rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
     private fun waitRules(count: Int) = rule.waitUntil(10000) { model.dataset.value?.rules?.size == count }

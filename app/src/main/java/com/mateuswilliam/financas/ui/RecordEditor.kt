@@ -66,6 +66,8 @@ fun RecordEditor(
     initialDescription: String = "",
     initialCategory: Category? = null,
     initialRecurring: Boolean = false,
+    realizedOnly: Boolean = false,
+    onOpenExpenseForecast: (() -> Unit)? = null,
 ) {
     val initial = existing ?: preset ?: recurring?.proposedRecord(recurring.id, ZoneId.systemDefault())
     val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: initialDate?.atTime(java.time.LocalTime.now())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis() }
@@ -125,6 +127,7 @@ fun RecordEditor(
     val recurringValue = RecurringPlan(id, description.trim(), cents ?: 0, movement, method, category,
         bank, date, recurringDay, recurring?.active ?: true)
     val error = when {
+        realizedOnly && LocalDate.parse(date) > LocalDate.now() -> "Use uma data até hoje. Para gastos futuros, crie uma previsão."
         recurringMode && recurrenceScope != null && java.time.YearMonth.from(LocalDate.parse(date)) != recurrenceScope -> "Escolha um vencimento dentro desta competência."
         recurringMode -> Recurrences.error(recurringValue)
         else -> scheduleResult?.exceptionOrNull()?.message ?: RecordValidation.error(record)
@@ -281,12 +284,16 @@ fun RecordEditor(
                     }
                 }, modifier = Modifier.fillMaxWidth().testTag(if (recurringMode) "recurring-due-date" else "record-date")) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("${if (recurringMode) if (recurrenceOnlyMonth) "Vencimento deste mês" else "Início / primeiro vencimento" else "Data"}: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                if (onOpenExpenseForecast != null && movement == Movement.EXPENSE) TextButton(
+                    onClick = onOpenExpenseForecast, enabled = !busy,
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) { Text("Planejar despesa recorrente ou parcelada") }
                 if (onDelete != null) TextButton(onClick = { deleteDialog = true }, enabled = !busy) { Text("Excluir lançamento", color = MaterialTheme.colorScheme.error) }
                 Spacer(Modifier.height(8.dp))
             }
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = { if (onIgnore != null) onIgnore() else onDismiss() }, enabled = !busy, modifier = Modifier.weight(1f)) {
-                    Text(if (onIgnore != null) "Não é transação" else "Cancelar")
+                    Text(if (onIgnore != null && realizedOnly) "Descartar" else if (onIgnore != null) "Não é transação" else "Cancelar")
                 }
                 Button(onClick = {
                     attempted = true
@@ -299,7 +306,7 @@ fun RecordEditor(
                         }
                     }
                 }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
-                    Text(if (busy) "Salvando…" else if (recurringMode) if (recurrenceOnlyMonth) "Salvar só este mês" else "Salvar recorrência" else if (purchaseMode) "Salvar compra parcelada" else "Confirmar")
+                    Text(if (busy) "Salvando…" else if (recurringMode) if (recurrenceOnlyMonth) "Salvar só este mês" else "Salvar recorrência" else if (purchaseMode) "Salvar compra parcelada" else if (realizedOnly && existing == null && movement == Movement.EXPENSE) "Registrar despesa" else if (realizedOnly) "Salvar lançamento" else "Confirmar")
                 }
             }
         }
