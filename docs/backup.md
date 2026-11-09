@@ -2,9 +2,11 @@
 
 ## Escopo
 
-O backup é um arquivo de dados do Controle Financeiro, protegido por senha. Inclui lançamentos confirmados, pendências com seus estados de revisão, identificadores para impedir reprocessamento, contas cadastradas, orçamentos mensais, recorrências e histórico dos vencimentos tratados, compras parceladas, compromissos, marcações de despesas fixas e renda/limite de cada mês. Também inclui as competências recorrentes e as configurações com vigência mensal, além de aparência, ocultação de valores e última origem utilizada manualmente.
+O backup é um arquivo de dados do Controle Financeiro, protegido por senha. Inclui as previsões versionadas de renda e gastos, ajustes por ocorrência, regras e transições de ciclo, eventos da reserva, destinações de sobras, meta opcional e metadados de procedência do importador. Uma simulação ainda não adotada é temporária e não integra o arquivo.
 
-O CSV continua sendo um relatório dos lançamentos confirmados e não é aceito como arquivo de restauração. O backup não inclui arquivos de assinatura, senhas bancárias, autorizações do Android, seleção de aplicativos, consentimento da captura ou configurações de bloqueio do aparelho.
+Também preserva os dados do fluxo anterior: lançamentos confirmados, pendências com seus estados de revisão, identificadores para impedir reprocessamento, contas cadastradas, orçamentos mensais, recorrências e histórico dos vencimentos tratados, compras parceladas, compromissos, marcações de despesas fixas e renda/limite de cada mês. Inclui o histórico de referências de saldo, contas arquivadas, natureza/vínculo dos estornos, competências recorrentes e configurações com vigência mensal, além de aparência, ocultação de valores e última origem utilizada manualmente.
+
+O CSV do planejador é um relatório das previsões do ciclo selecionado e não é aceito como arquivo de restauração. O backup não inclui arquivos de assinatura, senhas bancárias, autorizações do Android, seleção de aplicativos, consentimento da captura ou configurações de bloqueio do aparelho. Os valores da reserva são informados pelo usuário; o backup não consulta nem certifica saldos bancários.
 
 ## Operação pela interface
 
@@ -29,7 +31,7 @@ O envelope binário versão 1 utiliza inteiros de 32 bits em ordem big-endian:
 
 A chave de 256 bits é derivada com `PBKDF2WithHmacSHA256`; a criptografia utiliza `AES/GCM/NoPadding`. Salt e nonce novos são gerados com `SecureRandom` a cada criação. O cabeçalho inteiro é autenticado como AAD. Versões e parâmetros diferentes dos suportados são recusados antes da derivação para impedir custos arbitrários definidos pelo arquivo recebido.
 
-O conteúdo autenticado é JSON UTF-8 com identificação `controle-financeiro` e versão lógica 5. O leitor aceita também as versões 1, 2, 3 e 4. As versões anteriores preservam o estado que registravam e não criam exclusões novas. O arquivo não contém comandos SQL nem classes a serem instanciadas dinamicamente. Os centavos são números inteiros. Números fracionários, identificadores repetidos, vínculos inconsistentes, estados desconhecidos e campos fora dos limites são recusados.
+O conteúdo autenticado é JSON UTF-8 com identificação `controle-financeiro` e versão lógica 7. O leitor aceita também as versões 1, 2, 3, 4, 5 e 6. As versões anteriores preservam o estado que registravam e não criam exclusões novas. O arquivo não contém comandos SQL nem classes a serem instanciadas dinamicamente. Os centavos são números inteiros. Números fracionários, identificadores repetidos, vínculos inconsistentes, estados desconhecidos e campos fora dos limites são recusados. As regras de ciclo e os vínculos das destinações à reserva também são validados.
 
 O limite é de 16 MiB para o conteúdo e 50 mil itens no conjunto de tabelas. O envelope acrescenta 60 bytes ao tamanho do conteúdo. Versões futuras precisam de conversão explícita; arquivos desconhecidos não são abertos por tentativa ou recriação destrutiva.
 
@@ -44,6 +46,8 @@ O limite é de 16 MiB para o conteúdo e 50 mil itens no conjunto de tabelas. O 
 
 A restauração não troca o arquivo SQLite ativo enquanto ele está aberto. As preferências de apresentação são aplicadas após a transação financeira. Consentimento, seleção e proteção já configurados neste aparelho permanecem locais; um backup não concede essas autorizações.
 
+As previsões, ajustes, ciclos, eventos e metadados da reserva participam da mesma conferência e substituição transacional que os dados anteriores. A restauração substitui o conjunto; não mescla o arquivo com as previsões locais. Cancelar mantém tanto o planejador quanto o histórico original da instalação.
+
 ## Retenção e limitações
 
 O banco temporário é excluído ao cancelar, concluir ou falhar a operação. Bancos temporários abandonados após encerramento do processo são removidos na inicialização seguinte, antes de uma nova importação. O conteúdo decifrado existe em memória e no banco temporário privado durante a conferência. Limpar buffers e excluir arquivos não equivale a apagamento físico garantido de memória ou armazenamento flash.
@@ -56,11 +60,17 @@ A portabilidade do envelope tem um vetor fixo com texto e senha fictícios, prod
 
 Uma recuperação de teste utiliza emulador dedicado e dados fictícios. A instalação original com dados reais deve permanecer preservada. A substituição de APK exige o mesmo identificador e a mesma chave de assinatura; desinstalar para contornar uma assinatura diferente apaga a base local.
 
+O APK **preview** usa `com.mateuswilliam.financas.teste`, possui base própria e pode coexistir com a instalação principal. Restaurar nele é uma forma de conferir dados fictícios sem substituir a base da instalação principal. O procedimento ainda exige o arquivo e sua senha; a instalação separada não compartilha dados automaticamente.
+
 Os resultados efetivamente executados ficam em [Qualidade e validação](qualidade.md), e os comandos do ambiente ficam em [Desenvolvimento](desenvolvimento.md).
 
 ## Compatibilidade entre versões
 
-O envelope criptográfico continua na versão 1. O conteúdo de dados utiliza a versão 5, separado do esquema Room 8. O formato 2 introduziu as tabelas de comprometimento, o 3 acrescentou revisão, cancelamento e ajuste de parcelas, o 4 registra exclusões de parcelas individuais e de previsões recorrentes, e o 5 acrescenta snapshots por competência e revisões da configuração recorrente. Versões antigas do aplicativo precisam ser atualizadas para restaurar um arquivo V5. A prévia conta os itens no arquivo, inclusive os vínculos históricos; as previsões excluídas não voltam ao Planejamento. Um vetor congelado em `app/src/androidTest/assets/compatibility/` é restaurado numa base temporária antes de qualquer substituição.
+O envelope criptográfico continua na versão 1. O conteúdo de dados utiliza a versão 7, separado do esquema Room 10. O formato 2 introduziu as tabelas de comprometimento, o 3 acrescentou revisão, cancelamento e ajuste de parcelas, o 4 registra exclusões de parcelas individuais e de previsões recorrentes, e o 5 acrescenta snapshots por competência e revisões da configuração recorrente. O formato 6 acrescenta referências de saldo auditáveis, arquivamento de contas e vínculos/natureza dos estornos. O formato 7 acrescenta regras versionadas de previsão, ajustes por ocorrência, regras de ciclo, eventos de reserva e metadados de importação e meta. Aplicativos que só leem até V6 precisam ser atualizados para restaurar V7.
+
+Arquivos V1 a V5 não presumem saldos de contas; estornos antigos conservam a natureza de reembolso de despesa. Arquivos V1 a V6 não contêm o novo planejador. Depois da restauração, a inicialização do planejador aproveita os dados anteriores uma vez, preservando originais e chaves de procedência. Vínculos conhecidos evitam contar o lançamento e sua ocorrência novamente. Rendas de referência antigas exigem revisão manual antes de virar previsão, e nenhuma reserva é inventada. Um V7 já inicializado conserva o marcador de importação e não repete esse aproveitamento a cada abertura. Consulte [Planejador, ciclos e reserva](planejador-ciclos-reserva.md).
+
+A prévia apresenta as contagens dos dados anteriores, inclusive seus vínculos históricos; as previsões excluídas não voltam ao Planejamento. Um vetor congelado em `app/src/androidTest/assets/compatibility/` é restaurado numa base temporária antes de qualquer substituição.
 
 O vetor usa dados fictícios e criptografia gerada independentemente em Python. Não representa uma exportação bancária real. O teste compara todos os registros, vínculos, revisões, contas, orçamentos, recorrências e ocorrências, além da aparência. O cadastro local existente precisa permanecer intacto até a confirmação da restauração. O arquivo congelado não é regenerado durante o teste.
 

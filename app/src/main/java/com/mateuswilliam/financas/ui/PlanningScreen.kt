@@ -39,6 +39,7 @@ import kotlinx.coroutines.CancellationException
 fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -> Unit, busy: Boolean,
     onBack: () -> Unit, onBudget: (MonthlyBudget, () -> Unit) -> Unit, onDeleteBudget: (Category) -> Unit,
     commitments: CommitmentSetup?, commitmentReport: Result<CommitmentReport>?, onIncome: (MonthlyIncomePlan, () -> Unit) -> Unit,
+    projection: PeriodProjection? = null, forecastsLoaded: Boolean = true,
 ) {
     var budgetEditor by rememberSaveable { mutableStateOf(false) }
     var budgetCategory by rememberSaveable { mutableStateOf<Category?>(null) }
@@ -46,7 +47,8 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
     var incomeEditor by rememberSaveable(month.toString()) { mutableStateOf(false) }
     var otherExpanded by rememberSaveable(month.toString()) { mutableStateOf(false) }
     val zone = ZoneId.systemDefault()
-    val usage = remember(state.records, state.budgets, month, zone) { Budgets.usage(state.records, state.budgets, month, zone) }
+    val realized = projection?.realized?.records ?: state.records.filter { it.occurredAt <= System.currentTimeMillis() }
+    val usage = remember(realized, state.budgets, month, zone) { Budgets.usage(realized, state.budgets, month, zone) }
     val hidden = state.settings.hideAmounts
     LazyColumn(Modifier.testTag("planning-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
         item {
@@ -54,6 +56,7 @@ fun PlanningScreen(state: FinanceState, month: YearMonth, onMonth: (YearMonth) -
             SectionTitle("Planejamento", "Renda prevista, compromissos e limites do mês")
         }
         item { MonthPicker(month, onMonth) }
+        projection?.let { item { PeriodResultCard(it, hidden, forecastsLoaded) } }
         item(key = "commitment-card") {
             MonthlyCommitmentCard(commitmentReport, commitments?.income, commitments != null, busy, hidden) { incomeEditor = true }
         }
@@ -125,7 +128,7 @@ private fun BudgetEditor(existing: MonthlyBudget?, month: YearMonth, busy: Boole
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { DialogSystemBars(); Text("Limite mensal") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("O limite vale para ${month.format(DateTimeFormatter.ofPattern("MM/yyyy"))}. Salvar uma categoria já cadastrada atualiza o limite desse mês.")
-            ChoiceField("Categoria do orçamento", category, Category.entries.toList(), { it.label }) { category = it }
+            ChoiceField("Categoria do orçamento", category, categoriesFor(Movement.EXPENSE), { it.label }) { category = it }
             PrivateValueGate(hidden, "Mostrar valor para edição") { MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalid = it }) }
             if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error)
         } },

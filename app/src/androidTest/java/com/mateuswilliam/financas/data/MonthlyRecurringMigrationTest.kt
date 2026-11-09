@@ -39,7 +39,7 @@ class MonthlyRecurringMigrationTest {
             repeat(setup.length()) { db.execSQL(setup.getString(it)) }
             db.version = 7
         }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_7_8).build()
+        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9, FinanceDatabase.MIGRATION_9_10).build()
         try {
             val repo = FinanceRepository(database, CapturePreferences(context))
             val dao = database.financeDao()

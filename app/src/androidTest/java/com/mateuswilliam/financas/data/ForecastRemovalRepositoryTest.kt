@@ -148,6 +148,7 @@ class ForecastRemovalRepositoryTest {
         repeat(installments.length()) { installments.getJSONObject(it).remove("excluded") }
         old.getJSONArray("recurring").getJSONObject(0).remove("startMonth")
         old.remove("recurringRevisions"); old.remove("recurringMonths")
+        old.withoutBalanceFields()
         assertEquals(snapshot, BackupSnapshot.decode(old.toString().toByteArray()))
     }
 

@@ -21,7 +21,7 @@ object Budgets {
         val totals = mutableMapOf<Category, Long>()
         records.forEach { record ->
             if (YearMonth.from(Instant.ofEpochMilli(record.occurredAt).atZone(zone)) == month) {
-                val value = when (record.movement) { Movement.EXPENSE -> record.amountCents; Movement.REFUND -> -record.amountCents; else -> 0L }
+                val value = record.expenseContribution()
                 totals[record.category] = Math.addExact(totals[record.category] ?: 0L, value)
             }
         }

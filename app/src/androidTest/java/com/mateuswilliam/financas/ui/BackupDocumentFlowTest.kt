@@ -20,7 +20,7 @@ import java.util.UUID
 
 /** Usa o seletor real do Android no emulador dedicado, somente com arquivo e senha fictícios. */
 class BackupDocumentFlowTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
     private val secret = "Arquivo fictício 2026!"

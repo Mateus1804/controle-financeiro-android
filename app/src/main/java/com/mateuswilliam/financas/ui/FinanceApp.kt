@@ -34,6 +34,7 @@ import com.mateuswilliam.financas.core.ReviewQueue
 import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.core.RecurringMonth
 import com.mateuswilliam.financas.core.RecurringMonthStatus
+import com.mateuswilliam.financas.core.PeriodProjections
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.notifications.BankNotificationListener
 import com.mateuswilliam.financas.notifications.hasCaptureAccess
@@ -60,6 +61,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     var monthString by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val month = YearMonth.parse(monthString)
     var categoryFilter by rememberSaveable { mutableStateOf<Category?>(null) }
+    var accountFilterKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var accountsOpen by rememberSaveable { mutableStateOf(false) }
+    var templateTitle by rememberSaveable { mutableStateOf<String?>(null) }
     var editing by rememberSaveable { mutableStateOf(false) }
     var selectedDraftId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedRecordId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -159,7 +163,8 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     fun finishReview(id: String) { reviewCompleted++; editing = false; reviewAfter = id }
     fun finishSession() { reviewAfter = null; seen.addAll(state.pending.map { it.id }); reviewIds = emptyList(); tab = 1 }
     fun openPlanning() { if (tab != 4) planningReturn = tab; tab = 4 }
-    fun openManual(movement: Movement = Movement.EXPENSE) { manualMovement = movement; selectedDraftId = null; selectedRecordId = null; selectedRecurringId = null; selectedRecurringMonth = null; selectedInstallmentId = null; expectedRevision = null; reviewAfter = null; editing = true }
+    fun openManual(movement: Movement = Movement.EXPENSE) { templateTitle = null; manualMovement = movement; selectedDraftId = null; selectedRecordId = null; selectedRecurringId = null; selectedRecurringMonth = null; selectedInstallmentId = null; expectedRevision = null; reviewAfter = null; editing = true }
+    fun openTemplate(template: FixedExpenseTemplate) { openManual(Movement.EXPENSE); templateTitle = template.title }
     fun openPlannedRecord() {
         plannedRecordId = UUID.randomUUID().toString()
         plannedRecordAt = System.currentTimeMillis()
@@ -192,9 +197,16 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
         },
         purchase = ::manageInstallment, recurrenceIds = state.recurring.map { it.id }.toSet(),
     )
-    val movements = remember(state.records, recurringMonths, commitments, month) {
-        monthlyMovements(state.records, month, recurringMonths.orEmpty(), commitments?.installments.orEmpty())
+    val displayTime = remember(resumeCount, state.records) { System.currentTimeMillis() }
+    val movements = remember(state.records, recurringMonths, commitments, month, displayTime) {
+        monthlyMovements(state.records, month, recurringMonths.orEmpty(), commitments?.installments.orEmpty(), asOf = displayTime)
     }
+    val forecastsLoaded = recurringMonths != null && commitments != null
+    val projection = remember(state.records, movements, month, displayTime) {
+        PeriodProjections.month(state.records, movements.filter { it.status == "Prevista" }.map { it.value }, month, ZoneId.systemDefault(), displayTime)
+    }
+    val accountFilter = state.accountBalances.find { it.account.key == accountFilterKey }?.account
+    LaunchedEffect(resumeCount) { model.refreshBalances() }
     BackHandler(tab == 4 && !editing && managedInstallmentId == null) { tab = planningReturn }
 
     val captureIssue = CaptureIssue.evaluate(state.settings.consented, state.settings.enabled, state.settings.packages.isNotEmpty(), hasAccess, connected)
@@ -220,8 +232,8 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); if (model.message.value == it) model.message.value = null }
     }
-    LaunchedEffect(incomingDraft, state.loaded, state.pending, editing, tab, backupDialog, stagedRestore, busy) {
-        if (incomingDraft != null && state.loaded && !editing && !busy && tab != 4 && backupDialog == 0 && stagedRestore == null) {
+    LaunchedEffect(incomingDraft, state.loaded, state.pending, editing, tab, backupDialog, stagedRestore, busy, accountsOpen) {
+        if (incomingDraft != null && state.loaded && !editing && !busy && !accountsOpen && tab != 4 && backupDialog == 0 && stagedRestore == null) {
             state.pending.find { it.id == incomingDraft }?.let { openDraft(it); tab = 1 }
                 ?: run { model.message.value = "Esta notificação já foi revisada." }
             consumeDraft()
@@ -230,9 +242,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     LaunchedEffect(incomingPlanning, editing, backupDialog, stagedRestore, busy, reviewAfter) {
         if (incomingPlanning && !editing && !busy && backupDialog == 0 && stagedRestore == null && reviewAfter == null) { tab = 0; monthString = YearMonth.now().toString(); consumePlanning() }
     }
-    LaunchedEffect(state.pending, editing, tab, reviewAfter, backupDialog, stagedRestore, busy, state.settings.introSeen) {
+    LaunchedEffect(state.pending, editing, tab, reviewAfter, backupDialog, stagedRestore, busy, state.settings.introSeen, accountsOpen) {
         val seenIds = seen.toHashSet()
-        if (!editing && !busy && state.settings.introSeen && incomingDraft == null && tab in 0..1 && reviewAfter == null && backupDialog == 0 && stagedRestore == null) state.pending.firstOrNull {
+        if (!editing && !busy && !accountsOpen && state.settings.introSeen && incomingDraft == null && tab in 0..1 && reviewAfter == null && backupDialog == 0 && stagedRestore == null) state.pending.firstOrNull {
             it.capturedAt >= model.sessionStartedAt && it.id !in seenIds
         }?.let(::openDraft)
     }
@@ -268,16 +280,18 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                     0 -> DashboardScreen(state, month, { monthString = it.toString() },
                         { model.preferences.hideAmounts(!state.settings.hideAmounts) },
                         { tab = 1 },
-                        onExpenseGroup = { categoryFilter = null; expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; tab = 2 },
+                        onExpenseGroup = { accountFilterKey = null; categoryFilter = null; expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; tab = 2 },
                         notice = if (state.loaded && captureIssue != CaptureIssue.READY && state.settings.dismissedCondition != captureIssue.name) {
                             { CaptureNotice(captureIssue, ::resolveCapture) { model.preferences.dismissCaptureNotice(captureIssue.name) } }
                         } else null, onPlanning = ::openPlanning, onNew = ::openManual,
-                        movements = movements, actions = movementActions, busy = busy)
+                        movements = movements, actions = movementActions, busy = busy,
+                        projection = projection, forecastsLoaded = forecastsLoaded, onAccounts = { accountsOpen = true }, onTemplate = ::openTemplate)
                     1 -> PendingScreen(state.pending, state.settings.hideAmounts, ::openDraft, { model.dismiss(it) }, busy)
                     2 -> RecordsScreen(state.records, month, { monthString = it.toString() }, state.settings.hideAmounts,
                         categoryFilter, { categoryFilter = it }, { selectedRecordId = it.id; selectedDraftId = null; selectedRecurringId = null; selectedRecurringMonth = null; selectedInstallmentId = null; expectedRevision = null; editing = true },
                         expenseFilter = expenseFilter, onClearExpenseFilter = { expenseDimension = null },
-                        movements = movements, actions = movementActions, busy = busy)
+                        movements = movements, actions = movementActions, busy = busy,
+                        accountFilter = accountFilter, onClearAccount = { accountFilterKey = null })
                     3 -> SettingsScreen(state.settings, connected, hasAccess, canAlert, captureError,
                         onToggle = { enabled -> if (enabled && !state.settings.consented) disclosure = true else model.preferences.setEnabled(enabled) },
                         onApps = { if (!state.settings.consented) disclosure = true else { appPicker = true; model.loadApps() } },
@@ -294,11 +308,16 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         onBack = { tab = planningReturn }, onBudget = model::saveBudget,
                         onDeleteBudget = { model.deleteBudget(month.toString(), it) },
                         commitments = commitments, commitmentReport = commitmentReport,
-                        onIncome = model::saveMonthlyIncome)
+                        onIncome = model::saveMonthlyIncome, projection = projection, forecastsLoaded = forecastsLoaded)
                 }
             }
         }
     }
+
+    if (accountsOpen) AccountsManager(state.accountBalances, state.balanceReferences, state.settings.hideAmounts, busy,
+        onDismiss = { accountsOpen = false }, onStatement = {
+            accountFilterKey = it.key; categoryFilter = null; expenseDimension = null; accountsOpen = false; tab = 2
+        }, onSave = model::configureAccountBalance, onArchive = model::setAccountArchived)
 
     managedInstallmentId?.let { id ->
         key(id, installmentAction) {
@@ -314,7 +333,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
 
     if (editing && (selectedDraftId == null || draft != null) && (selectedRecordId == null || record != null) &&
         (selectedRecurringId == null || recurringPreset != null) && (selectedInstallmentId == null || installmentPreset != null)
-    ) key(selectedDraftId, selectedRecordId, selectedRecurringId, selectedInstallmentId) {
+    ) key(selectedDraftId, selectedRecordId, selectedRecurringId, selectedInstallmentId, templateTitle) {
         RecordEditor(draft, record, busy, onDismiss = { editing = false },
             onSave = { value ->
                 val recurringMonth = selectedRecurringMonth
@@ -333,6 +352,9 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
             onIgnore = draft?.let { current -> { model.dismiss(current.id) { finishReview(current.id) } } },
             onDelete = record?.let { current -> { model.delete(current.id) } },
             accounts = state.accounts, lastOrigin = state.settings.lastOrigin.ifBlank { state.records.firstOrNull()?.bank.orEmpty() }, onAddAccount = model::addAccount,
+            balances = state.accountBalances, history = state.records,
+            initialDescription = templateTitle.orEmpty(), initialCategory = fixedExpenseTemplates.find { it.title == templateTitle }?.category,
+            initialRecurring = templateTitle != null && draft == null && record == null && selectedRecurringId == null && selectedInstallmentId == null,
             preset = recurringPreset ?: installmentPreset, initialMovement = manualMovement, duplicateIndex = duplicateIndex, hideAmounts = state.settings.hideAmounts,
             reviewProgress = if (draft != null) "Revisão ${reviewIds.indexOf(draft.id) + 1} de ${reviewIds.size}" else null,
             newPendingCount = if (draft != null) newPendingCount else 0,

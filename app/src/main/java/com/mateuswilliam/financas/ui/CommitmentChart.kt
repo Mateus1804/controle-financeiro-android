@@ -53,6 +53,8 @@ internal fun MonthlyCommitmentCard(
             Text("Comprometimento da renda", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             Text("Parcelas e despesas fixas do mês, previstas ou já registradas.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text("A renda informada aqui é uma referência de análise. Para entrar no resultado e no saldo, cadastre o recebimento em Movimentações.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             when {
                 !loaded -> Text("Carregando a configuração do mês…")
                 hidden -> Text("Renda e limite ocultos")

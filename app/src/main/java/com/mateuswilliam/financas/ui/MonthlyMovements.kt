@@ -33,22 +33,27 @@ internal class MovementActions(
 internal data class MonthlyMovement(
     val key: String, val value: Record, val status: String, val realized: Boolean,
     val recurring: RecurringMonth? = null, val installment: InstallmentDue? = null,
+    val stored: Boolean = false,
 )
 
 /** Os vínculos substituem a previsão paga; nenhuma linha desta composição entra no Ledger. */
 internal fun monthlyMovements(records: List<Record>, month: YearMonth, recurring: List<RecurringMonth>,
-    installments: List<InstallmentDue>, zone: ZoneId = ZoneId.systemDefault()): List<MonthlyMovement> {
+    installments: List<InstallmentDue>, zone: ZoneId = ZoneId.systemDefault(), asOf: Long = System.currentTimeMillis()): List<MonthlyMovement> {
     val all = records.associateBy { it.id }
     val result = linkedMapOf<String, MonthlyMovement>()
     Ledger.month(records, month, zone).records.forEach {
-        result["record:${it.id}"] = MonthlyMovement("record:${it.id}", it, "Realizada", true)
+        val realized = it.occurredAt <= asOf
+        result["record:${it.id}"] = MonthlyMovement("record:${it.id}", it, if (realized) "Realizada" else "Prevista", realized, stored = true)
     }
     recurring.filter { it.month == month }.forEach { occurrence ->
         val paid = occurrence.recordId?.let(all::get)
         if (paid != null) {
             val inPeriod = YearMonth.from(Instant.ofEpochMilli(paid.occurredAt).atZone(zone)) == month
             val key = if (inPeriod) "record:${paid.id}" else "settled:${paid.id}:$month"
-            result[key] = MonthlyMovement(key, paid, if (inPeriod) "Realizada" else "Quitada em ${shortDate(paid.occurredAt)}", inPeriod, recurring = occurrence)
+            val realized = paid.occurredAt <= asOf
+            val status = if (inPeriod) if (realized) "Realizada" else "Prevista"
+                else if (realized) "Quitada em ${shortDate(paid.occurredAt)}" else "Agendada para ${shortDate(paid.occurredAt)}"
+            result[key] = MonthlyMovement(key, paid, status, inPeriod && realized, recurring = occurrence, stored = true)
         } else if (occurrence.status != RecurringMonthStatus.RECORDED) {
             val key = "recurring:${occurrence.recurringId}:$month"
             val status = if (occurrence.status == RecurringMonthStatus.SKIPPED) "Ignorada neste mês" else if (!occurrence.plan.active) "Pausada" else "Prevista"
@@ -61,7 +66,10 @@ internal fun monthlyMovements(records: List<Record>, month: YearMonth, recurring
         val key = if (paid != null) if (inPeriod) "record:${paid.id}" else "settled:${paid.id}:$month" else "installment:${due.id}"
         val value = paid ?: Record(key, due.amountCents, Movement.EXPENSE, due.method, due.category,
             due.bank, due.title, LocalDate.parse(due.dueDate).atTime(12, 0).atZone(zone).toInstant().toEpochMilli())
-        result[key] = MonthlyMovement(key, value, if (paid != null) if (inPeriod) "Realizada" else "Quitada em ${shortDate(paid.occurredAt)}" else "Prevista", inPeriod, installment = due)
+        val realized = paid != null && paid.occurredAt <= asOf
+        val status = if (paid == null) "Prevista" else if (inPeriod) if (realized) "Realizada" else "Prevista"
+            else if (realized) "Quitada em ${shortDate(paid.occurredAt)}" else "Agendada para ${shortDate(paid.occurredAt)}"
+        result[key] = MonthlyMovement(key, value, status, inPeriod && realized, installment = due, stored = paid != null)
     }
     return result.values.sortedWith(compareBy<MonthlyMovement> { if (it.status == "Prevista") 0 else if (it.realized) 1 else 2 }.thenBy { it.value.occurredAt })
 }
@@ -78,7 +86,7 @@ private fun MonthlyMovementRow(item: MonthlyMovement, hidden: Boolean, busy: Boo
     val largeText = LocalDensity.current.fontScale > 1.25f
     val recurrence = item.recurring
     val installment = item.installment
-    val hasPayment = item.realized || recurrence?.recordId != null || installment?.recordId != null
+    val hasPayment = item.stored || item.realized || recurrence?.recordId != null || installment?.recordId != null
     val due = recurrence?.plan?.nextDate ?: installment?.dueDate
     val displayDate = if (!item.realized && hasPayment && due != null) "Vencimento ${LocalDate.parse(due).format(commitmentDateFormat)}" else shortDate(item.value.occurredAt)
     val description = privateDisplayText(item.value.description, hidden)

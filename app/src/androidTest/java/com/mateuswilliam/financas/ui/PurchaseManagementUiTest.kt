@@ -15,7 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class PurchaseManagementUiTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     private val repository get() = app.repository
     private val dao get() = app.database.financeDao()

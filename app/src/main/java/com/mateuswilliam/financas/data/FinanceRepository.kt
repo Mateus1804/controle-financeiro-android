@@ -55,9 +55,51 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }.flowOn(Dispatchers.Default)
     val records = ledger.map { it.records }
     val manualRecords = ledger.map { it.manualRecords }
-    val accounts = combine(dao.accounts(), dao.usedAccounts()) { saved, used ->
-        AccountCatalog.merge(saved.map { it.toOption() }, used.map { com.mateuswilliam.financas.core.AccountOption("", it.label, it.lastUsedAt) })
+    val allAccounts = combine(dao.accounts(), dao.usedAccounts()) { saved, used ->
+        AccountCatalog.merge(saved.map { it.toOption() }, used.map { AccountOption("", it.label, it.lastUsedAt) })
     }.flowOn(Dispatchers.Default)
+    val accounts = combine(allAccounts, dao.accounts()) { merged, saved ->
+        val archived = saved.filter { it.archived }.map { it.nameKey }.toSet()
+        merged.filterNot { it.key in archived }
+    }
+    val accountBalanceEvents = dao.accountBalanceEvents().map { rows -> rows.map { it.toReference() } }
+    fun observeAccountBalances(asOf: Long = System.currentTimeMillis()) = database.invalidationTracker.createFlow(
+        "accounts", "account_balance_events", "records",
+    ).conflate().map {
+        database.withTransaction {
+            val saved = dao.allAccounts()
+            val entries = dao.allRecords().map { it.toRecord() }
+            AccountBalances.calculate(AccountCatalog.options(saved.map { it.toOption() }, entries),
+                saved.filter { it.archived }.map { it.nameKey }.toSet(), dao.allAccountBalanceEvents().map { it.toReference() }, entries, asOf)
+        }
+    }.distinctUntilChanged().flowOn(Dispatchers.Default)
+    suspend fun accountBalanceHistory(key: String) = dao.allAccountBalanceEvents().filter { it.accountKey == key }.map { it.toReference() }
+
+    suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) = writes.withLock {
+        val label = AccountNames.clean(name)
+        require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
+        require(balanceCents in -Money.MAX_CENTS..Money.MAX_CENTS) { "Saldo fora do limite permitido." }
+        val date = java.time.Instant.ofEpochMilli(effectiveAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        require(effectiveAt > 0 && effectiveAt == date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()) { "Informe o início da data de referência." }
+        val cleanReason = reason.trim()
+        require(cleanReason.isNotBlank() && cleanReason.length <= 200 && '\u0000' !in cleanReason) { "Informe um motivo com até 200 caracteres." }
+        database.withTransaction {
+            rememberAccount(label)
+            dao.insertAccountBalanceEvent(AccountBalanceEventEntity(accountKey = AccountNames.key(label), balanceCents = balanceCents,
+                effectiveAt = effectiveAt, createdAt = System.currentTimeMillis(), reason = cleanReason))
+        }
+    }
+    suspend fun setAccountArchived(key: String, archived: Boolean) = writes.withLock {
+        database.withTransaction {
+            if (dao.accountByKey(key) == null) {
+                val historic = dao.allRecords().asSequence().flatMap { sequenceOf(it.bank, it.destination) }
+                    .firstOrNull { AccountNames.key(it) == key }
+                require(historic != null) { "Conta não encontrada." }
+                rememberAccount(historic)
+            }
+            dao.setAccountArchived(key, archived)
+        }
+    }
     val budgets = dao.budgets().map { rows -> rows.map { it.toBudget() } }
     val recurring = dao.recurring().map { rows -> rows.map { it.toPlan() } }
 
@@ -110,11 +152,26 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     suspend fun save(record: Record, draftId: String?, editing: Boolean = false, expectedRevision: Int? = null): Boolean = writes.withLock {
         RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
         val saved = database.withTransaction {
+            val original = record.originalRecordId?.let { dao.recordById(it)?.toRecord() }
+            val record = if (original != null) Refunds.applyOriginal(record, original) else record
+            RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
+            if (record.movement == Movement.TRANSFER) {
+                val previous = if (editing) dao.recordById(record.id) else null
+                val unchangedLegacy = previous?.movement == Movement.TRANSFER &&
+                    AccountNames.key(previous.bank) == AccountNames.key(record.bank) && AccountNames.key(previous.destination) == AccountNames.key(record.destination)
+                require(AccountNames.key(record.bank) != AccountNames.key(record.destination)) { "Escolha contas diferentes para a transferência." }
+                if (!unchangedLegacy) require(dao.accountByKey(AccountNames.key(record.bank))?.archived == false &&
+                    dao.accountByKey(AccountNames.key(record.destination))?.archived == false) { "Cadastre as duas contas próprias antes de transferir." }
+            }
             if (editing) {
                 val previous = dao.recordById(record.id) ?: return@withTransaction false
                 if (record.movement != Movement.EXPENSE) unlinkCommitment(record.id)
                 val updated = dao.updateRecord(RecordEntity.from(record, previous.sourceDraftId)) == 1
                 if (updated) {
+                    dao.refundsForRecord(record.id).forEach { refund ->
+                        val normalized = Refunds.applyOriginal(refund.toRecord(), record)
+                        check(dao.updateRecord(RecordEntity.from(normalized, refund.sourceDraftId)) == 1)
+                    }
                     if (record.movement == Movement.EXPENSE) reconcileRecurringCommitment(record)
                     rememberAccount(record.bank); rememberAccount(record.destination)
                 }
@@ -479,10 +536,11 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     private suspend fun clearTables() {
+        dao.clearForecastOverrides(); dao.clearForecastRules(); dao.clearCycleRules(); dao.clearReserveEvents(); dao.clearForecastMeta()
         dao.clearCommitments(); dao.clearFixedRecurring(); dao.clearPurchases(); dao.clearMonthlyPlans()
         dao.clearRecurringMonths(); dao.clearRecurringRevisions()
         dao.clearOccurrences(); dao.clearRecurring(); dao.clearBudgets()
-        dao.clearRecords(); dao.clearDrafts(); dao.clearAccounts()
+        dao.clearRecords(); dao.clearDrafts(); dao.clearAccountBalanceEvents(); dao.clearAccounts()
     }
 
     suspend fun clear() = writes.withLock {

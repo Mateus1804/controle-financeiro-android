@@ -14,7 +14,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class ForecastRemovalUiTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     private val repo get() = app.repository
     private val month = YearMonth.now()

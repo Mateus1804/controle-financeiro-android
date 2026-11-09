@@ -13,11 +13,15 @@ data class FinanceSnapshot(
     val monthlyPlans: List<MonthlyPlanEntity> = emptyList(), val purchases: List<PurchaseEntity> = emptyList(),
     val fixedRecurring: List<FixedRecurringEntity> = emptyList(), val commitments: List<CommitmentEntity> = emptyList(),
     val recurringRevisions: List<RecurringRevisionEntity> = emptyList(), val recurringMonths: List<RecurringMonthEntity> = emptyList(),
+    val accountBalanceEvents: List<AccountBalanceEventEntity> = emptyList(),
+    val forecastRules:List<ForecastRuleEntity> = emptyList(), val forecastOverrides:List<ForecastOverrideEntity> = emptyList(),
+    val cycleRules:List<CycleRuleEntity> = emptyList(), val reserveEvents:List<ReserveEventEntity> = emptyList(),
+    val forecastMeta:List<ForecastMetaEntity> = emptyList(),
 )
 
 /** JSON de dados, sem desserialização de classes arbitrárias ou SQL recebido do arquivo. */
 object BackupSnapshot {
-    const val FORMAT_VERSION = 5
+    const val FORMAT_VERSION = 7
     private const val MAX_ROWS = 50_000
     private fun json(vararg fields: Pair<String, Any?>) = JSONObject().apply { fields.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
     private fun <T> array(rows: List<T>, convert: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(convert(it)) } }
@@ -26,16 +30,23 @@ object BackupSnapshot {
         val snapshot = RecurringSnapshots.upgrade(original)
         validate(snapshot)
         return json(
+            "forecastRules" to array(snapshot.forecastRules) { ForecastSnapshots.ruleJson(it) },
+            "forecastOverrides" to array(snapshot.forecastOverrides) { ForecastSnapshots.overrideJson(it) },
+            "cycleRules" to array(snapshot.cycleRules) { json("effectiveStart" to it.effectiveStart,"day" to it.day) },
+            "reserveEvents" to array(snapshot.reserveEvents) { json("id" to it.id,"kind" to it.kind,"amountCents" to it.amountCents,"createdAt" to it.createdAt,"reason" to it.reason,"cycleStart" to it.cycleStart) },
+            "forecastMeta" to array(snapshot.forecastMeta) { json("key" to it.key,"value" to it.value) },
             "format" to "controle-financeiro", "version" to FORMAT_VERSION, "createdAt" to snapshot.createdAt,
             "display" to json("appearance" to snapshot.display.appearance.name, "hideAmounts" to snapshot.display.hideAmounts, "lastOrigin" to snapshot.display.lastOrigin),
             "records" to array(snapshot.records) { r -> json("id" to r.id, "sourceDraftId" to r.sourceDraftId,
                 "amountCents" to r.amountCents, "movement" to r.movement.name, "method" to r.method.name,
-                "category" to r.category.name, "bank" to r.bank, "description" to r.description, "occurredAt" to r.occurredAt, "destination" to r.destination) },
+                "category" to r.category.name, "bank" to r.bank, "description" to r.description, "occurredAt" to r.occurredAt, "destination" to r.destination, "originalRecordId" to r.originalRecordId, "reversalMovement" to r.reversalMovement.name) },
             "drafts" to array(snapshot.drafts) { d -> json("id" to d.id, "sourceKey" to d.sourceKey, "sourcePackage" to d.sourcePackage,
                 "bank" to d.bank, "sourceTitle" to d.sourceTitle, "sourceBody" to d.sourceBody, "amountCents" to d.amountCents,
                 "movement" to d.movement.name, "method" to d.method.name, "category" to d.category.name,
                 "explanation" to d.explanation, "occurredAt" to d.occurredAt, "capturedAt" to d.capturedAt, "status" to d.status, "revision" to d.revision) },
-            "accounts" to array(snapshot.accounts) { a -> json("nameKey" to a.nameKey, "label" to a.label, "lastUsedAt" to a.lastUsedAt) },
+            "accounts" to array(snapshot.accounts) { a -> json("nameKey" to a.nameKey, "label" to a.label, "lastUsedAt" to a.lastUsedAt, "archived" to a.archived) },
+            "accountBalanceEvents" to array(snapshot.accountBalanceEvents) { e -> json("id" to e.id, "accountKey" to e.accountKey,
+                "balanceCents" to e.balanceCents, "effectiveAt" to e.effectiveAt, "createdAt" to e.createdAt, "reason" to e.reason) },
             "budgets" to array(snapshot.budgets) { b -> json("month" to b.month, "category" to b.category.name, "limitCents" to b.limitCents) },
             "recurring" to array(snapshot.recurring) { r -> json("id" to r.id, "title" to r.title, "amountCents" to r.amountCents,
                 "movement" to r.movement.name, "method" to r.method.name, "category" to r.category.name, "bank" to r.bank,
@@ -79,16 +90,24 @@ object BackupSnapshot {
         if (version == 1L) require(listOf("monthlyPlans", "purchases", "fixedRecurring", "commitments").none { j.has(it) }) {
             "Dados de comprometimento exigem a versão 2 do backup."
         }
+        require(version >= 6 || !j.has("accountBalanceEvents")) { "Saldos exigem a versão 6 do backup." }
+        require(version >= 7 || listOf("forecastRules","forecastOverrides","cycleRules","reserveEvents","forecastMeta").none { j.has(it) }) { "Planejamento por ciclos exige a versão 7 do backup." }
         val display = j.getJSONObject("display")
         val snapshot = FinanceSnapshot(j.long("createdAt"),
-            j.rows("records") { r -> RecordEntity(r.text("id", 128), r.nullableText("sourceDraftId", 128), r.long("amountCents"),
+            j.rows("records") { r ->
+                require(version >= 6 || (!r.has("originalRecordId") && !r.has("reversalMovement"))) { "Estornos vinculados exigem a versão 6 do backup." }
+                if (version >= 6) require(r.has("originalRecordId"))
+                RecordEntity(r.text("id", 128), r.nullableText("sourceDraftId", 128), r.long("amountCents"),
                 Movement.valueOf(r.text("movement", 30)), PaymentMethod.valueOf(r.text("method", 30)), Category.valueOf(r.text("category", 30)),
-                r.text("bank", 80), r.text("description", 200), r.long("occurredAt"), r.text("destination", 80)) },
+                r.text("bank", 80), r.text("description", 200), r.long("occurredAt"), r.text("destination", 80), if (version >= 6) r.nullableText("originalRecordId", 128) else null,
+                if (version >= 6) Movement.valueOf(r.text("reversalMovement", 30)) else Movement.EXPENSE) },
             j.rows("drafts") { d -> DraftEntity(d.text("id", 128), d.text("sourceKey", 2048), d.text("sourcePackage", 300),
                 d.text("bank", 80), d.text("sourceTitle", 2000), d.text("sourceBody", 20_000), if (d.isNull("amountCents")) null else d.long("amountCents"),
                 Movement.valueOf(d.text("movement", 30)), PaymentMethod.valueOf(d.text("method", 30)), Category.valueOf(d.text("category", 30)),
                 d.text("explanation", 2000), d.long("occurredAt"), d.long("capturedAt"), d.text("status", 30), d.long("revision").also { require(it in 1L..Int.MAX_VALUE.toLong()) }.toInt()) },
-            j.rows("accounts") { a -> AccountEntity(a.text("nameKey", 160), a.text("label", 80), a.long("lastUsedAt")) },
+            j.rows("accounts") { a ->
+                require(version >= 6 || !a.has("archived")) { "Arquivamento de contas exige a versão 6 do backup." }
+                AccountEntity(a.text("nameKey", 160), a.text("label", 80), a.long("lastUsedAt"), version >= 6 && a.bool("archived")) },
             j.rows("budgets") { b -> BudgetEntity(b.text("month", 12), Category.valueOf(b.text("category", 30)), b.long("limitCents")) },
             j.rows("recurring") { r ->
                 require(version >= 4 || !r.has("archived")) { "Exclusão de previsões exige a versão 4 do backup." }
@@ -128,6 +147,13 @@ object BackupSnapshot {
                 Category.valueOf(r.text("category", 30)), r.text("bank", 80), r.text("dueDate", 20), r.integer("dayOfMonth", 1, 31),
                 r.bool("active"), r.text("status", 20), r.nullableText("recordId", 128), r.bool("fixedExpense"), r.long("revision"),
                 r.bool("overridden"), r.text("lastRemindedDate", 20)) } else emptyList(),
+            if (version >= 6) j.rows("accountBalanceEvents") { e -> AccountBalanceEventEntity(e.long("id"), e.text("accountKey", 160),
+                e.long("balanceCents"), e.long("effectiveAt"), e.long("createdAt"), e.text("reason", 200)) } else emptyList(),
+            if(version>=7) j.rows("forecastRules") { ForecastSnapshots.rule(it) } else emptyList(),
+            if(version>=7) j.rows("forecastOverrides") { ForecastSnapshots.overrideRow(it) } else emptyList(),
+            if(version>=7) j.rows("cycleRules") { CycleRuleEntity(it.text("effectiveStart",10),it.integer("day",1,31)) } else emptyList(),
+            if(version>=7) j.rows("reserveEvents") { ReserveEventEntity(it.long("id"),it.text("kind",20),it.long("amountCents"),it.long("createdAt"),it.text("reason",200),it.nullableText("cycleStart",10)) } else emptyList(),
+            if(version>=7) j.rows("forecastMeta") { ForecastMetaEntity(it.text("key",40),it.text("value",100)) } else emptyList(),
         )
         val upgraded = if (version < 5) RecurringSnapshots.upgrade(snapshot) else snapshot
         validate(upgraded)
@@ -136,7 +162,7 @@ object BackupSnapshot {
 
     fun validate(snapshot: FinanceSnapshot) {
         require(snapshot.createdAt > 0) { "Data de backup inválida." }
-        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size, snapshot.monthlyPlans.size, snapshot.purchases.size, snapshot.fixedRecurring.size, snapshot.commitments.size, snapshot.recurringRevisions.size, snapshot.recurringMonths.size).sum()
+        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size, snapshot.monthlyPlans.size, snapshot.purchases.size, snapshot.fixedRecurring.size, snapshot.commitments.size, snapshot.recurringRevisions.size, snapshot.recurringMonths.size, snapshot.accountBalanceEvents.size,snapshot.forecastRules.size,snapshot.forecastOverrides.size,snapshot.cycleRules.size,snapshot.reserveEvents.size,snapshot.forecastMeta.size).sum()
         require(total <= MAX_ROWS) { "O backup excede o limite de 50 mil itens." }
         fun unique(values: List<String>) { require(values.all { it.isNotBlank() } && values.distinct().size == values.size) { "Identificadores repetidos ou vazios no backup." } }
         unique(snapshot.records.map { it.id }); unique(snapshot.drafts.map { it.id }); unique(snapshot.drafts.map { it.sourceKey })
@@ -158,6 +184,19 @@ object BackupSnapshot {
             require(d.status == "PENDING" || (d.sourceBody.isEmpty() && d.sourceTitle.isEmpty())) { "Texto original indevido em pendência revisada." }
         }
         snapshot.accounts.forEach { a -> require(a.label.isNotBlank() && a.label.length <= 80 && a.nameKey == AccountNames.key(a.label) && a.lastUsedAt >= 0) { "Conta inválida no backup." } }
+        require(snapshot.accountBalanceEvents.map { it.id }.distinct().size == snapshot.accountBalanceEvents.size) { "Referências de saldo repetidas." }
+        val accountKeys = snapshot.accounts.map { it.nameKey }.toSet()
+        snapshot.accountBalanceEvents.forEach { e ->
+            require(e.id > 0 && e.accountKey in accountKeys && e.balanceCents in -Money.MAX_CENTS..Money.MAX_CENTS &&
+                e.effectiveAt > 0 && e.createdAt > 0 &&
+                e.reason.isNotBlank() && e.reason.length <= 200 && '\u0000' !in e.reason) { "Referência de saldo inválida." }
+        }
+        snapshot.records.forEach { row ->
+            row.originalRecordId?.let { id ->
+                require(id != row.id && row.movement == Movement.REFUND) { "Vínculo de estorno inválido." }
+                recordIds[id]?.let { original -> require(Refunds.applyOriginal(row.toRecord(), original.toRecord()) == row.toRecord()) { "Natureza de estorno inválida." } }
+            }
+        }
         snapshot.budgets.forEach { require(Budgets.error(it.toBudget()) == null) { "Orçamento inválido no backup." } }
         snapshot.recurring.forEach { plan ->
             require(Recurrences.error(plan.toPlan()) == null &&
@@ -171,26 +210,27 @@ object BackupSnapshot {
             require(o.status in setOf("RECORDED", "SKIPPED", "REMOVED")) { "Estado de vencimento inválido." }
             require(if (o.status == "RECORDED") o.recordId in recordIds else o.recordId == null) { "Vínculo de lançamento recorrente inválido." }
         }
+        ForecastSnapshots.validate(snapshot)
         CommitmentSnapshotValidation.validate(snapshot)
         RecurringSnapshots.validate(snapshot)
         require(snapshot.display.lastOrigin.length <= 80) { "Preferência de origem inválida." }
     }
 
-    private fun JSONObject.integer(key: String, min: Int, max: Int): Int = long(key).also {
+    internal fun JSONObject.integer(key: String, min: Int, max: Int): Int = long(key).also {
         require(it in min.toLong()..max.toLong()) { "Inteiro fora do limite em $key." }
     }.toInt()
-    private fun JSONObject.long(key: String): Long {
+    internal fun JSONObject.long(key: String): Long {
         val value = get(key)
         require(value is Int || value is Long) { "Número inteiro inválido em $key." }
         return (value as Number).toLong()
     }
-    private fun JSONObject.text(key: String, max: Int): String {
+    internal fun JSONObject.text(key: String, max: Int): String {
         val value = get(key)
         require(value is String && value.length <= max && '\u0000' !in value) { "Texto inválido em $key." }
         return value
     }
-    private fun JSONObject.nullableText(key: String, max: Int): String? = if (isNull(key)) null else text(key, max)
-    private fun JSONObject.bool(key: String): Boolean = get(key).also { require(it is Boolean) { "Preferência inválida em $key." } } as Boolean
+    internal fun JSONObject.nullableText(key: String, max: Int): String? = if (isNull(key)) null else text(key, max)
+    internal fun JSONObject.bool(key: String): Boolean = get(key).also { require(it is Boolean) { "Preferência inválida em $key." } } as Boolean
     private fun <T> JSONObject.rows(key: String, convert: (JSONObject) -> T): List<T> {
         val list = getJSONArray(key)
         require(list.length() <= MAX_ROWS) { "Quantidade de itens inválida em $key." }

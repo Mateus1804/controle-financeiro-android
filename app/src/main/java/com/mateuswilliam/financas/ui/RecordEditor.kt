@@ -61,23 +61,37 @@ fun RecordEditor(
     recurrenceOnlyMonth: Boolean = false,
     recurringFixed: Boolean = true,
     initialDate: LocalDate? = null,
+    balances: List<AccountBalance> = emptyList(),
+    history: List<Record> = emptyList(),
+    initialDescription: String = "",
+    initialCategory: Category? = null,
+    initialRecurring: Boolean = false,
 ) {
     val initial = existing ?: preset ?: recurring?.proposedRecord(recurring.id, ZoneId.systemDefault())
-    val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: initialDate?.atTime(12, 0)?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis() }
+    val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: initialDate?.atTime(java.time.LocalTime.now())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis() }
     val originalDate = Instant.ofEpochMilli(originalAt).atZone(ZoneId.systemDefault())
     val id = rememberSaveable { initial?.id ?: UUID.randomUUID().toString() }
     val amount = rememberTextFieldState(initialText = (initial?.amountCents ?: draft?.amountCents)?.let(MoneyInput::fromCents).orEmpty())
     var invalidMoneyInput by rememberSaveable { mutableStateOf(false) }
     val installmentAmount = rememberTextFieldState()
     var invalidInstallmentAmount by rememberSaveable { mutableStateOf(false) }
-    var frequency by rememberSaveable { mutableStateOf(if (recurring != null) MovementFrequency.RECURRING else MovementFrequency.SINGLE) }
+    var frequency by rememberSaveable { mutableStateOf(if (recurring != null || initialRecurring) MovementFrequency.RECURRING else MovementFrequency.SINGLE) }
     var fixedExpense by rememberSaveable { mutableStateOf(recurringFixed) }
     var terms by rememberSaveable(stateSaver = PurchaseTerms.Saver) { mutableStateOf(PurchaseTerms(LocalDate.now())) }
-    var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: lastOrigin.ifBlank { "Carteira" }) }
-    var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200).orEmpty()) }
+    val activeAccounts = accounts.filter { account -> balances.none { it.account.key == account.key && it.archived } }
+    val defaultBank = lastOrigin.takeIf { name -> name.isNotBlank() && balances.none { it.archived && it.account.key == AccountNames.key(name) } }
+        ?: activeAccounts.firstOrNull()?.label
+        ?: "Carteira".takeUnless { balances.any { account -> account.archived && account.account.key == AccountNames.key("Carteira") } }.orEmpty()
+    var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: defaultBank) }
+    var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200) ?: initialDescription) }
     var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: initialMovement) }
     var method by rememberSaveable { mutableStateOf(initial?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
-    var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.category ?: Category.OTHER) }
+    var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.let { source -> source.category.takeIf { it in categoriesFor(source.movement) } }
+        ?: initialCategory ?: if ((draft?.movement ?: initialMovement) == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER) }
+    var categoryEdited by rememberSaveable { mutableStateOf(false) }
+    var accountEdited by rememberSaveable { mutableStateOf(false) }
+    var originalRecordId by rememberSaveable { mutableStateOf(initial?.originalRecordId) }
+    var reversalMovement by rememberSaveable { mutableStateOf(initial?.reversalMovement ?: Movement.EXPENSE) }
     var destination by rememberSaveable { mutableStateOf(initial?.destination.orEmpty()) }
     var date by rememberSaveable { mutableStateOf(originalDate.toLocalDate().toString()) }
     var recurringDay by rememberSaveable { mutableIntStateOf(recurring?.dayOfMonth ?: LocalDate.parse(date).dayOfMonth) }
@@ -106,7 +120,8 @@ fun RecordEditor(
     val record = Record(id, (if (purchaseMode) schedule?.totalCents else cents) ?: 0, movement,
         if (purchaseMode) PaymentMethod.CARD else method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-        if (movement == Movement.TRANSFER) destination else "")
+        if (movement == Movement.TRANSFER) destination else "",
+        originalRecordId = if (movement == Movement.REFUND) originalRecordId else null, reversalMovement = reversalMovement)
     val recurringValue = RecurringPlan(id, description.trim(), cents ?: 0, movement, method, category,
         bank, date, recurringDay, recurring?.active ?: true)
     val error = when {
@@ -183,7 +198,7 @@ fun RecordEditor(
                     ChoiceField("Frequência", frequency, frequencies, { it.label }) { if (!busy) frequency = it }
                 }
                 if (recurringMode) {
-                    Text(if (recurrenceOnlyMonth) "Apenas esta ocorrência será alterada." else "Mensal · o valor pode ser ajustado ou ignorado em cada mês.", style = MaterialTheme.typography.bodySmall)
+                    Text(if (recurrenceOnlyMonth) "Só esta competência será alterada; os outros meses serão preservados." else if (recurring != null) "Desta competência em diante; pagamentos realizados e meses anteriores preservados." else "Mensal · o valor pode ser ajustado ou ignorado em cada mês.", style = MaterialTheme.typography.bodySmall)
                     if (!recurrenceOnlyMonth && movement == Movement.EXPENSE) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Despesa fixa", Modifier.weight(1f))
                         Switch(fixedExpense, { fixedExpense = it }, enabled = !busy, modifier = Modifier.semantics { contentDescription = "Despesa fixa" })
@@ -198,15 +213,64 @@ fun RecordEditor(
                 }
                 if (recurring == null && preset == null && !installmentConfirmation) ChoiceField("Movimentação", movement,
                     Movement.entries.toList(), { it.label }) {
+                    if (movement != it) {
+                        category = if (it == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER
+                        categoryEdited = false
+                        destination = ""
+                        originalRecordId = null
+                        reversalMovement = Movement.EXPENSE
+                    }
                     movement = it
                     if (it !in setOf(Movement.INCOME, Movement.EXPENSE) || (it != Movement.EXPENSE && frequency == MovementFrequency.INSTALLMENTS)) frequency = MovementFrequency.SINGLE
                 }
-                if (!purchaseMode) ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
-                ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category, Category.entries.toList(), { it.label }) { category = it }
-                AccountPickerField("Conta ou banco de origem", bank, accounts, { bank = it }, onAddAccount, hidden = hideAmounts)
-                if (movement == Movement.TRANSFER) AccountPickerField("Conta de destino", destination, accounts, { destination = it }, onAddAccount, hidden = hideAmounts)
+                if (movement == Movement.REFUND) {
+                    val originals = history.filter { it.id != id && it.movement in setOf(Movement.EXPENSE, Movement.INCOME) }
+                        .sortedByDescending { it.occurredAt }
+                    ChoiceField("Lançamento original (opcional)", originalRecordId,
+                        (listOf<String?>(null) + originals.map { it.id } + listOfNotNull(originalRecordId)).distinct(),
+                        { selected -> if (selected == null) "Sem vínculo" else originals.firstOrNull { it.id == selected }?.let {
+                            "${privateDisplayText(it.description, hideAmounts)} · ${shortDate(it.occurredAt)}"
+                        } ?: "Lançamento original indisponível" }) { selected ->
+                        originalRecordId = selected
+                        originals.firstOrNull { it.id == selected }?.let {
+                            reversalMovement = it.movement
+                            category = it.category
+                        }
+                    }
+                    if (originalRecordId == null) ChoiceField("Natureza do estorno", reversalMovement,
+                        listOf(Movement.EXPENSE, Movement.INCOME),
+                        { if (it == Movement.INCOME) "Devolução de receita" else "Reembolso de despesa" }) {
+                        reversalMovement = it
+                        category = if (it == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER
+                    }
+                }
+                if (movement != Movement.TRANSFER) {
+                    val categoryOptions = (categoriesFor(movement, reversalMovement) + category).distinct()
+                    if (movement == Movement.REFUND && originalRecordId != null) {
+                        Text("Categoria do lançamento original: ${category.label}", style = MaterialTheme.typography.bodyMedium)
+                        Text("Remova o vínculo para editar a categoria.", style = MaterialTheme.typography.bodySmall)
+                    } else ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category,
+                        categoryOptions, { it.label }) { category = it; categoryEdited = true }
+                } else Text("Transferência entre minhas contas", style = MaterialTheme.typography.titleSmall)
+                AccountPickerField("Conta ou banco de origem", bank, activeAccounts, { bank = it; accountEdited = true }, onAddAccount, hidden = hideAmounts)
+                if (movement == Movement.TRANSFER) {
+                    AccountPickerField("Conta de destino", destination, activeAccounts.filter { AccountNames.key(it.label) != AccountNames.key(bank) }, { destination = it }, onAddAccount, hidden = hideAmounts)
+                    TransferPreview(record, existing, balances, hideAmounts)
+                }
+                if (!purchaseMode) FinanceDisclosure("Mais detalhes · meio de pagamento", "record-payment-details") {
+                    ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
+                }
                 PrivateValueGate(hideAmounts && privateDisplayText(description, true) != description, "Mostrar descrição para edição") {
-                OutlinedTextField(description, { description = it.take(200) }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth().testTag(if (recurring != null) "recurring-title" else "record-description"), minLines = 2,
+                OutlinedTextField(description, { value ->
+                    description = value.take(200)
+                    if (existing == null && preset == null && draft == null && movement != Movement.TRANSFER && originalRecordId == null) {
+                        history.filter { it.movement == movement && it.description.trim().equals(description.trim(), ignoreCase = true) }
+                            .maxByOrNull { it.occurredAt }?.let { match ->
+                                if (!categoryEdited && match.category in categoriesFor(movement, reversalMovement)) category = match.category
+                                if (!accountEdited && activeAccounts.any { AccountNames.key(it.label) == AccountNames.key(match.bank) }) bank = match.bank
+                            }
+                    }
+                }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth().testTag(if (recurring != null) "recurring-title" else "record-description"), minLines = 2,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
                 }
                 if (!purchaseMode) OutlinedButton(onClick = {
@@ -252,7 +316,7 @@ fun <T> ChoiceField(label: String, value: T, options: List<T>, text: (T) -> Stri
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small, border = null,
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().semantics { contentDescription = label }, shape = MaterialTheme.shapes.small, border = null,
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, contentColor = MaterialTheme.colorScheme.onSurface), contentPadding = PaddingValues(16.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     if (icon != null) AppIcon(icon)

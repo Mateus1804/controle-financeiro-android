@@ -72,6 +72,8 @@ class RecordInputBackupTest {
     @Test fun acceptedUnicodeBoundaryValuesRoundTripWithoutChangingTheRecord() = runBlocking<Unit> {
         val valid = record("ç".repeat(128)).copy(bank = "Conta São João", description = "Pão, café e almoço — exemplo",
             movement = Movement.TRANSFER, destination = "Poupança familiar", method = PaymentMethod.UNKNOWN)
+        repository.addAccount(valid.bank)
+        repository.addAccount(valid.destination)
         assertTrue(repository.save(valid, null))
         val snapshot = repository.snapshot()
         val restored = BackupSnapshot.decode(BackupSnapshot.encode(snapshot))

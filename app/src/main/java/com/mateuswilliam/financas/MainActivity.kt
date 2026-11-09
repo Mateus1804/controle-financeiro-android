@@ -32,16 +32,23 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mateuswilliam.financas.notifications.ReviewNotifications
 import com.mateuswilliam.financas.ui.FinanceApp
+import com.mateuswilliam.financas.ui.ForecastApp
 import com.mateuswilliam.financas.ui.FinanceTheme
 import com.mateuswilliam.financas.ui.LockScreen
 import com.mateuswilliam.financas.security.AppLockState
 import com.mateuswilliam.financas.security.AuthenticationAction
 import com.mateuswilliam.financas.core.SessionPolicy
 import com.mateuswilliam.financas.notifications.RecurringReminders
+import com.mateuswilliam.financas.notifications.ForecastReminders
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        // Retained ledger components have an explicit debug-only regression host.
+        const val EXTRA_LEGACY_TEST_UI = "com.mateuswilliam.financas.LEGACY_TEST_UI"
+    }
+    private var legacyTestUi = false
     private var resumeCount by mutableIntStateOf(0)
     private var draftFromNotification by mutableStateOf<String?>(null)
     private var planningFromNotification by mutableStateOf(false)
@@ -55,6 +62,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = application as FinanceApplication
+        legacyTestUi = BuildConfig.DEBUG && intent.getBooleanExtra(EXTRA_LEGACY_TEST_UI, false)
         session = ViewModelProvider(this)[AppLockState::class.java]
         financeModel = ViewModelProvider(this)[FinanceViewModel::class.java]
         updateScreenProtection(app.settings.snapshot().secureScreen)
@@ -80,11 +88,15 @@ class MainActivity : ComponentActivity() {
                 if (settings.lockEnabled && !session.authenticated) LockScreen(session.authenticating, session.message) {
                     authenticate(AuthenticationAction.UNLOCK)
                 } else savedUi.SaveableStateProvider("finance") {
-                    FinanceApp(financeModel, resumeCount, draftFromNotification,
+                    if (legacyTestUi) FinanceApp(financeModel, resumeCount, draftFromNotification,
                         consumeDraft = { draftFromNotification = null; intent.removeExtra(ReviewNotifications.EXTRA_DRAFT_ID) },
                         incomingPlanning = planningFromNotification,
                         consumePlanning = { planningFromNotification = false; intent.removeExtra(RecurringReminders.EXTRA_PLANNING) },
                         onLockChange = { authenticate(if (it) AuthenticationAction.ENABLE else AuthenticationAction.DISABLE) })
+                    else ForecastApp(financeModel, ViewModelProvider(this@MainActivity)[ForecastViewModel::class.java], resumeCount,
+                        onLockChange = { authenticate(if (it) AuthenticationAction.ENABLE else AuthenticationAction.DISABLE) },
+                        incomingPlanning = planningFromNotification,
+                        consumePlanning = { planningFromNotification = false; intent.removeExtra(RecurringReminders.EXTRA_PLANNING) })
                 }
             }
         }
@@ -100,7 +112,10 @@ class MainActivity : ComponentActivity() {
             if (SessionPolicy.requiresAuthentication(app.settings.snapshot().lockEnabled, session.authenticated,
                     session.backgroundAt, SystemClock.elapsedRealtime(), keyguard.isDeviceLocked)) session.authenticated = false
             session.backgroundAt = null
-            app.background.launch { runCatching { app.repository.notifyDue(LocalDate.now()) { RecurringReminders.show(this@MainActivity, it) } } }
+            app.background.launch { runCatching {
+                if (legacyTestUi) app.repository.notifyDue(LocalDate.now()) { RecurringReminders.show(this@MainActivity, it) }
+                else ForecastReminders.notifyToday(app)
+            } }
         }
     }
     override fun onStop() {
