@@ -10,6 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.YearMonth
 
 /** The planner writes forecasts/reserve events only; it never records receipts or payments. */
 class ForecastViewModel(application: Application) : AndroidViewModel(application) {
@@ -33,6 +34,8 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
             catch (_: Exception) { loadError.value = "Não foi possível abrir o planejamento. Seus dados foram preservados. Tente novamente." }
         }
     }
+
+    fun monthlyPlan(month: YearMonth) = app.database.financeDao().observeMonthlyPlan(month.toString())
 
     fun refresh() = viewModelScope.launch {
         if (observing?.isActive != true) { observe(); return@launch }

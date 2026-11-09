@@ -102,7 +102,10 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val asOf = remember(resumeCount, oldState.records) { System.currentTimeMillis() }
     val realized = remember(oldState.records, asOf) { oldState.records.filter { it.occurredAt <= asOf } }
     val duplicateIndex = remember(oldState.manualRecords) { DuplicateCandidates(oldState.manualRecords) }
-    val salaryReference = legacyIncome.firstOrNull { it.month == monthText }
+    val salaryReference = key(monthText) {
+        val reference by remember(month) { model.monthlyPlan(month) }.collectAsStateWithLifecycle(initialValue = null)
+        reference
+    }
     val salarySummary = remember(oldState.records, data, month, zone, asOf, salaryReference) {
         runCatching { SalarySummaries.month(oldState.records, data, month, zone, asOf, salaryReference?.incomeCents) }.getOrElse {
             SalarySummaries.month(oldState.records, null, month, zone, asOf, salaryReference?.incomeCents)
