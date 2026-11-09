@@ -165,7 +165,7 @@ class MainActivity : ComponentActivity() {
         session.message = null
         if (Build.VERSION.SDK_INT >= 28) {
             val executor = ContextCompat.getMainExecutor(this)
-            val builder = BiometricPrompt.Builder(this).setTitle("Controle Financeiro")
+            val builder = BiometricPrompt.Builder(this).setTitle("Rendly")
                 .setDescription("Confirme a identidade para acessar ou alterar a proteção do aplicativo.")
             if (Build.VERSION.SDK_INT >= 30) builder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
             else builder.setNegativeButton("Usar PIN, padrão ou senha", executor) { _, _ -> launchCredential() }
@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
     private fun launchCredential() {
         if (session.credentialInFlight) return
         val intent = getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent(
-            "Controle Financeiro", "Confirme PIN, padrão ou senha para continuar.")
+            "Rendly", "Confirme PIN, padrão ou senha para continuar.")
         if (intent == null) { authenticationError("A autenticação do aparelho está indisponível."); session.authenticating = false; session.action = null }
         else {
             session.credentialInFlight = true

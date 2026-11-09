@@ -55,6 +55,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     var initialKind by rememberSaveable { mutableStateOf(ForecastKind.EXPENSE) }
     var template by rememberSaveable { mutableStateOf<String?>(null) }
     var legacyMonth by rememberSaveable { mutableStateOf<String?>(null) }
+    var dueDates by rememberSaveable { mutableStateOf(false) }
     var templates by rememberSaveable { mutableStateOf(false) }
     var cycleEditor by rememberSaveable { mutableStateOf(false) }
     var reserveKind by rememberSaveable { mutableStateOf<ReserveEventKind?>(null) }
@@ -121,7 +122,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     }
                 }
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                    listOf("Orçamento" to R.drawable.ic_overview, "Projeções" to R.drawable.ic_calendar, "Reserva" to R.drawable.ic_wallet).forEachIndexed { index, (label, icon) ->
+                    listOf("Orçamento" to R.drawable.ic_overview, "Projeções" to R.drawable.ic_chevron_right, "Reserva" to R.drawable.ic_wallet).forEachIndexed { index, (label, icon) ->
                         NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { AppIcon(selectedIcon(icon, tab == index)) }, label = { Text(label) })
                     }
                 }
@@ -131,7 +132,14 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 840.dp).fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = FinanceSpacing.page, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (tab >= 3) "Ajustes e histórico" else "Meu planejamento", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(32.dp))
+                            Text("Rendly", style = MaterialTheme.typography.titleLarge)
+                        }
+                        Text(if (tab >= 3) "Ajustes e histórico" else if (settings.displayName.isBlank()) "Olá!" else "Olá, ${settings.displayName}!",
+                            style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("rendly-greeting"), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
                     IconButton({ finance.preferences.hideAmounts(!hidden) }) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
                     IconButton({ tab = if (tab == 3) 0 else 3 }, Modifier.testTag("forecast-settings")) { AppIcon(R.drawable.ic_settings, description = "Ajustes") }
                 }
@@ -145,7 +153,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onBackup = { backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { tab = 1 },
                         onLockChange = onLockChange, onSecureScreen = finance.preferences::setSecureScreen,
                         onReminders = { finance.preferences.setReminders(it); if (it && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) alerts.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                        plannerMode = true)
+                        plannerMode = true, onDisplayName = finance.preferences::setDisplayName)
                     tab == 4 -> LazyColumn(Modifier.testTag("forecast-legacy-records"), contentPadding = PaddingValues(FinanceSpacing.page)) {
                         item { TextButton({ tab = 0 }) { Text("Voltar ao orçamento") }; Text("Registros anteriores", style = MaterialTheme.typography.titleLarge)
                             Text("Consulta do histórico preservado. As novas previsões são gerenciadas no orçamento.") }
@@ -163,6 +171,11 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { followingCurrent = true; browsing = today.toString() }, { cycleEditor = true }) }
                         item { Text(if (closed) "Ciclo encerrado · valores estimados" else "Planejamento do ciclo · valores estimados", style = MaterialTheme.typography.labelMedium) }
                         item { ForecastSummary(report, hidden) }
+                        item { RendlyCategories(report, hidden) }
+                        item { TextButton({ dueDates = true },
+                            enabled = report.lines.any { it.included && !it.ignored && it.date >= today }, modifier = Modifier.fillMaxWidth()) {
+                            AppIcon(R.drawable.ic_chevron_right); Spacer(Modifier.width(8.dp)); Text("Próximos vencimentos · consultar previsão")
+                        } }
                         if (report.incomeCents <= 0) item {
                             EmptyCard("Informe sua renda prevista", "Cadastre o salário uma única vez. O mesmo valor alimenta o orçamento e todas as projeções.")
                             TextButton({ newItem(ForecastKind.INCOME) }, modifier = Modifier.testTag("forecast-setup-salary")) { Text("Cadastrar salário mensal") }
@@ -191,6 +204,19 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     val selectedLine = report?.lines?.firstOrNull { it.itemId == editItem && it.occurrenceKey == editKey }
+    if (dueDates && report != null) AlertDialog(onDismissRequest = { dueDates = false },
+        title = { Text("Próximos vencimentos") }, text = {
+            LazyColumn(Modifier.heightIn(max = 400.dp)) {
+                val upcoming = report.lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && !it.rule.cycleAnchored && it.date >= today }.sortedBy { it.date }
+                if (upcoming.isEmpty()) item { Text("Sem vencimentos previstos restantes neste ciclo.") }
+                upcoming.forEach { line -> item {
+                    TextButton({ dueDates = false; edit(line) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Column(Modifier.weight(1f)) { Text(privateDisplayText(line.title, hidden)); Text(line.date.toString()) }
+                        Amount(line.amountCents, hidden, size = 16)
+                    }
+                } }
+            }
+        }, confirmButton = { TextButton({ dueDates = false }) { Text("Fechar") } })
     val selectedRule = snapshot?.rules?.filter { it.itemId == editItem }?.maxByOrNull { it.effectiveFrom }
     val oldIncome = legacyIncome.firstOrNull { it.month == legacyMonth }
     val referenceRule = oldIncome?.let { ForecastRule("monthly-reference:${it.month}", period.start, "Renda anterior · revisar", ForecastKind.INCOME,

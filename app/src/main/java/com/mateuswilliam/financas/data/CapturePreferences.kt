@@ -19,6 +19,7 @@ data class CaptureSettings(
     val remindersEnabled: Boolean = false,
     val lockEnabled: Boolean = false,
     val secureScreen: Boolean = false,
+    val displayName: String = "",
 )
 
 class CapturePreferences(context: Context) {
@@ -41,8 +42,16 @@ class CapturePreferences(context: Context) {
         preferences.getBoolean("reminders_enabled", false),
         preferences.getBoolean("lock_enabled", false),
         preferences.getBoolean("secure_screen", false),
+        preferences.getString("display_name", "").orEmpty(),
     )
 
+    fun setDisplayName(value: String) {
+        val name = value.trim()
+        require(name.codePointCount(0, name.length) <= 40) { "Use até 40 caracteres." }
+        require(name.none { it.isISOControl() }) { "Use um nome em uma única linha." }
+        check(preferences.edit().putString("display_name", name).commit()) { "Não foi possível salvar o nome." }
+        mutable.value = read()
+    }
     fun acceptDisclosure() { preferences.edit { putBoolean("disclosure_v1", true); putBoolean("enabled", true) } }
     fun setEnabled(enabled: Boolean) { preferences.edit { putBoolean("enabled", enabled && read().consented) } }
     fun selectPackages(packages: Set<String>) { preferences.edit { putStringSet("packages", packages.toSet()) } }

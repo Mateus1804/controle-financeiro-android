@@ -17,7 +17,7 @@ fun LockScreen(busy: Boolean, message: String?, onUnlock: () -> Unit) {
         Column(Modifier.safeDrawingPadding().padding(28.dp).widthIn(max = 480.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
             IconBadge(R.drawable.ic_lock)
-            Text("Controle Financeiro", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+            Text("Rendly", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
             Text("Acesso protegido", style = MaterialTheme.typography.titleLarge)
             Text("A autenticação do aparelho é necessária para abrir os dados. A captura autorizada pode continuar em segundo plano.")
             message?.let { Text(it, color = MaterialTheme.colorScheme.error) }

@@ -23,8 +23,8 @@ for attempt in 1 2 3; do
   if timeout 12s adb shell uiautomator dump "$hierarchy" >/dev/null &&
      adb exec-out cat "$hierarchy" > qa/phone-preview-hierarchy.xml &&
      grep -F 'package="com.mateuswilliam.financas.teste"' qa/phone-preview-hierarchy.xml >/dev/null &&
-     grep -F 'text="Meu planejamento"' qa/phone-preview-hierarchy.xml >/dev/null &&
-     grep -F 'text="Previsão do ciclo"' qa/phone-preview-hierarchy.xml >/dev/null; then
+     grep -F 'text="Rendly"' qa/phone-preview-hierarchy.xml >/dev/null &&
+     grep -F 'text="Resultado do mês"' qa/phone-preview-hierarchy.xml >/dev/null; then
     echo 'APK de teste instalado ao lado do original; planejamento carregado na primeira abertura.' | tee -a qa/phone-preview-launch.log
     exit 0
   fi
