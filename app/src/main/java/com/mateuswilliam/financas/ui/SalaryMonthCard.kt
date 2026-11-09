@@ -12,15 +12,16 @@ import java.time.YearMonth
 
 @Composable
 internal fun SalaryMonthCard(summary: SalarySummary, hidden: Boolean, onSalary: () -> Unit) {
+    val salaryCents = summary.salaryCents
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(Modifier.fillMaxWidth().testTag("salary-month-summary").padding(FinanceSpacing.card),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionTitle("Meu salário no mês", "Gastos realizados e sobra estimada")
-            if (summary.salaryCents == null) {
+            if (salaryCents == null) {
                 Text("Informe o salário líquido do mês para calcular a sobra e o percentual utilizado.")
             } else {
                 SalaryMetric(if (summary.isEstimatedSalary) "Salário do mês · referência" else "Salário do mês · registrado",
-                    summary.salaryCents, hidden)
+                    salaryCents, hidden)
                 summary.usedPercentage?.let {
                     Text(if (hidden) "Salário utilizado: ••••" else "Salário utilizado: ${it.toPlainString().replace('.', ',')}%")
                 }
