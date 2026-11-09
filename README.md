@@ -50,7 +50,7 @@ O planejador utiliza regras versionadas e ajustes por ocorrência sobre interval
 
 ## Qualidade
 
-O novo planejador passou em **203 testes do core** e **24 cenários instrumentados distintos na API 26**: 15 novos e 9 regressões preservadas. Debug, AndroidTest e preview compilaram; o lint debug terminou com zero erros e 18 avisos. Os cenários, evidências e limites estão em [Validação do planejador, ciclos e reserva](docs/validacao-planejador-ciclos-reserva.md). A atualização completa por APK anterior e backup criptografado aguarda a execução do CI.
+O novo planejador passou em **203 testes do core** e **28 cenários instrumentados distintos na API 26**: 15 novos e 13 regressões preservadas. Debug, AndroidTest e preview compilaram; o lint debug terminou com zero erros e 18 avisos. O CI também aprovou a compilação release e a atualização completa por APK anterior e backup criptografado na API 35. A primeira suíte remota teve quatro falhas de preparação de testes anteriores; consulte os checks do PR17 para a repetição após as correções. Os cenários, evidências e limites estão em [Validação do planejador, ciclos e reserva](docs/validacao-planejador-ciclos-reserva.md).
 
 Os números e links restantes desta seção registram validações anteriores ao novo planejador.
 

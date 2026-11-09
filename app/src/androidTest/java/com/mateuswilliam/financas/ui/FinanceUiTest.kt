@@ -306,6 +306,22 @@ class FinanceUiTest {
         }
         val shellListenerCommand = command("cmd notification help").contains("allow_listener")
         val previousListeners = command("settings get secure enabled_notification_listeners").trim().takeUnless { it == "null" }.orEmpty()
+        val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        val alertsWereGranted = android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(app, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        fun denyRuntimeAlerts() {
+            val permissionManager = checkNotNull(app.getSystemService("permission"))
+            val revoke = permissionManager.javaClass.getMethod("revokePostNotificationPermissionWithoutKillForTest",
+                String::class.java, Int::class.javaPrimitiveType)
+            val userId = command("am get-current-user").trim().toInt()
+            // TestApi usado pelo CTS: revoga a permissão real sem encerrar a instrumentação.
+            automation.adoptShellPermissionIdentity("android.permission.REVOKE_POST_NOTIFICATIONS_WITHOUT_KILL",
+                "android.permission.REVOKE_RUNTIME_PERMISSIONS")
+            try { revoke.invoke(permissionManager, app.packageName, userId) }
+            finally { automation.dropShellPermissionIdentity() }
+            assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
+                androidx.core.content.ContextCompat.checkSelfPermission(app, android.Manifest.permission.POST_NOTIFICATIONS))
+        }
         fun listenerAccess(allowed: Boolean) {
             if (shellListenerCommand) command("cmd notification " + (if (allowed) "allow_listener " else "disallow_listener ") + component)
             else {
@@ -316,9 +332,8 @@ class FinanceUiTest {
             }
         }
         try {
-            // A API 26 não possui a permissão runtime da API 33 nem o comando allow_listener.
-            if (android.os.Build.VERSION.SDK_INT >= 33)
-                command("appops set " + app.packageName + " POST_NOTIFICATION deny")
+            // Da API 33 em diante, o estado dos alertas depende da permissão runtime, não do app-op legado.
+            if (android.os.Build.VERSION.SDK_INT >= 33) denyRuntimeAlerts()
             rule.runOnIdle {
                 app.settings.acceptDisclosure()
                 app.settings.selectPackages(setOf("banco.exemplo"))
@@ -330,7 +345,6 @@ class FinanceUiTest {
             rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
             val alertAction = rule.onNodeWithText("Permitir alertas de revisão")
             if (android.os.Build.VERSION.SDK_INT >= 33) {
-                // O app-op bloqueia os alertas efetivos sem revogar a permissão runtime.
                 assertFalse(androidx.core.app.NotificationManagerCompat.from(app).areNotificationsEnabled())
                 alertAction.assertExists()
             } else {
@@ -345,10 +359,11 @@ class FinanceUiTest {
             rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Autorizar acesso"))
             rule.onNodeWithText("Autorizar acesso").assertIsDisplayed()
         } finally {
-            listenerAccess(false)
-            if (android.os.Build.VERSION.SDK_INT >= 33)
-                command("appops set " + app.packageName + " POST_NOTIFICATION default")
-            rule.runOnIdle { app.settings.setEnabled(false) }
+            try { listenerAccess(false) }
+            finally {
+                if (alertsWereGranted) automation.grantRuntimePermission(app.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
+                rule.runOnIdle { app.settings.setEnabled(false) }
+            }
         }
     }
 

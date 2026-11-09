@@ -65,7 +65,7 @@ class CommitmentBackupTest {
         repository.restore(legacy)
         assertEquals(0L, repository.commitmentReport(month).committedCents)
         val encoded = BackupSnapshot.encode(repository.snapshot())
-        assertEquals(6, JSONObject(encoded.toString(Charsets.UTF_8)).getInt("version"))
+        assertEquals(BackupSnapshot.FORMAT_VERSION, JSONObject(encoded.toString(Charsets.UTF_8)).getInt("version"))
         assertEquals(legacy.records.toSet(), BackupSnapshot.decode(encoded).records.toSet())
     }
     @Test fun versionTwoDefaultsToAnActiveUnchangedPurchaseAndRejectsDisguisedManagementFields() = runBlocking<Unit> {

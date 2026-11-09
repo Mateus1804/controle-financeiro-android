@@ -11,7 +11,7 @@ Room 9→10 acrescenta regras versionadas, ajustes por ocorrência, ciclos e res
 - `:core:test`: **203 testes, zero falhas, erros ou ignorados**, conforme os XMLs em `core/build/test-results/test/`. Incluem salário único e ajuste de ocorrência, todos os gastos, fatura sem duplicação, valores acima de 100%, estornos, centavos de parcelas, meses curtos, mudança de dia, histórico e reserva sem cobertura automática de déficit.
 - `:app:assembleDebug`, `:app:assembleDebugAndroidTest`, `:app:assemblePreview` e `:app:lintDebug`: **sucesso**, no build final de produção em **2 min 13 s**. O relatório de lint registra **zero erros e 18 avisos**.
 - Após ajustes somente nos testes de regressão, `:app:assembleDebugAndroidTest`: **sucesso em 26 s**.
-- Instrumentação direcionada no emulador **API 26**: **24 cenários distintos aprovados**, sendo **15 novos** do planejador e **9 regressões preservadas**. O cenário principal de salário foi repetido no lote final e é contado uma vez.
+- Instrumentação direcionada no emulador **API 26**: **28 cenários distintos aprovados**, sendo **15 novos** do planejador e **13 regressões preservadas**. Repetições de salário e notificações são contadas uma vez.
 
 | Lote | Resultado observado | Evidência local |
 | --- | --- | --- |
@@ -19,8 +19,11 @@ Room 9→10 acrescenta regras versionadas, ajustes por ocorrência, ciclos e res
 | Editor e jornadas novos | 9 aprovados | `/workspace/scratch/forecast-resume-ui-tests.log` |
 | Regressões anteriores | 6 aprovados no primeiro lote; 2 falhas corrigidas e repetidas no lote final | `/workspace/scratch/forecast-legacy-regressions.log` |
 | Lote final direcionado | 4 aprovados em 106,544 s: captura, aparência, transferência e repetição do salário | `/workspace/scratch/forecast-final-targeted-tests.log` |
+| Regressões identificadas pelo CI | 5 aprovados em 54,138 s: dois formatos antigos de backup, notificações e preservação de natureza ao editar receita/despesa | `/workspace/scratch/forecast-ci-fixes-tests.log` |
 
 Os builds estão registrados em `/workspace/scratch/forecast-ready-build.log` e `/workspace/scratch/forecast-regression-final-build.log`. Os 18 avisos foram conferidos em `app/build/reports/lint-results-debug.xml`; essa contagem não é uma execução de lint release.
+
+O APK de testes com as correções posteriores do CI compilou em 36 s (`/workspace/scratch/forecast-ci-fixes-build.log`). Os cinco cenários repetidos passaram na API26; a revogação da permissão runtime, exclusiva da API33 em diante, depende da nova execução remota na API35.
 
 A [captura final com dados fictícios](imagens/planejador/ciclo-exemplo-ficticio.png) foi inspecionada em 320 × 640: ciclo de 05/11/2026 a 04/12/2026, renda ajustada de R$ 2.850,00, gastos de R$ 2.200,00, percentual de 77,19% e margem de R$ 650,00 visíveis sem rolagem. Essa inspeção não substitui a conferência manual com fonte ampliada ou TalkBack.
 
@@ -43,9 +46,17 @@ O primeiro lote de oito regressões terminou com seis aprovações e duas falhas
 
 Duas revisões independentes de código encerraram sem problemas acionáveis nos recortes revistos: correções financeiras em `/workspace/scratch/forecast-financial-fixes-review.md` e correções de interface em `/workspace/scratch/forecast-app-fixes-review.md`. A revisão financeira conferiu fronteiras históricas, mudança do dia das parcelas, arquivamento de fontes antigas, limites de origem/texto e preservação de destinações. A revisão de interface conferiu ativação de ocorrência importada, renda estimada, privacidade dos campos e semântica do controle. Essas revisões foram inspeções de código; a evidência de execução é a dos testes acima.
 
+## Primeira execução remota
+
+A [execução 76 do CI](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/42559643628), no commit `c8a30f2`, aprovou os builds debug, preview e release, o bundle, os testes do core e os lints. O job de atualização na API 35 aprovou as duas fases com o APK anterior e seu backup criptografado.
+
+A suíte completa da API 35 executou 219 testes: 215 aprovações e quatro falhas em testes anteriores. Todos os 15 cenários novos do planejador passaram. Duas verificações ainda esperavam o formato 6 do backup e foram ajustadas ao formato atual. O teste de edição de valor passou a acionar o botão habilitado pela semântica, preservando as verificações de natureza, valor e data. A preparação da permissão de alertas passou a revogar a permissão runtime real com o TestApi usado pelo CTS, sem encerrar a instrumentação, restaurando a concessão anterior no `finally`. A API 35 consulta essa permissão; bloquear somente o app-op não reproduzia o cenário negado quando outro teste já havia concedido notificações.
+
+Essas correções serão verificadas em nova execução remota; a primeira execução não é declarada aprovada integralmente. O resultado atualizado acompanha os checks do PR17.
+
 ## Limites e conferência no celular
 
-A validação local utilizou dados fictícios e cenários direcionados na API 26. Não reexecutou toda a suíte em todas as APIs nem o fluxo completo de instalar o APK anterior, exportar seu backup criptografado e recuperá-lo após a atualização. Esse cenário é lento no emulador local e permanece para o job de atualização do CI na API 35, sem resultado novo presumido. A migração isolada e a serialização/restauração dos snapshots foram verificadas localmente; elas não equivalem à atualização completa por APK.
+A validação local utilizou dados fictícios e cenários direcionados na API 26. Não reexecutou toda a suíte em todas as APIs nem o fluxo completo de instalar o APK anterior, exportar seu backup criptografado e recuperá-lo após a atualização. Esse cenário foi aprovado pelo job de atualização do CI na API 35 descrito acima. A migração isolada e a serialização/restauração dos snapshots foram verificadas localmente; elas não equivalem à atualização completa por APK.
 
 TalkBack manual, biometria em aparelho, notificações bancárias reais e o checklist manual com fonte ampliada ainda exigem conferência específica. Não houve integração bancária, consulta de saldo real ou conciliação automática. A margem é estimada e a reserva é informada pelo usuário.
 

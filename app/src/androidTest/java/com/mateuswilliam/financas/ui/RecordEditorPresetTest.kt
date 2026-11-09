@@ -1,5 +1,6 @@
 package com.mateuswilliam.financas.ui
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.mateuswilliam.financas.core.*
@@ -31,7 +32,8 @@ class RecordEditorPresetTest {
         rule.onNodeWithText("Movimentação").assertDoesNotExist()
         rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("5000")
         rule.onNodeWithTag("amount-input").performImeAction()
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        rule.onNode(hasText("Confirmar") and hasClickAction()).assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         rule.runOnIdle {
             assertEquals(movement, saved?.movement)
             assertEquals(5000L, saved?.amountCents)

@@ -165,10 +165,10 @@ class MonthlyRecurringRepositoryTest {
         assertEquals(62500L, month(november).plan.amountCents)
         assertEquals(62500L, repo.commitmentReport(november).committedCents)
         assertEquals(60000L, repo.commitmentReport(december).committedCents)
-        val v5 = JSONObject(BackupSnapshot.encode(repo.snapshot()).toString(Charsets.UTF_8))
-        assertEquals(6, v5.getInt("version"))
-        assertTrue(v5.getJSONArray("recurringRevisions").length() > 0)
-        assertTrue(v5.getJSONArray("recurringMonths").length() > 0)
+        val current = JSONObject(BackupSnapshot.encode(repo.snapshot()).toString(Charsets.UTF_8))
+        assertEquals(BackupSnapshot.FORMAT_VERSION, current.getInt("version"))
+        assertTrue(current.getJSONArray("recurringRevisions").length() > 0)
+        assertTrue(current.getJSONArray("recurringMonths").length() > 0)
     }
 
     @Test fun reopeningRoomKeepsMonthlyEditsSkippedStateAndOriginalHabitualDay() = runBlocking<Unit> {

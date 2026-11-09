@@ -78,7 +78,8 @@ Reservas: SET inicial/correção explícita; WITHDRAW não pode superar saldo. A
 - [x] Editor: formulário único para regra/ocorrência, conta opcional, frequência e tipo corretos, valor estimado, consumo sem data, fatura explícita e alcance mensal/futuro. Dialogs de ciclo e reserva reutilizando MoneyAmountField/ChoiceField. Templates sem valores.
 - [x] Integração: ViewModel/entrada principal, resumo e gráfico total, lista contextual sem quitação, histórico e próximos períodos, reserva/destinação, simulador sem mutação, ajustes/backup/dados legados acessíveis. Lembretes informativos.
 - [x] Validar localmente: core, assemble/lint e cenários instrumentados essenciais; revisão independente; corrigir falhas e atualizar documentação.
-- [ ] Entrega: atualizar PR17 e disponibilizar o APK preview e os artefatos finais; conferir o resultado remoto da suíte e da atualização completa por APK/backup no CI.
+- [x] Entrega local: atualizar PR17 e disponibilizar o APK preview, código-fonte e evidências de validação.
+- [ ] CI: repetir a suíte completa após corrigir quatro testes anteriores identificados na execução76. Build release e atualização completa por APK/backup aprovados nessa execução.
 
 ## Verificações essenciais
 
@@ -88,6 +89,6 @@ Reservas: SET inicial/correção explícita; WITHDRAW não pode superar saldo. A
 
 Base: `a433c56`, PR17 aberto. Não fazer merge. A instrumentação ampla anterior teve falhas de UI; consultar evidência remota somente quando afetar a mudança, sem repetir baterias amplas sem motivo. Este plano é execução do pedido detalhado autorizado, sem nova rodada de aprovação de design.
 
-Validação local de 09/11/2026: 203 testes do core sem falhas/erros/ignorados; 24 cenários instrumentados distintos aprovados na API 26 (15 novos e 9 regressões). O lote final passou os quatro cenários selecionados, incluindo repetição do salário que não aumenta a contagem distinta. Debug/AndroidTest/preview/lint debug concluíram com sucesso em 2m13s, zero erros e 18 avisos de lint; o rebuild posterior somente de testes concluiu em 26s. As revisões independentes financeiras e de interface encerraram sem problemas acionáveis nos recortes revistos.
+Validação local de 09/11/2026: 203 testes do core sem falhas/erros/ignorados; 28 cenários instrumentados distintos aprovados na API26 (15 novos e 13 regressões). Repetições de salário/notificações não aumentam a contagem distinta. Debug/AndroidTest/preview/lint debug concluíram com sucesso em 2m13s, zero erros e 18 avisos de lint. Os rebuilds somente de testes concluíram em 26 s e 36 s. As revisões independentes financeiras e de interface encerraram sem problemas acionáveis nos recortes revistos. Após a primeira suíte remota, os cinco cenários direcionados passaram em 54,138 s localmente; a preparação de permissão exclusiva da API33+ será verificada no CI.
 
-A migração 9→10 isolada, reabertura e serialização/restauração de snapshots passaram. A atualização completa pelo APK anterior com backup criptografado não foi repetida localmente; permanece para o CI. O host antigo de interface em debug cobre somente regressões preservadas; as jornadas novas usam a entrada principal real. Resultados e limites: [Validação do planejador](../../validacao-planejador-ciclos-reserva.md).
+A migração 9→10 isolada, reabertura e serialização/restauração de snapshots passaram. A atualização completa pelo APK anterior com backup criptografado passou no CI76/API35. O host antigo de interface em debug cobre somente regressões preservadas; as jornadas novas usam a entrada principal real. Resultados e limites: [Validação do planejador](../../validacao-planejador-ciclos-reserva.md).
