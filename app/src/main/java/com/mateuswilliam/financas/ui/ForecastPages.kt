@@ -73,12 +73,13 @@ internal fun ReserveGoalEditor(existing: Long?, busy: Boolean, hidden: Boolean, 
 @Composable
 internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPeriod, simulation: ForecastRule?, hidden: Boolean, busy: Boolean,
     onSimulate: () -> Unit, onDiscard: () -> Unit, onAdopt: () -> Unit, onOpen: (BudgetPeriod) -> Unit,
-    legacyIncome: List<MonthlyPlanEntity>, onReuse: (MonthlyPlanEntity) -> Unit) {
+    legacyIncome: List<MonthlyPlanEntity>, onReuse: (MonthlyPlanEntity) -> Unit,
+    represented: Set<Pair<String, String>> = emptySet()) {
     val periods = remember(data.cycleRules, selected) {
         buildList { var next = selected; repeat(6) { add(next); next = CycleCalendar.periodContaining(next.endExclusive, data.cycleRules) } }
     }
-    val projected = remember(data, simulation, periods) { periods.map { period ->
-        ForecastCalculator.report(data, period) to simulation?.let { ForecastCalculator.report(data.copy(rules = data.rules + it), period) }
+    val projected = remember(data, simulation, periods, represented) { periods.map { period ->
+        ForecastCalculator.report(data, period, represented) to simulation?.let { ForecastCalculator.report(data.copy(rules = data.rules + it), period, represented) }
     } }
     LazyColumn(Modifier.testTag("forecast-projections"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {

@@ -35,6 +35,7 @@ fun SettingsScreen(
     onBackup: () -> Unit, onRestore: () -> Unit, onPlanning: () -> Unit,
     onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit, onReminders: (Boolean) -> Unit = {},
     plannerMode: Boolean = false,
+    showCapture: Boolean = !plannerMode,
     onDisplayName: (String) -> Unit = {},
 ) {
     var nameEditor by remember { mutableStateOf(false) }
@@ -74,7 +75,7 @@ fun SettingsScreen(
                 }
             }
         }
-        if (!plannerMode) item {
+        if (showCapture) item {
             SettingsCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {

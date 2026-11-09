@@ -9,7 +9,7 @@ object ForecastCalculator {
     private data class Occurrence(val key: String, val date: LocalDate, val amount: Long)
     private fun monthDate(month: YearMonth, day: Int) = month.atDay(minOf(day, month.lengthOfMonth()))
 
-    fun report(dataset: ForecastDataset, period: BudgetPeriod): ForecastReport {
+    fun report(dataset: ForecastDataset, period: BudgetPeriod, excluded: Set<Pair<String, String>> = emptySet()): ForecastReport {
         val overrides = dataset.overrides.associateBy { it.itemId to it.occurrenceKey }
         val lines = mutableListOf<ForecastLine>()
         dataset.rules.groupBy { it.itemId }.forEach { (itemId, versions) ->
@@ -53,6 +53,7 @@ object ForecastCalculator {
                 }
             }
             candidates.forEach { (key, pair) ->
+                if ((itemId to key) in excluded) return@forEach
                 val (rule, occurrence) = pair
                 val override = overrides[itemId to key]
                 val date = override?.date ?: occurrence.date

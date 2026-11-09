@@ -35,6 +35,7 @@ data class ForecastDataset(
     val rules: List<ForecastRule> = emptyList(), val overrides: List<ForecastOverride> = emptyList(),
     val cycleRules: List<CycleRule> = emptyList(), val reserveEvents: List<ReserveEvent> = emptyList(),
     val reserveGoalCents: Long? = null,
+    val recordLinks: Map<Pair<String, String>, Set<String>> = emptyMap(),
 )
 data class ForecastLine(
     val itemId: String, val occurrenceKey: String, val title: String, val date: LocalDate,
