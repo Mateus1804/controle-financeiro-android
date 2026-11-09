@@ -29,17 +29,23 @@ private fun forecastPercent(value: BigDecimal): String = value.setScale(2, Round
 
 @Composable
 internal fun ForecastSummary(report: ForecastReport, hidden: Boolean) {
-    Card(Modifier.fillMaxWidth().testTag("forecast-summary")) {
+    Card(Modifier.fillMaxWidth().testTag("forecast-summary"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionTitle("Previsão do ciclo", "Não é saldo bancário")
-            ForecastValue("Renda prevista", report.incomeCents, hidden)
-            ForecastValue("Todos os gastos", report.totalExpensesCents, hidden)
+            SectionTitle("Resultado do mês", "Previsão do ciclo · receitas menos despesas")
+            Amount(report.marginCents, hidden, size = 32)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(Modifier.weight(1f), color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+                    Column(Modifier.padding(12.dp)) { Text("Receitas", style = MaterialTheme.typography.labelLarge); Amount(report.incomeCents, hidden, size = 18) }
+                }
+                Surface(Modifier.weight(1f), color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.medium) {
+                    Column(Modifier.padding(12.dp)) { Text("Despesas", style = MaterialTheme.typography.labelLarge); Amount(report.totalExpensesCents, hidden, size = 18) }
+                }
+            }
             BasicText(if (hidden) "••••" else report.expensePercentage?.let { "${forecastPercent(it)} da renda em gastos" }
                 ?: "Renda não informada", style = MaterialTheme.typography.titleLarge.copy(
                     color = if (!hidden && (report.expensePercentage?.compareTo(BigDecimal(100)) ?: -1) > 0)
                         MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface),
                 maxLines = 2, autoSize = TextAutoSize.StepBased(minFontSize = 18.sp, maxFontSize = 22.sp, stepSize = 1.sp))
-            ForecastValue(if (report.marginCents < 0) "Déficit previsto" else "Margem prevista", report.marginCents, hidden)
             if (!hidden && report.expensePercentage != null && report.incomeCents > 0) ForecastExpenseBar(report)
             if (report.allocatedCents > 0) {
                 ForecastValue("Destinado à reserva", report.allocatedCents, hidden)
@@ -118,8 +124,11 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
             !line.included -> "Já incluído na fatura"
             else -> null
         }
-        ListItem(modifier = Modifier.testTag("forecast-line:${line.itemId}:${line.occurrenceKey}"),
-            headlineContent = { Text(privateDisplayText(line.title, hidden)) },
+        Card(onClick = { onEdit(line) }, enabled = !busy,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        ListItem(colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.testTag("forecast-line:${line.itemId}:${line.occurrenceKey}"),
+            headlineContent = { Text(privateDisplayText(line.title, hidden), style = MaterialTheme.typography.titleMedium) },
             supportingContent = {
                 Column {
                     Text("$group · ${if (line.rule.cycleAnchored) "Consumo do ciclo" else line.date.format(forecastDate)}${if (line.estimated) " · Estimado" else ""}")
@@ -138,6 +147,6 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
                         })
                 }
             })
-        HorizontalDivider()
+        }
     }
 }

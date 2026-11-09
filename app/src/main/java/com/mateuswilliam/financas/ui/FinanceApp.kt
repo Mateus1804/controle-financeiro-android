@@ -128,7 +128,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
     val alertPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
     fun requestAccess() {
         runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
-            .onFailure { model.message.value = "Abra Configurações > Acesso às notificações e selecione Controle Financeiro." }
+            .onFailure { model.message.value = "Abra Configurações > Acesso às notificações e selecione Rendly." }
     }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) scope.launch {
@@ -300,7 +300,7 @@ fun FinanceApp(model: FinanceViewModel, resumeCount: Int, incomingDraft: String?
                         onAlerts = ::requestAlerts,
                         onExport = { export.launch("movimentacoes-${YearMonth.now()}.csv") },
                         onClear = { clearDialog = true }, onSimulate = model::simulate,
-                        onAppearance = model.preferences::setAppearance, busy = busy,
+                        onAppearance = model.preferences::setAppearance, onDisplayName = model.preferences::setDisplayName, busy = busy,
                         onBackup = { backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = ::openPlanning,
                         onLockChange = onLockChange, onSecureScreen = model.preferences::setSecureScreen,
                         onReminders = { model.preferences.setReminders(it); if (it && !canAlert) requestAlerts() })

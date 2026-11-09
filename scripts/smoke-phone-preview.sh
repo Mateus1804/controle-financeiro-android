@@ -23,10 +23,21 @@ for attempt in 1 2 3; do
   if timeout 12s adb shell uiautomator dump "$hierarchy" >/dev/null &&
      adb exec-out cat "$hierarchy" > qa/phone-preview-hierarchy.xml &&
      grep -F 'package="com.mateuswilliam.financas.teste"' qa/phone-preview-hierarchy.xml >/dev/null &&
-     grep -F 'text="Meu planejamento"' qa/phone-preview-hierarchy.xml >/dev/null &&
-     grep -F 'text="Previsão do ciclo"' qa/phone-preview-hierarchy.xml >/dev/null; then
+     grep -F 'text="Rendly"' qa/phone-preview-hierarchy.xml >/dev/null &&
+     grep -F 'text="Resultado do mês"' qa/phone-preview-hierarchy.xml >/dev/null; then
     echo 'APK de teste instalado ao lado do original; planejamento carregado na primeira abertura.' | tee -a qa/phone-preview-launch.log
     exit 0
+  fi
+  if test -f qa/phone-preview-hierarchy.xml && grep -F 'text="Agora não"' qa/phone-preview-hierarchy.xml >/dev/null; then
+    python3 - <<'PYTHON'
+import re, subprocess, xml.etree.ElementTree as ET
+root = ET.parse('qa/phone-preview-hierarchy.xml').getroot()
+for node in root.iter('node'):
+    if node.get('text') == 'Agora não':
+        x1,y1,x2,y2 = map(int, re.findall(r'\d+', node.get('bounds')))
+        subprocess.run(['adb','shell','input','tap',str((x1+x2)//2),str((y1+y2)//2)],check=True)
+        break
+PYTHON
   fi
 done
 echo 'O planejamento do APK de teste não foi carregado.' >&2

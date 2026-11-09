@@ -31,7 +31,7 @@ class ForecastJourneyTest {
 
     @Before fun reset() {
         runBlocking { app.repository.clear(); app.forecasts.initialize(); app.forecasts.setCycleDay(5, today) }
-        app.settings.finishIntro(); model.refresh()
+        app.settings.finishIntro(); app.settings.dismissNamePrompt(); model.refresh()
         rule.waitUntil(10000) { model.dataset.value?.let { it.rules.isEmpty() && it.cycleRules.lastOrNull()?.day == 5 } == true }
         rule.waitForIdle()
     }

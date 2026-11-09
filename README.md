@@ -1,6 +1,6 @@
-# Controle Financeiro Android
+# Rendly
 
-O Controle Financeiro Android organiza renda e gastos previstos por ciclo financeiro. O fluxo principal é um planejador: informa quanto se espera receber, quanto se pretende gastar e qual é a margem estimada, sem exigir confirmação de pagamentos ou recebimentos. Os dados ficam no aparelho.
+O Rendly organiza renda e gastos previstos por ciclo financeiro. O fluxo principal é um planejador: informa quanto se espera receber, quanto se pretende gastar e qual é a margem estimada, sem exigir confirmação de pagamentos ou recebimentos. Os dados ficam no aparelho.
 
 ## Funcionalidades
 
@@ -85,3 +85,13 @@ A [documentação de atualizações](docs/atualizacoes.md) descreve assinatura e
 Na [validação funcional de 25/10/2026](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/40202162302), passaram 104 testes do core e 81 testes em cada uma das APIs 26, 33, 35 e 36, sem testes ignorados. A atualização sobre o APK anterior e a recuperação de um backup produzido por ele também passaram. O Android Lint terminou sem erros nas variantes debug e release, mantendo 14 avisos anteriores em cada uma.
 
 Os [registros de qualidade](docs/qualidade.md) distinguem validação automatizada, inspeção de capturas e limitações. Notificações bancárias reais e preparação com a chave definitiva continuam pendentes. Não houve publicação ou acesso a dados financeiros pessoais.
+
+## Identidade Mist Teal
+
+Rendly utiliza uma paleta própria em creme, menta e teal, com temas Sistema, Claro e Escuro. A aparência acompanha o aparelho quando Sistema está selecionado; cores dinâmicas não substituem a identidade.
+
+Em Ajustes, **Como você quer ser chamado?** permite informar, editar ou apagar um nome opcional de até 40 caracteres. A saudação é atualizada imediatamente. Essa preferência fica no aparelho e não integra o backup. Resultado do mês corresponde à diferença entre receitas e despesas previstas do ciclo selecionado, sem representar saldo bancário.
+
+A [renomeação do repositório](docs/renomeacao-rendly.md) está preparada para uma etapa posterior à revisão e autorização. Os identificadores Android e os dados existentes permanecem compatíveis.
+
+Na primeira abertura, o nome pode ser informado ou adiado em **Agora não**. A pergunta é apresentada uma vez; o nome pode ser alterado nos Ajustes. A saudação inclui 👋🏼. Os cards das previsões permitem tocar no lançamento para editar e mantêm ações de recorrência no menu.

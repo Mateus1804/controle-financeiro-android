@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Controle Financeiro</string>
-    <string name="notification_service_name">Controle Financeiro — revisão de movimentações</string>
+    <string name="app_name">Rendly</string>
+    <string name="notification_service_name">Rendly — revisão de movimentações</string>
 </resources>

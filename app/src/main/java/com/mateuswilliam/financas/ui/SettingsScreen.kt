@@ -35,9 +35,15 @@ fun SettingsScreen(
     onBackup: () -> Unit, onRestore: () -> Unit, onPlanning: () -> Unit,
     onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit, onReminders: (Boolean) -> Unit = {},
     plannerMode: Boolean = false,
+    onDisplayName: (String) -> Unit = {},
 ) {
+    var nameEditor by remember { mutableStateOf(false) }
+    if (nameEditor) DisplayNameDialog(settings.displayName, { nameEditor = false }, onDisplayName)
     var privacy by remember { mutableStateOf(false) }
     LazyColumn(Modifier.testTag("settings-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
+        item { OutlinedButton({ nameEditor = true }, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("display-name-settings")) {
+            Text("Como você quer ser chamado?")
+        } }
         item { SectionTitle("Ajustes", "Preferências, captura e proteção dos dados") }
         item {
             SettingsCard {
@@ -165,7 +171,7 @@ fun SettingsScreen(
                 OutlinedButton(onClick = onSimulate, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Criar notificações fictícias") }
             }
         }
-        item { Text("Controle Financeiro · ${BuildConfig.VERSION_NAME}\nDados locais · revisão obrigatória das sugestões", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Rendly · ${BuildConfig.VERSION_NAME}\nDados locais · revisão obrigatória das sugestões", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     if (privacy) AlertDialog(onDismissRequest = { privacy = false }, title = { DialogSystemBars(); Text("Privacidade") },
         text = { Text(modifier = Modifier.verticalScroll(rememberScrollState()), text = "As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.\n\nO texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais são mantidos para evitar o reprocessamento do mesmo evento.\n\nO CSV contém os lançamentos confirmados. O backup criptografado também inclui pendências e planejamento; o arquivo e a senha ficam sob responsabilidade do usuário. O bloqueio da interface não criptografa o banco local.\n\nOs dados locais são removidos ao desinstalar ou usar a opção de apagar. A recuperação depende de um backup válido e da senha original.") },
@@ -184,7 +190,7 @@ fun DisclosureDialog(onDismiss: () -> Unit, onAccept: () -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, title = { DialogSystemBars(); Text("Antes de ativar a captura") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Para sugerir receitas e despesas, o Controle Financeiro acessa o título e o texto das notificações dos aplicativos selecionados, inclusive quando esta tela está fechada.")
+                Text("Para sugerir receitas e despesas, o Rendly acessa o título e o texto das notificações dos aplicativos selecionados, inclusive quando esta tela está fechada.")
                 Text("A autorização do Android permite acesso amplo às notificações. Dentro do aplicativo, apenas as origens escolhidas são processadas. A seleção pode ser alterada e a captura desativada a qualquer momento.")
                 Text("As pendências são armazenadas e interpretadas neste aparelho. Nenhum texto bancário é transmitido. Mensagens identificadas como autenticação são descartadas. O texto original é apagado ao confirmar ou ignorar a pendência.")
                 Text("A revisão e a confirmação são obrigatórias antes de criar qualquer lançamento. Recusar a captura permite continuar usando o cadastro manual.")

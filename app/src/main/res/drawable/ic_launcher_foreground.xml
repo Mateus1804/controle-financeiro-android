@@ -1,21 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Original Rendly SVG paths; the complete bounds fit the 66dp circular safe area. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <group android:scaleX="0.70" android:scaleY="0.70"
-        android:translateX="19.0875" android:translateY="19.0875">
-        <path android:name="curva-e-perna"
-            android:fillColor="#014030"
-            android:pathData="M56.2 21h8.2c11.58 0 19.85 8.25 19.85 19.6 0 8.47-4.15 14.48-10.61 17.72-.96.48-1.28 1.61-.66 2.5L83.5 75.28c1.05 1.45.02 3.47-1.77 3.47h-9.67c-1.11 0-2.16-.54-2.8-1.45L56.2 58.34v-9.39h7.85c4.04 0 7.3-3.15 7.3-7.375s-3.26-7.375-7.3-7.375H56.2Z" />
-        <path android:name="barra-1"
-            android:fillColor="#20CD91"
-            android:pathData="M15.5 62.4c0-1.28.78-2.43 1.97-2.89l5.3-2.05C24.84 56.66 27 58.14 27 60.36v15.29a3.1 3.1 0 0 1-3.1 3.1h-5.3a3.1 3.1 0 0 1-3.1-3.1Z" />
-        <path android:name="barra-2"
-            android:fillColor="#20CD91"
-            android:pathData="M30.75 47.9c0-1.28.78-2.43 1.97-2.89l5.3-2.05c2.07-.8 4.23.68 4.23 2.9v29.79a3.1 3.1 0 0 1-3.1 3.1h-5.3a3.1 3.1 0 0 1-3.1-3.1Z" />
-        <path android:name="barra-3-haste"
-            android:fillColor="#20CD91"
-            android:pathData="M56 21h5.65C59.08 24.7 57.5 29.54 57.5 34.2v41.45a3.1 3.1 0 0 1-3.1 3.1h-5.3a3.1 3.1 0 0 1-3.1-3.1V31c0-5.523 4.477-10 10-10Z" />
-    </group>
-</vector>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+<group android:scaleX="0.56" android:scaleY="0.56" android:translateX="24" android:translateY="23">
+<path android:name="curva" android:fillColor="#0F6B63" android:pathData="M30 20 Q30 17 33 17 H57 C80 17 91 31 91 46 C91 57 85 65 78 69 L94 89 Q96 92 92 92 H78 Q76 92 75 90 L66 71 V59 C71 57 76 52 76 46 C76 38 70 32 60 32 H33 Q30 32 30 29 Z"/>
+<path android:name="barra1" android:fillColor="#94DBCC" android:pathData="M17 69 Q17 65 21 65 H27 Q31 65 31 69 V88 Q31 92 27 92 H21 Q17 92 17 88 Z"/>
+<path android:name="barra2" android:fillColor="#66BFB0" android:pathData="M33 58 Q33 54 37 54 H43 Q47 54 47 58 V88 Q47 92 43 92 H37 Q33 92 33 88 Z"/>
+<path android:name="barra3" android:fillColor="#31998D" android:pathData="M49 47 Q49 43 53 43 H59 Q63 43 63 47 V88 Q63 92 59 92 H53 Q49 92 49 88 Z"/>
+</group></vector>
