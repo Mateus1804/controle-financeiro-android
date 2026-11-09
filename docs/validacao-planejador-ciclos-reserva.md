@@ -25,6 +25,8 @@ Os builds estão registrados em `/workspace/scratch/forecast-ready-build.log` e 
 
 O APK de testes com as correções posteriores do CI compilou em 36 s (`/workspace/scratch/forecast-ci-fixes-build.log`). Os cinco cenários repetidos passaram na API26; a revogação da permissão runtime, exclusiva da API33 em diante, depende da nova execução remota na API35.
 
+O lint debug foi repetido após essas correções: sucesso em1m29s, zero erros e oito avisos (`/workspace/scratch/forecast-ci-fixes-lint.log`). Essa é a contagem local mais recente; os 18 avisos acima pertencem ao build inicial.
+
 A [captura final com dados fictícios](imagens/planejador/ciclo-exemplo-ficticio.png) foi inspecionada em 320 × 640: ciclo de 05/11/2026 a 04/12/2026, renda ajustada de R$ 2.850,00, gastos de R$ 2.200,00, percentual de 77,19% e margem de R$ 650,00 visíveis sem rolagem. Essa inspeção não substitui a conferência manual com fonte ampliada ou TalkBack.
 
 ## Cobertura integrada
@@ -46,13 +48,17 @@ O primeiro lote de oito regressões terminou com seis aprovações e duas falhas
 
 Duas revisões independentes de código encerraram sem problemas acionáveis nos recortes revistos: correções financeiras em `/workspace/scratch/forecast-financial-fixes-review.md` e correções de interface em `/workspace/scratch/forecast-app-fixes-review.md`. A revisão financeira conferiu fronteiras históricas, mudança do dia das parcelas, arquivamento de fontes antigas, limites de origem/texto e preservação de destinações. A revisão de interface conferiu ativação de ocorrência importada, renda estimada, privacidade dos campos e semântica do controle. Essas revisões foram inspeções de código; a evidência de execução é a dos testes acima.
 
-## Primeira execução remota
+## Execuções remotas
 
 A [execução 76 do CI](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/42559643628), no commit `c8a30f2`, aprovou os builds debug, preview e release, o bundle, os testes do core e os lints. O job de atualização na API 35 aprovou as duas fases com o APK anterior e seu backup criptografado.
 
 A suíte completa da API 35 executou 219 testes: 215 aprovações e quatro falhas em testes anteriores. Todos os 15 cenários novos do planejador passaram. Duas verificações ainda esperavam o formato 6 do backup e foram ajustadas ao formato atual. O teste de edição de valor passou a acionar o botão habilitado pela semântica, preservando as verificações de natureza, valor e data. A preparação da permissão de alertas passou a revogar a permissão runtime real com o TestApi usado pelo CTS, sem encerrar a instrumentação, restaurando a concessão anterior no `finally`. A API 35 consulta essa permissão; bloquear somente o app-op não reproduzia o cenário negado quando outro teste já havia concedido notificações.
 
-Essas correções serão verificadas em nova execução remota; a primeira execução não é declarada aprovada integralmente. O resultado atualizado acompanha os checks do PR17.
+A [execução77](https://github.com/Mateus1804/controle-financeiro-android/actions/runs/42561519457), no commit `8e382c1`, confirmou **219 testes instrumentados aprovados, nenhum ignorado**, em346,075s. A preparação da permissão runtime e os quatro testes corrigidos passaram na API35. Builds e as duas fases de atualização/recuperação também passaram novamente.
+
+Após os 219 testes, a verificação de instalação paralela do preview ainda procurava o texto da introdução antiga, `Usar manualmente`, e encerrou o job com falha. O script passou a exigir o pacote `.teste`, o cabeçalho `Meu planejamento` e o resumo carregado `Previsão do ciclo`, preservando a instalação comum sem `-t`, a coexistência com o original e as tentativas limitadas. A hierarquia fica salva para diagnóstico. O script corrigido passou no APK preview real na API26 (`/workspace/scratch/forecast-preview-smoke.log`), e uma revisão independente não encontrou problemas nesse ajuste.
+
+A execução77 não é declarada integralmente aprovada devido à verificação posterior aos testes. O resultado completo após corrigir o script acompanha os checks do PR17.
 
 ## Limites e conferência no celular
 

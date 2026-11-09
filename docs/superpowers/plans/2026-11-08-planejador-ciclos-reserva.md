@@ -79,7 +79,7 @@ Reservas: SET inicial/correção explícita; WITHDRAW não pode superar saldo. A
 - [x] Integração: ViewModel/entrada principal, resumo e gráfico total, lista contextual sem quitação, histórico e próximos períodos, reserva/destinação, simulador sem mutação, ajustes/backup/dados legados acessíveis. Lembretes informativos.
 - [x] Validar localmente: core, assemble/lint e cenários instrumentados essenciais; revisão independente; corrigir falhas e atualizar documentação.
 - [x] Entrega local: atualizar PR17 e disponibilizar o APK preview, código-fonte e evidências de validação.
-- [ ] CI: repetir a suíte completa após corrigir quatro testes anteriores identificados na execução76. Build release e atualização completa por APK/backup aprovados nessa execução.
+- [ ] CI: conferir a execução completa após atualizar a verificação da instalação paralela do preview. A execução77 aprovou219 testes na API35, build release e atualização completa por APK/backup. O script de primeira abertura corrigido passou localmente no APK preview real.
 
 ## Verificações essenciais
 
