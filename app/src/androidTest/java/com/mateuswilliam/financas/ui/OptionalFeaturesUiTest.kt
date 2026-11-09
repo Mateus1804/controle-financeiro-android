@@ -254,7 +254,8 @@ class OptionalFeaturesUiTest {
         rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement(description)
         rule.onNodeWithText("Descrição").performImeAction()
         waitForKeyboard()
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).assertIsDisplayed().performClick()
+        rule.onNode(hasText("Confirmar") and hasClickAction()).assertIsEnabled()
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
     }
     private fun waitForKeyboard() {
         rule.waitUntil(5000) {

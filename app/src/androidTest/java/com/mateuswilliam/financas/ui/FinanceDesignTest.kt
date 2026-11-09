@@ -28,17 +28,17 @@ import org.junit.Test
 class FinanceDesignTest {
     @get:Rule val rule = createComposeRule()
 
-    @Test fun dynamicColorsFollowTheSelectedModeAndFallbackOnOlderAndroid() {
+    @Test fun rendlyPaletteFollowsSelectedModeWithoutDynamicReplacement() {
         var dark by mutableStateOf(false)
         var primary = Color.Unspecified
-        rule.setContent { FinanceTheme(darkTheme = dark) {
+        rule.setContent { FinanceTheme(darkTheme = dark, dynamicColor = true) {
             val actual = MaterialTheme.colorScheme.primary
             SideEffect { primary = actual }
         } }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        rule.runOnIdle { assertEquals(if (Build.VERSION.SDK_INT >= 31) dynamicLightColorScheme(context).primary else Color(0xFF54558B), primary) }
+        rule.runOnIdle { assertEquals(Color(0xFF0F6B63), primary) }
         rule.runOnIdle { dark = true }
-        rule.runOnIdle { assertEquals(if (Build.VERSION.SDK_INT >= 31) dynamicDarkColorScheme(context).primary else Color(0xFFC6C0F5), primary) }
+        rule.runOnIdle { assertEquals(Color(0xFF8FD6C9), primary) }
     }
 
     @Test fun fallbackAndDynamicTextPairsHaveReadableContrastInBothModes() {
