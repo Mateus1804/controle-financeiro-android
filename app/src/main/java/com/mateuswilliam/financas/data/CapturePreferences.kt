@@ -20,6 +20,7 @@ data class CaptureSettings(
     val lockEnabled: Boolean = false,
     val secureScreen: Boolean = false,
     val displayName: String = "",
+    val namePromptSeen: Boolean = false,
 )
 
 class CapturePreferences(context: Context) {
@@ -43,13 +44,18 @@ class CapturePreferences(context: Context) {
         preferences.getBoolean("lock_enabled", false),
         preferences.getBoolean("secure_screen", false),
         preferences.getString("display_name", "").orEmpty(),
+        preferences.getBoolean("name_prompt_seen", false) || !preferences.getString("display_name", "").isNullOrBlank(),
     )
 
+    fun dismissNamePrompt() {
+        check(preferences.edit().putBoolean("name_prompt_seen", true).commit()) { "Não foi possível salvar a preferência." }
+        mutable.value = read()
+    }
     fun setDisplayName(value: String) {
         val name = value.trim()
         require(name.codePointCount(0, name.length) <= 40) { "Use até 40 caracteres." }
         require(name.none { it.isISOControl() }) { "Use um nome em uma única linha." }
-        check(preferences.edit().putString("display_name", name).commit()) { "Não foi possível salvar o nome." }
+        check(preferences.edit().putString("display_name", name).putBoolean("name_prompt_seen", true).commit()) { "Não foi possível salvar o nome." }
         mutable.value = read()
     }
     fun acceptDisclosure() { preferences.edit { putBoolean("disclosure_v1", true); putBoolean("enabled", true) } }

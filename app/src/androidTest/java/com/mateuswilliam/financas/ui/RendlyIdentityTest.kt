@@ -15,18 +15,18 @@ class RendlyIdentityTest {
     @Test fun optionalNameUpdatesImmediatelyPersistsAndCanBeRemoved() {
         val app = rule.activity.application as FinanceApplication
         app.settings.setDisplayName("")
-        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá!")
+        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá! 👋🏼")
         app.settings.setDisplayName("  Ana Lúcia Silva  ")
         rule.waitForIdle()
-        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá, Ana Lúcia Silva!")
+        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá, Ana Lúcia Silva! 👋🏼")
         assertEquals("Ana Lúcia Silva", CapturePreferences(app).snapshot().displayName)
         rule.activityRule.scenario.recreate()
-        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá, Ana Lúcia Silva!")
+        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá, Ana Lúcia Silva! 👋🏼")
         assertTrue(runCatching { app.settings.setDisplayName("a".repeat(41)) }.isFailure)
         assertEquals("Ana Lúcia Silva", app.settings.snapshot().displayName)
         app.settings.setDisplayName("")
         rule.waitForIdle()
-        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá!")
+        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá! 👋🏼")
         for (theme in listOf(Appearance.LIGHT, Appearance.DARK, Appearance.SYSTEM)) {
             app.settings.setAppearance(theme); rule.waitForIdle()
             assertEquals(theme, CapturePreferences(app).snapshot().appearance)
@@ -36,6 +36,7 @@ class RendlyIdentityTest {
         val app = rule.activity.application as FinanceApplication
         app.repository.clear()
         app.forecasts.initialize()
+        app.settings.dismissNamePrompt()
         val date = java.time.LocalDate.now()
         app.forecasts.saveRule(com.mateuswilliam.financas.core.ForecastRule("rendly-income-example", date, "Renda fictícia", com.mateuswilliam.financas.core.ForecastKind.INCOME, 300000,
             com.mateuswilliam.financas.core.Category.SALARY, com.mateuswilliam.financas.core.ForecastFrequency.MONTHLY, date))
@@ -53,6 +54,19 @@ class RendlyIdentityTest {
             }
             bitmap.recycle()
         }
+    }
+
+    @Test fun firstOpeningCanBeSkippedAndIsNotRepeatedAfterRecreation() {
+        val app = rule.activity.application as FinanceApplication
+        app.getSharedPreferences("capture_settings", android.content.Context.MODE_PRIVATE).edit()
+            .remove("display_name").putBoolean("name_prompt_seen", false).commit()
+        rule.waitForIdle()
+        rule.onNodeWithText("Como você quer ser chamado?").assertExists()
+        rule.onNodeWithText("Agora não").performClick()
+        assertTrue(CapturePreferences(app).snapshot().namePromptSeen)
+        rule.activityRule.scenario.recreate()
+        rule.onNodeWithText("Como você quer ser chamado?").assertDoesNotExist()
+        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá! 👋🏼")
     }
 
 }

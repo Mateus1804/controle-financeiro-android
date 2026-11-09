@@ -124,8 +124,11 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
             !line.included -> "Já incluído na fatura"
             else -> null
         }
-        ListItem(modifier = Modifier.testTag("forecast-line:${line.itemId}:${line.occurrenceKey}"),
-            headlineContent = { Text(privateDisplayText(line.title, hidden)) },
+        Card(onClick = { onEdit(line) }, enabled = !busy,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        ListItem(colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.testTag("forecast-line:${line.itemId}:${line.occurrenceKey}"),
+            headlineContent = { Text(privateDisplayText(line.title, hidden), style = MaterialTheme.typography.titleMedium) },
             supportingContent = {
                 Column {
                     Text("$group · ${if (line.rule.cycleAnchored) "Consumo do ciclo" else line.date.format(forecastDate)}${if (line.estimated) " · Estimado" else ""}")
@@ -144,6 +147,6 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
                         })
                 }
             })
-        HorizontalDivider()
+        }
     }
 }

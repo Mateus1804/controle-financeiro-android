@@ -82,6 +82,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         if (it.startsWith("Dados restaurados") || it.startsWith("Dados apagados")) model.refresh()
         snackbar.showSnackbar(it); if (finance.message.value == it) finance.message.value = null
     } }
+    if (!settings.namePromptSeen) DisplayNameDialog(settings.displayName,
+        finance.preferences::dismissNamePrompt, finance.preferences::setDisplayName, firstRun = true)
     val snapshot = data
     val period = remember(snapshot?.cycleRules, browsing) { CycleCalendar.periodContaining(LocalDate.parse(browsing), snapshot?.cycleRules.orEmpty()) }
     val reportResult = remember(snapshot, period) { snapshot?.let { runCatching { ForecastCalculator.report(it, period) } } }
@@ -137,7 +139,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(32.dp))
                             Text("Rendly", style = MaterialTheme.typography.titleLarge)
                         }
-                        Text(if (tab >= 3) "Ajustes e histórico" else if (settings.displayName.isBlank()) "Olá!" else "Olá, ${settings.displayName}!",
+                        Text(if (tab >= 3) "Ajustes e histórico" else if (settings.displayName.isBlank()) "Olá! 👋🏼" else "Olá, ${settings.displayName}! 👋🏼",
                             style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("rendly-greeting"), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                     IconButton({ finance.preferences.hideAmounts(!hidden) }) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }

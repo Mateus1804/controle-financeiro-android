@@ -93,3 +93,5 @@ Rendly utiliza uma paleta própria em creme, menta e teal, com temas Sistema, Cl
 Em Ajustes, **Como você quer ser chamado?** permite informar, editar ou apagar um nome opcional de até 40 caracteres. A saudação é atualizada imediatamente. Essa preferência fica no aparelho e não integra o backup. Resultado do mês corresponde à diferença entre receitas e despesas previstas do ciclo selecionado, sem representar saldo bancário.
 
 A [renomeação do repositório](docs/renomeacao-rendly.md) está preparada para uma etapa posterior à revisão e autorização. Os identificadores Android e os dados existentes permanecem compatíveis.
+
+Na primeira abertura, o nome pode ser informado ou adiado em **Agora não**. A pergunta é apresentada uma vez; o nome pode ser alterado nos Ajustes. A saudação inclui 👋🏼. Os cards das previsões permitem tocar no lançamento para editar e mantêm ações de recorrência no menu.

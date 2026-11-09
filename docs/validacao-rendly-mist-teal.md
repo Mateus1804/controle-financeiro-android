@@ -17,3 +17,7 @@ A renomeação do repositório está documentada separadamente e aguarda autoriz
 Resultados locais: 203 testes do core, zero falhas/erros/ignorados; assembleDebug, assemblePreview, assembleDebugAndroidTest e lintDebug concluídos em 2 min 09 s. Instrumentação API 35 e capturas pendentes do CI.
 
 Lint debug: zero erros e nove avisos.
+
+## Ajustes solicitados após a revisão
+
+Cards de previsão arredondados e acionáveis, mantendo o menu e as chaves das ocorrências. Saudação com 👋🏼 e pergunta opcional de nome apresentada uma vez. O indicador local de apresentação é preservado ao reabrir, não exige Room nem integra o backup. Foram adicionados testes da opção Agora não e da persistência após recriação. O smoke de instalação trata a pergunta inicial antes de validar o orçamento. A checagem do rótulo do APK foi corrigida para Rendly (teste). O merge foi autorizado e aguarda os checks.
