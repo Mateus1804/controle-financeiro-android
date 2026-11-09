@@ -536,6 +536,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     private suspend fun clearTables() {
+        dao.clearForecastOverrides(); dao.clearForecastRules(); dao.clearCycleRules(); dao.clearReserveEvents(); dao.clearForecastMeta()
         dao.clearCommitments(); dao.clearFixedRecurring(); dao.clearPurchases(); dao.clearMonthlyPlans()
         dao.clearRecurringMonths(); dao.clearRecurringRevisions()
         dao.clearOccurrences(); dao.clearRecurring(); dao.clearBudgets()

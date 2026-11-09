@@ -42,12 +42,13 @@ internal object CompatibilityFixtures {
             db.version = 3
         }
         return Room.databaseBuilder(context, FinanceDatabase::class.java, name)
-            .addMigrations(FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9).build()
+            .addMigrations(FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9, FinanceDatabase.MIGRATION_9_10).build()
     }
 }
 
 /** Remove only fields unavailable before balance-aware backup version six. */
 internal fun org.json.JSONObject.withoutBalanceFields(): org.json.JSONObject = apply {
+    listOf("forecastRules","forecastOverrides","cycleRules","reserveEvents","forecastMeta").forEach { remove(it) }
     remove("accountBalanceEvents")
     getJSONArray("accounts").let { rows -> repeat(rows.length()) { rows.getJSONObject(it).remove("archived") } }
     getJSONArray("records").let { rows -> repeat(rows.length()) {

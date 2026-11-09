@@ -120,7 +120,7 @@ class AccountBalancesDataTest {
             db.execSQL("INSERT INTO records VALUES ('legacy', NULL, 100, 'REFUND', 'PIX', 'FOOD', 'A', 'Legado', 1792800000000, '')")
             db.version = 8
         }
-        val db = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_8_9).build()
+        val db = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_8_9, FinanceDatabase.MIGRATION_9_10).build()
         try {
             val dao = db.financeDao()
             assertFalse(dao.allAccounts().single().archived)

@@ -14,7 +14,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class MonthlyRecurringUiTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     private val month = YearMonth.now()
     private val plan get() = RecurringPlan("escopo-ui", "Conta mensal", 5000, Movement.EXPENSE,

@@ -19,7 +19,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class CommitmentJourneyTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     private val repository get() = app.repository
     private val dao get() = app.database.financeDao()
@@ -70,7 +70,7 @@ class CommitmentJourneyTest {
         assertTrue(repository.exportRecords().isEmpty())
 
         val paidId = "installment:${reviewed.id}:1"
-        tapPlanning("confirm-installment-$paidId")
+        tapPlanning("confirm-$paidId")
         rule.onNodeWithText("Conferir parcela").assertExists()
         typeAndCloseKeyboard("amount-input", "22000")
         rule.onNodeWithText("Confirmar").performClick()

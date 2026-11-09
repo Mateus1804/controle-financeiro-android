@@ -1,70 +1,58 @@
 # Controle Financeiro Android
 
-O Controle Financeiro Android permite acompanhar receitas e despesas com menos digitação e mais clareza. O projeto reúne dados locais, revisão de movimentações e uma interface simples em português para o controle financeiro do dia a dia.
+O Controle Financeiro Android organiza renda e gastos previstos por ciclo financeiro. O fluxo principal é um planejador: informa quanto se espera receber, quanto se pretende gastar e qual é a margem estimada, sem exigir confirmação de pagamentos ou recebimentos. Os dados ficam no aparelho.
 
 ## Funcionalidades
 
-- Registro manual de receitas, despesas, transferências e estornos.
-- Entrada monetária com centavos automáticos: a digitação de `1234` exibe `R$ 12,34`. O campo também aceita a colagem de valores formatados em reais.
-- Contas próprias com saldo de referência e data, painel individual e consolidado, extrato por conta, correções auditáveis e arquivamento que preserva o histórico. Contas antigas ficam sem saldo configurado até informação explícita.
-- Transferências entre contas próprias com prévia, recálculo dos dois lados e total conservado.
-- Categorias adequadas a receitas e despesas; estornos com vínculo opcional e natureza preservada.
-- Edição e exclusão de lançamentos confirmados.
-- Caixa de revisão para notificações, com valor, origem, movimentação, meio de pagamento e categoria editáveis.
-- Captura opcional dos aplicativos selecionados, após consentimento e autorização do Android.
-- Saldo disponível, resultado realizado e projeção do mês identificados separadamente. Resumo e Planejamento compartilham a projeção de realizados + previsões pendentes.
-- Modelos opcionais de aluguel, luz, água, internet e telefone abrem o cadastro mensal com valor em branco.
-- Gráfico de rosca das despesas brutas por categoria, conta ou meio de pagamento, com detalhamento e estornos indicados separadamente.
-- Busca e filtros no histórico, navegação por mês e exportação CSV.
-- Temas Sistema, Claro e Escuro persistentes, com cores dinâmicas do Material You no Android 12 ou superior e paletas próprias nas versões anteriores.
-- Ações rápidas de receita, despesa e transferência, histórico em superfícies agrupadas e ícones vetoriais Phosphor Regular/Fill.
-- Ocultação de valores nos resumos, gráficos, textos de notificações e leitores de tela, com revelação explícita no editor.
-- Apresentação inicial da captura opcional e avisos de configuração que podem ser fechados, mantendo o cadastro manual disponível.
-- Backup criptografado com senha e formato versionado, com prévia e conferência em banco temporário antes da restauração.
-- Avisos de possível duplicidade entre lançamentos manuais e novas pendências, sem união ou exclusão automática.
-- Revisão em sequência com progresso e oferta de acesso ao próximo item, preservando a edição quando chegam novas notificações.
-- Orçamentos mensais por categoria e previsões recorrentes, com confirmação manual de cada vencimento.
-- Renda líquida prevista e limite de comprometimento por mês, com card e gráfico de rosca para parcelas e despesas recorrentes marcadas como fixas.
-- Compras parceladas no cadastro manual e na revisão de notificações, com prévia, registro separado, edição e cancelamento de parcelas em aberto.
-- Lembretes opcionais de vencimentos e proteção opcional por biometria ou credencial do aparelho.
+- Salário líquido previsto cadastrado uma única vez como receita mensal, compartilhado pelo orçamento e pelas projeções. Outras receitas e valores estimados usam o mesmo cadastro.
+- Ajuste de uma ocorrência ou alteração daquele ciclo em diante, preservando os demais períodos.
+- Cadastro único de contas recorrentes, compras parceladas, gastos únicos e estimativas de consumo. Frequência mensal e valor estimado são escolhas independentes.
+- Percentual principal calculado com **todos os gastos previstos ÷ renda prevista**, incluindo compromissos e consumo variável, com déficit e percentuais acima de 100%.
+- Ciclo configurável entre os dias 1 e 31, datas completas e ajuste ao último dia dos meses curtos. Renda, gastos, parcelas, gráfico e projeções usam o mesmo intervalo.
+- Consulta de ciclos encerrados com renda, gastos e sobra ou déficit estimado; correções explícitas preservam as configurações futuras.
+- Reserva de emergência informada pelo usuário, com saldo inicial, correções, acréscimos, retiradas, histórico e meta opcional.
+- Destinação explícita de parte da sobra à reserva, sem criar despesa ou alterar o percentual de gastos.
+- Projeções de seis ciclos e simulação de uma nova parcela, gravada somente ao escolher **Adotar no planejamento**.
+- Modelos opcionais de gastos com valor em branco e lembretes opcionais de datas previstas, sem registrar quitação.
+- Temas Sistema, Claro e Escuro, ocultação de valores e proteção opcional por biometria ou credencial do aparelho.
+- Exportação CSV das previsões do ciclo e backup criptografado com prévia antes da restauração.
+- Histórico original preservado para consulta, separado das novas previsões.
 
-As regras de referência de saldo, transferências, projeção e o checklist de uso estão em [Contas e saldos](docs/contas-saldos-projecoes.md).
+As regras, exemplos de cálculo e o checklist para o celular estão em [Planejador, ciclos e reserva](docs/planejador-ciclos-reserva.md).
 
-## Captura e revisão de notificações
+## Como usar
 
-A captura não depende de uma lista fechada de bancos. A seleção apresenta aplicativos com ícone de abertura disponíveis no mesmo perfil do Android. A origem informada pelo sistema identifica o aplicativo, e a interpretação do texto disponível sugere os demais campos.
+Em **Orçamento**, cadastre a renda e os gastos do ciclo e escolha **Configurar ciclo** se quiser outro dia inicial. Não é necessário cadastrar conta bancária, saldo real ou configurar a captura de notificações. **Projeções** mostra o efeito dos próximos vencimentos, do término das parcelas e de uma simulação. **Reserva** reúne o valor informado e suas alterações.
 
-A implementação inicial reconhece padrões genéricos em português e valores em reais. O reconhecimento é uma sugestão: mensagens ambíguas continuam pendentes, e nenhuma notificação entra nos totais sem confirmação. O tipo de movimentação (receita, despesa, transferência ou estorno), o meio de pagamento (Pix, cartão, boleto etc.) e a categoria (alimentação, moradia etc.) são campos separados.
+Com início no dia 5, o ciclo de **05/11/2026 a 04/12/2026** inclui uma conta prevista para 02/12. Em 05/12 começa o próximo ciclo; a passagem da data não registra pagamento, recebimento, dívida ou movimentação da reserva. A margem é uma estimativa do orçamento e não representa saldo bancário.
 
-Com o aplicativo aberto, a revisão ocorre em um formulário. Fora dele, um alerta abre a pendência ao ser tocado, desde que o envio de alertas esteja autorizado. O lançamento manual permanece disponível quando uma notificação não chega ou não contém informações suficientes.
+## Dados anteriores e recuperação
 
-As possíveis duplicidades consideram valor, tipo, proximidade de data, origem e descrição. Contas diferentes do mesmo banco podem representar movimentações legítimas; a indicação é apenas um apoio à conferência. Uma atualização da notificação mantém os campos editados e exige conferência explícita da nova versão.
+A atualização preserva lançamentos, contas, pendências, recorrências, parcelas, vínculos e configurações anteriores. O aproveitamento para o planejador mantém a origem dos itens e usa os vínculos existentes para evitar somar novamente a mesma ocorrência. Rendas de referência antigas ficam disponíveis em **Projeções → Rendas de referência antigas** para revisão manual; não são somadas automaticamente ao salário. O histórico original está disponível em **Orçamento → Histórico e dados anteriores → Consultar lançamentos anteriores**.
 
-Os casos reproduzíveis e a situação de Inter, Nubank, PicPay, Mercado Pago e PagBank estão registrados em [Validação bancária](docs/validacao-bancaria.md). Os exemplos sintéticos não constituem homologação de notificações reais.
+A captura e a revisão de notificações pertencem ao fluxo anterior e não são necessárias para usar o planejador. Seu histórico técnico e as limitações dos exemplos sintéticos permanecem em [Validação bancária](docs/validacao-bancaria.md). As regras anteriores de contas e saldos estão documentadas em [Contas e saldos](docs/contas-saldos-projecoes.md).
 
-## Planejamento e recuperação
-
-Os limites mensais acompanham despesas líquidas confirmadas por categoria. A recorrência é uma característica do lançamento no mesmo cadastro de receitas e despesas: única, mensal ou parcelada. Cada mês pode ser editado, registrado ou ignorado, e alterações futuras preservam pagamentos anteriores. Planejamento reúne análises e parâmetros, sem outro cadastro de movimentações. Os lembretes dependem da autorização de alertas e das condições de execução do Android, sem garantia de horário exato.
-
-O backup inclui lançamentos, pendências, contas, orçamentos, recorrências, compras parceladas, compromissos, renda/limite mensal e preferências de apresentação. O conteúdo de dados utiliza a versão 6, mantendo a leitura das versões 1 a 5 e incluindo referências de saldo, arquivamento de contas e natureza/vínculo de estornos (Room 9). O arquivo utiliza AES-256-GCM e uma chave derivada da senha com PBKDF2-HMAC-SHA256. A recuperação exige a senha original e confirmação antes de substituir os dados locais. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. O formato e os limites estão descritos em [Backup e recuperação](docs/backup.md).
+O banco instalado utiliza Room 10. O backup inclui as previsões versionadas, ajustes por ocorrência, regras de ciclo, eventos e meta da reserva, além de todos os dados anteriores e preferências de apresentação. O conteúdo utiliza a versão 7 e lê as versões 1 a 6; o envelope criptográfico continua na versão 1, com AES-256-GCM e chave derivada da senha com PBKDF2-HMAC-SHA256. A restauração exige a senha original e confirmação antes de substituir os dados locais. Consulte [Backup e recuperação](docs/backup.md).
 
 ## Privacidade
 
-O processamento e o armazenamento dos dados ocorrem no aparelho. As origens selecionadas são filtradas antes da leitura do conteúdo; mensagens identificadas como autenticação são descartadas. O texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais evitam o reprocessamento do mesmo evento.
+O processamento e o armazenamento ocorrem no aparelho. O aplicativo não solicita credenciais bancárias nem acessa o extrato completo. A reserva e os valores previstos são informados pelo usuário; não há integração bancária, conciliação automática ou sincronização em nuvem.
 
-O aplicativo não solicita credenciais bancárias. A exportação CSV e o backup criptografado ocorrem somente para um destino escolhido pelo usuário. A senha do backup não é salva no aplicativo. Os backups automáticos do sistema estão desativados nesta versão, e a exclusão dos dados locais está disponível em Ajustes.
+A exportação CSV e o backup ocorrem para um destino escolhido pelo usuário. A senha do backup não é salva no aplicativo. Consentimento, permissões e configurações de segurança do aparelho não são transferidos pelo arquivo. Os backups automáticos do sistema estão desativados, e a exclusão dos dados locais está disponível em Ajustes.
 
-A proteção opcional exige autenticação do aparelho ao iniciar e após 30 segundos em segundo plano. A opção de proteger a imagem no seletor também bloqueia capturas de tela quando respeitada pelo Android. Esse bloqueio da interface não acrescenta criptografia ao banco Room.
-
-O tratamento dos dados está descrito em [Privacidade](docs/privacidade.md).
+A proteção opcional exige autenticação do aparelho ao iniciar e após 30 segundos em segundo plano. A opção de proteger a imagem no seletor também bloqueia capturas de tela quando respeitada pelo Android. Esse bloqueio da interface não acrescenta criptografia ao banco Room. Consulte [Privacidade](docs/privacidade.md).
 
 ## Organização técnica
 
-A base utiliza Kotlin, Jetpack Compose, Material 3, Room/SQLite, Coroutines e StateFlow. O módulo `core` concentra as regras de dinheiro, interpretação e totais; o módulo `app` reúne interface, persistência e integração com o Android.
+A base utiliza Kotlin, Jetpack Compose, Material 3, Room/SQLite, Coroutines e StateFlow. O módulo `core` concentra as regras de dinheiro, ciclos, previsões e reserva; o módulo `app` reúne interface, persistência e integração com o Android. Os valores monetários são armazenados em centavos inteiros.
 
-Os valores monetários são armazenados em centavos inteiros. Transferências ficam fora do resultado mensal, e estornos de despesas reduzem as despesas líquidas, enquanto devoluções de receitas reduzem as receitas. A confirmação de uma pendência e a criação do lançamento ocorrem na mesma transação do banco de dados. Os gráficos apresentam despesas brutas e indicam os estornos separadamente. O cadastro de contas e a validação de transferências utilizam a mesma normalização de nomes.
+O planejador utiliza regras versionadas e ajustes por ocorrência sobre intervalos com início inclusivo e fim exclusivo. Orçamento e Projeções compartilham o mesmo cálculo; simulações usam dados temporários. O importador conserva a procedência dos itens antigos e não altera as tabelas de origem. Os componentes do fluxo anterior mantidos para regressão usam um host de testes apenas em debug, sem constituir um caminho do produto.
 
 ## Qualidade
+
+O novo planejador passou em **203 testes do core** e **24 cenários instrumentados distintos na API 26**: 15 novos e 9 regressões preservadas. Debug, AndroidTest e preview compilaram; o lint debug terminou com zero erros e 18 avisos. Os cenários, evidências e limites estão em [Validação do planejador, ciclos e reserva](docs/validacao-planejador-ciclos-reserva.md). A atualização completa por APK anterior e backup criptografado aguarda a execução do CI.
+
+Os números e links restantes desta seção registram validações anteriores ao novo planejador.
 
 A validação combina testes Kotlin, persistência Room, migrações, fluxos de interface e atualização sobre a versão anterior. A validação atual está concentrada na API 35; as execuções anteriores em outras APIs permanecem documentadas. Os resultados e as limitações de cada execução ficam registrados em [Qualidade e validação](docs/qualidade.md). As novas interações e o sistema de temas são descritos em [Revisão visual](docs/redesign.md).
 
@@ -74,33 +62,17 @@ A revisão de competências mensais, interface compacta e ícone Rendly está de
 
 As verificações desta integração estão em [Validação de contas e saldos](docs/validacao-contas-saldos.md).
 
-## Interface
+## Interface e estágio do projeto
 
-A interface utiliza superfícies neutras, espaçamentos compartilhados e cores tonais. A tela principal diferencia dinheiro disponível, resultado confirmado e projeção com previsões pendentes. Os mesmos dados alimentam Planejamento, gráficos e relatórios. Saldo inicial e renda de referência não geram receitas. A implementação mantém os componentes e as interações nativas do Android.
+A versão **0.2.0** está em desenvolvimento. A navegação principal reúne **Orçamento**, **Projeções** e **Reserva**, com edição no contexto do ciclo e detalhes progressivos. As capturas da [Revisão visual](docs/redesign.md) e os relatos anteriores documentam a interface de lançamentos que antecedeu este planejador; não representam suas telas atuais.
 
-As capturas utilizam somente dados fictícios. A comparação entre o visual anterior e o atual, a procedência das imagens e os critérios de acessibilidade estão em [Revisão visual](docs/redesign.md).
+<img src="docs/imagens/planejador/ciclo-exemplo-ficticio.png" alt="Exemplo fictício do ciclo de 05/11 a 04/12: renda de R$ 2.850, gastos de R$ 2.200, percentual de 77,19% e margem de R$ 650" width="260">
 
-| Resumo claro | Resumo escuro |
-| --- | --- |
-| <img src="docs/imagens/redesign/depois-resumo-claro.png" alt="Resumo redesenhado no tema claro com valores fictícios" width="260"> | <img src="docs/imagens/redesign/depois-resumo-escuro.png" alt="Resumo redesenhado no tema escuro com valores fictícios" width="260"> |
+Exemplo fictício após ajustar o salário somente neste ciclo, em uma tela de 320 × 640.
 
-| Extrato | Revisão de notificação |
-| --- | --- |
-| <img src="docs/imagens/redesign/depois-extrato-claro.png" alt="Lançamentos fictícios em uma lista agrupada" width="260"> | <img src="docs/imagens/redesign/depois-revisao-escuro.png" alt="Revisão de uma sugestão fictícia no tema escuro" width="260"> |
+O APK da variante **preview** usa o identificador separado `com.mateuswilliam.financas.teste`, permitindo uma instalação de teste junto ao aplicativo principal. Ele tem dados próprios e não atualiza a instalação principal. Use dados fictícios para o checklist de [Planejador, ciclos e reserva](docs/planejador-ciclos-reserva.md).
 
-| Planejamento claro | Planejamento escuro |
-| --- | --- |
-| <img src="docs/imagens/redesign/depois-planejamento-claro.png" alt="Orçamento fictício no tema claro" width="260"> | <img src="docs/imagens/redesign/depois-planejamento-escuro.png" alt="Orçamento fictício no tema escuro" width="260"> |
-
-## Estágio do projeto
-
-A versão **0.2.0** está em desenvolvimento, com a base de registro e revisão disponível. Os padrões são validados com exemplos sintéticos; a conferência de notificações reais de cada aplicativo bancário e do comportamento dos aparelhos permanece pendente.
-
-A captura não equivale a uma integração oficial com os bancos ou ao acesso ao extrato completo. Os saldos dependem das referências e movimentações informadas pelo usuário. Conciliação bancária automática, gestão de faturas, metas e sincronização em nuvem permanecem fora desta etapa. Limites de cartão não devem ser cadastrados como saldo de uma conta.
-
-Os resultados efetivamente executados estão registrados em [Qualidade e validação](docs/qualidade.md), junto às [decisões técnicas](docs/decisoes.md) e às [referências de estudo](docs/referencias.md). As instruções do ambiente e os comandos ficam no [guia de desenvolvimento](docs/desenvolvimento.md).
-
-As regras de [parcelamento](docs/parcelamento.md) e [comprometimento mensal](docs/comprometimento.md) estão disponíveis no core para distribuir centavos, calcular vencimentos e relacionar compromissos com a renda prevista. O relatório calcula limite, estados e proporções da rosca, inclusive acima da renda. A terceira fase acrescenta a persistência no esquema Room 5, a vinculação das confirmações e a recuperação por backup. A quarta fase disponibiliza os cadastros de renda, limite e compras parceladas no app, além da consulta das parcelas por mês. A quinta fase apresenta o indicador, a rosca e a legenda em Planejamento. A sexta permite corrigir a compra ou as parcelas em aberto e cancelar previsões sem apagar pagamentos confirmados. A renda líquida prevista continua sendo informada manualmente por mês.
+Os resultados locais e os limites da entrega estão em [Validação do planejador](docs/validacao-planejador-ciclos-reserva.md). Notificações bancárias reais, TalkBack manual e biometria em aparelho continuam sujeitos à conferência específica.
 
 ## Atualizações e preservação do histórico
 

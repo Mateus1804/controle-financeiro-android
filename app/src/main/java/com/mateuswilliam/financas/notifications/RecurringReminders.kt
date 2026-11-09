@@ -44,7 +44,11 @@ object RecurringReminders {
             .setPeriodic(6 * 60 * 60 * 1000L).setPersisted(true).build())
     }
 
-    fun show(context: Context, plan: RecurringPlan): Boolean {
+    fun show(context: Context, plan: RecurringPlan): Boolean = showInformative(
+        context, "plan:${plan.id}:${plan.nextDate}", "Há uma movimentação prevista para hoje"
+    )
+
+    internal fun showInformative(context: Context, tag: String, title: String): Boolean {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled() ||
             (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)) return false
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -55,10 +59,10 @@ object RecurringReminders {
                 .putExtra(EXTRA_PLANNING, true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Há uma movimentação prevista para conferir")
-            .setContentText("Abra as movimentações. Uma previsão só entra nos totais após confirmação.")
+            .setContentTitle(title)
+            .setContentText("Consulte as previsões no aplicativo.")
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setOnlyAlertOnce(true).setAutoCancel(true).setContentIntent(pending).build()
-        return try { manager.notify("plan:${plan.id}:${plan.nextDate}", NOTIFICATION_ID, notification); true }
+        return try { manager.notify(tag, NOTIFICATION_ID, notification); true }
             catch (_: SecurityException) { false }
     }
     fun cancel(context: Context, id: String, due: String) {
@@ -84,7 +88,7 @@ class RecurringReminderService : JobService() {
         val app = application as FinanceApplication
         job = app.background.launch {
             var retry = false
-            try { app.repository.notifyDue(LocalDate.now()) { RecurringReminders.show(this@RecurringReminderService, it) } }
+            try { ForecastReminders.notifyToday(app, today = LocalDate.now()) }
             catch (exception: CancellationException) { throw exception }
             catch (_: Exception) { retry = true }
             finally { if (isActive) jobFinished(params, retry) }

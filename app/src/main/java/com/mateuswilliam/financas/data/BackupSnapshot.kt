@@ -14,11 +14,14 @@ data class FinanceSnapshot(
     val fixedRecurring: List<FixedRecurringEntity> = emptyList(), val commitments: List<CommitmentEntity> = emptyList(),
     val recurringRevisions: List<RecurringRevisionEntity> = emptyList(), val recurringMonths: List<RecurringMonthEntity> = emptyList(),
     val accountBalanceEvents: List<AccountBalanceEventEntity> = emptyList(),
+    val forecastRules:List<ForecastRuleEntity> = emptyList(), val forecastOverrides:List<ForecastOverrideEntity> = emptyList(),
+    val cycleRules:List<CycleRuleEntity> = emptyList(), val reserveEvents:List<ReserveEventEntity> = emptyList(),
+    val forecastMeta:List<ForecastMetaEntity> = emptyList(),
 )
 
 /** JSON de dados, sem desserialização de classes arbitrárias ou SQL recebido do arquivo. */
 object BackupSnapshot {
-    const val FORMAT_VERSION = 6
+    const val FORMAT_VERSION = 7
     private const val MAX_ROWS = 50_000
     private fun json(vararg fields: Pair<String, Any?>) = JSONObject().apply { fields.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
     private fun <T> array(rows: List<T>, convert: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(convert(it)) } }
@@ -27,6 +30,11 @@ object BackupSnapshot {
         val snapshot = RecurringSnapshots.upgrade(original)
         validate(snapshot)
         return json(
+            "forecastRules" to array(snapshot.forecastRules) { ForecastSnapshots.ruleJson(it) },
+            "forecastOverrides" to array(snapshot.forecastOverrides) { ForecastSnapshots.overrideJson(it) },
+            "cycleRules" to array(snapshot.cycleRules) { json("effectiveStart" to it.effectiveStart,"day" to it.day) },
+            "reserveEvents" to array(snapshot.reserveEvents) { json("id" to it.id,"kind" to it.kind,"amountCents" to it.amountCents,"createdAt" to it.createdAt,"reason" to it.reason,"cycleStart" to it.cycleStart) },
+            "forecastMeta" to array(snapshot.forecastMeta) { json("key" to it.key,"value" to it.value) },
             "format" to "controle-financeiro", "version" to FORMAT_VERSION, "createdAt" to snapshot.createdAt,
             "display" to json("appearance" to snapshot.display.appearance.name, "hideAmounts" to snapshot.display.hideAmounts, "lastOrigin" to snapshot.display.lastOrigin),
             "records" to array(snapshot.records) { r -> json("id" to r.id, "sourceDraftId" to r.sourceDraftId,
@@ -83,6 +91,7 @@ object BackupSnapshot {
             "Dados de comprometimento exigem a versão 2 do backup."
         }
         require(version >= 6 || !j.has("accountBalanceEvents")) { "Saldos exigem a versão 6 do backup." }
+        require(version >= 7 || listOf("forecastRules","forecastOverrides","cycleRules","reserveEvents","forecastMeta").none { j.has(it) }) { "Planejamento por ciclos exige a versão 7 do backup." }
         val display = j.getJSONObject("display")
         val snapshot = FinanceSnapshot(j.long("createdAt"),
             j.rows("records") { r ->
@@ -140,6 +149,11 @@ object BackupSnapshot {
                 r.bool("overridden"), r.text("lastRemindedDate", 20)) } else emptyList(),
             if (version >= 6) j.rows("accountBalanceEvents") { e -> AccountBalanceEventEntity(e.long("id"), e.text("accountKey", 160),
                 e.long("balanceCents"), e.long("effectiveAt"), e.long("createdAt"), e.text("reason", 200)) } else emptyList(),
+            if(version>=7) j.rows("forecastRules") { ForecastSnapshots.rule(it) } else emptyList(),
+            if(version>=7) j.rows("forecastOverrides") { ForecastSnapshots.overrideRow(it) } else emptyList(),
+            if(version>=7) j.rows("cycleRules") { CycleRuleEntity(it.text("effectiveStart",10),it.integer("day",1,31)) } else emptyList(),
+            if(version>=7) j.rows("reserveEvents") { ReserveEventEntity(it.long("id"),it.text("kind",20),it.long("amountCents"),it.long("createdAt"),it.text("reason",200),it.nullableText("cycleStart",10)) } else emptyList(),
+            if(version>=7) j.rows("forecastMeta") { ForecastMetaEntity(it.text("key",40),it.text("value",100)) } else emptyList(),
         )
         val upgraded = if (version < 5) RecurringSnapshots.upgrade(snapshot) else snapshot
         validate(upgraded)
@@ -148,7 +162,7 @@ object BackupSnapshot {
 
     fun validate(snapshot: FinanceSnapshot) {
         require(snapshot.createdAt > 0) { "Data de backup inválida." }
-        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size, snapshot.monthlyPlans.size, snapshot.purchases.size, snapshot.fixedRecurring.size, snapshot.commitments.size, snapshot.recurringRevisions.size, snapshot.recurringMonths.size, snapshot.accountBalanceEvents.size).sum()
+        val total = listOf(snapshot.records.size, snapshot.drafts.size, snapshot.accounts.size, snapshot.budgets.size, snapshot.recurring.size, snapshot.occurrences.size, snapshot.monthlyPlans.size, snapshot.purchases.size, snapshot.fixedRecurring.size, snapshot.commitments.size, snapshot.recurringRevisions.size, snapshot.recurringMonths.size, snapshot.accountBalanceEvents.size,snapshot.forecastRules.size,snapshot.forecastOverrides.size,snapshot.cycleRules.size,snapshot.reserveEvents.size,snapshot.forecastMeta.size).sum()
         require(total <= MAX_ROWS) { "O backup excede o limite de 50 mil itens." }
         fun unique(values: List<String>) { require(values.all { it.isNotBlank() } && values.distinct().size == values.size) { "Identificadores repetidos ou vazios no backup." } }
         unique(snapshot.records.map { it.id }); unique(snapshot.drafts.map { it.id }); unique(snapshot.drafts.map { it.sourceKey })
@@ -196,26 +210,27 @@ object BackupSnapshot {
             require(o.status in setOf("RECORDED", "SKIPPED", "REMOVED")) { "Estado de vencimento inválido." }
             require(if (o.status == "RECORDED") o.recordId in recordIds else o.recordId == null) { "Vínculo de lançamento recorrente inválido." }
         }
+        ForecastSnapshots.validate(snapshot)
         CommitmentSnapshotValidation.validate(snapshot)
         RecurringSnapshots.validate(snapshot)
         require(snapshot.display.lastOrigin.length <= 80) { "Preferência de origem inválida." }
     }
 
-    private fun JSONObject.integer(key: String, min: Int, max: Int): Int = long(key).also {
+    internal fun JSONObject.integer(key: String, min: Int, max: Int): Int = long(key).also {
         require(it in min.toLong()..max.toLong()) { "Inteiro fora do limite em $key." }
     }.toInt()
-    private fun JSONObject.long(key: String): Long {
+    internal fun JSONObject.long(key: String): Long {
         val value = get(key)
         require(value is Int || value is Long) { "Número inteiro inválido em $key." }
         return (value as Number).toLong()
     }
-    private fun JSONObject.text(key: String, max: Int): String {
+    internal fun JSONObject.text(key: String, max: Int): String {
         val value = get(key)
         require(value is String && value.length <= max && '\u0000' !in value) { "Texto inválido em $key." }
         return value
     }
-    private fun JSONObject.nullableText(key: String, max: Int): String? = if (isNull(key)) null else text(key, max)
-    private fun JSONObject.bool(key: String): Boolean = get(key).also { require(it is Boolean) { "Preferência inválida em $key." } } as Boolean
+    internal fun JSONObject.nullableText(key: String, max: Int): String? = if (isNull(key)) null else text(key, max)
+    internal fun JSONObject.bool(key: String): Boolean = get(key).also { require(it is Boolean) { "Preferência inválida em $key." } } as Boolean
     private fun <T> JSONObject.rows(key: String, convert: (JSONObject) -> T): List<T> {
         val list = getJSONArray(key)
         require(list.length() <= MAX_ROWS) { "Quantidade de itens inválida em $key." }

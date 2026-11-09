@@ -34,6 +34,7 @@ fun SettingsScreen(
     onClear: () -> Unit, onSimulate: () -> Unit, onAppearance: (Appearance) -> Unit, busy: Boolean,
     onBackup: () -> Unit, onRestore: () -> Unit, onPlanning: () -> Unit,
     onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit, onReminders: (Boolean) -> Unit = {},
+    plannerMode: Boolean = false,
 ) {
     var privacy by remember { mutableStateOf(false) }
     LazyColumn(Modifier.testTag("settings-list"), contentPadding = PaddingValues(FinanceSpacing.page, 16.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
@@ -67,7 +68,7 @@ fun SettingsScreen(
                 }
             }
         }
-        item {
+        if (!plannerMode) item {
             SettingsCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -106,7 +107,7 @@ fun SettingsScreen(
                     ))
                 }
                 Text("Os registros ficam neste aparelho. O CSV é um relatório; o backup permite recuperar os dados do aplicativo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Exportar lançamentos em CSV") }
+                OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text(if (plannerMode) "Exportar previsões em CSV" else "Exportar lançamentos em CSV") }
             }
         }
         item {

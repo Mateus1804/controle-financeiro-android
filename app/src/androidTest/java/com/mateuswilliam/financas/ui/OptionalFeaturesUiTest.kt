@@ -26,7 +26,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 class OptionalFeaturesUiTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
     private fun forecast() = RecurringPlan("mensal-ficticia", "Aluguel fictício", 60000, Movement.EXPENSE,

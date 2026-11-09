@@ -29,7 +29,7 @@ class HistoryCompatibilityTest {
         try {
             assertTables(CompatibilityFixtures.snapshot(), readSnapshot(database.financeDao(), 1, CompatibilityFixtures.snapshot().display))
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(9, sqlite.version)
+            assertEquals(10, sqlite.version)
             fun plan(query: String) = sqlite.query("EXPLAIN QUERY PLAN $query").use { cursor ->
                 buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }.joinToString(" ")
             }
@@ -59,7 +59,7 @@ class HistoryCompatibilityTest {
             assertTables(expected, actual)
             assertEquals(expected.display, actual.display)
             assertFalse(preferences.snapshot().enabled); assertFalse(preferences.snapshot().remindersEnabled)
-            assertEquals(9, database.openHelper.writableDatabase.version)
+            assertEquals(10, database.openHelper.writableDatabase.version)
             // O exportador usa o formato atual; o leitor preserva o arquivo congelado de formato 1.
             assertTables(actual, BackupSnapshot.decode(BackupSnapshot.encode(actual)))
         } finally { store.removeAbandonedStages(); preferences.reset(); database.close() }

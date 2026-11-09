@@ -123,6 +123,24 @@ data class UsedAccount(val label: String, val lastUsedAt: Long)
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM forecast_rules ORDER BY itemId,effectiveFrom") suspend fun allForecastRules(): List<ForecastRuleEntity>
+    @Query("SELECT * FROM forecast_overrides ORDER BY itemId,occurrenceKey") suspend fun allForecastOverrides(): List<ForecastOverrideEntity>
+    @Query("SELECT * FROM cycle_rules ORDER BY effectiveStart") suspend fun allCycleRules(): List<CycleRuleEntity>
+    @Query("SELECT * FROM reserve_events ORDER BY createdAt,id") suspend fun allReserveEvents(): List<ReserveEventEntity>
+    @Query("SELECT * FROM forecast_meta ORDER BY `key`") suspend fun allForecastMeta(): List<ForecastMetaEntity>
+    @Upsert suspend fun upsertForecastRule(row:ForecastRuleEntity)
+    @Upsert suspend fun upsertForecastOverride(row:ForecastOverrideEntity)
+    @Upsert suspend fun upsertCycleRule(row:CycleRuleEntity)
+    @Upsert suspend fun upsertForecastMeta(row:ForecastMetaEntity)
+    @Insert suspend fun insertReserveEvent(row:ReserveEventEntity):Long
+    @Query("DELETE FROM forecast_rules WHERE itemId=:id AND effectiveFrom>:date") suspend fun deleteFutureForecastRules(id:String,date:String)
+    @Query("DELETE FROM cycle_rules WHERE effectiveStart>=:date") suspend fun deleteFutureCycleRules(date:String)
+    @Query("DELETE FROM forecast_rules") suspend fun clearForecastRules()
+    @Query("DELETE FROM forecast_overrides") suspend fun clearForecastOverrides()
+    @Query("DELETE FROM cycle_rules") suspend fun clearCycleRules()
+    @Query("DELETE FROM reserve_events") suspend fun clearReserveEvents()
+    @Query("DELETE FROM forecast_meta") suspend fun clearForecastMeta()
+
     @Query("SELECT * FROM account_balance_events ORDER BY effectiveAt, createdAt, id") fun accountBalanceEvents(): Flow<List<AccountBalanceEventEntity>>
     @Query("SELECT * FROM account_balance_events ORDER BY effectiveAt, createdAt, id") suspend fun allAccountBalanceEvents(): List<AccountBalanceEventEntity>
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertAccountBalanceEvent(event: AccountBalanceEventEntity): Long
@@ -265,11 +283,20 @@ interface FinanceDao {
     @Query("DELETE FROM records") suspend fun clearRecords()
 }
 
-@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, AccountBalanceEventEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class, RecurringRevisionEntity::class, RecurringMonthEntity::class], version = 9, exportSchema = true)
+@Database(entities = [DraftEntity::class, RecordEntity::class, AccountEntity::class, AccountBalanceEventEntity::class, BudgetEntity::class, RecurringEntity::class, OccurrenceEntity::class, MonthlyPlanEntity::class, PurchaseEntity::class, FixedRecurringEntity::class, CommitmentEntity::class, RecurringRevisionEntity::class, RecurringMonthEntity::class, ForecastRuleEntity::class, ForecastOverrideEntity::class, CycleRuleEntity::class, ReserveEventEntity::class, ForecastMetaEntity::class], version = 10, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
+        val MIGRATION_9_10 = object : Migration(9,10) {
+ override fun migrate(db:SupportSQLiteDatabase) {
+db.execSQL("CREATE TABLE IF NOT EXISTS forecast_rules (itemId TEXT NOT NULL,effectiveFrom TEXT NOT NULL,title TEXT NOT NULL,kind TEXT NOT NULL,amountCents INTEGER NOT NULL,category TEXT NOT NULL,frequency TEXT NOT NULL,startDate TEXT NOT NULL,dayOfMonth INTEGER NOT NULL,installmentCount INTEGER NOT NULL,cycleAnchored INTEGER NOT NULL,`group` TEXT NOT NULL,estimated INTEGER NOT NULL,active INTEGER NOT NULL,statementKey TEXT NOT NULL,statementTotal INTEGER NOT NULL,account TEXT NOT NULL,legacySource TEXT,PRIMARY KEY(itemId,effectiveFrom))")
+db.execSQL("CREATE TABLE IF NOT EXISTS forecast_overrides (itemId TEXT NOT NULL,occurrenceKey TEXT NOT NULL,amountCents INTEGER,date TEXT,ignored INTEGER NOT NULL,active INTEGER,title TEXT,category TEXT,PRIMARY KEY(itemId,occurrenceKey))")
+db.execSQL("CREATE TABLE IF NOT EXISTS cycle_rules (effectiveStart TEXT NOT NULL PRIMARY KEY,day INTEGER NOT NULL)")
+db.execSQL("CREATE TABLE IF NOT EXISTS reserve_events (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,kind TEXT NOT NULL,amountCents INTEGER NOT NULL,createdAt INTEGER NOT NULL,reason TEXT NOT NULL,cycleStart TEXT)")
+db.execSQL("CREATE TABLE IF NOT EXISTS forecast_meta (`key` TEXT NOT NULL PRIMARY KEY,value TEXT NOT NULL)")
+ }
+ }
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE accounts ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")

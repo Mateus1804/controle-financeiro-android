@@ -18,7 +18,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class UnifiedMovementsUiTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     private val month = YearMonth.now()
     @Before fun reset() {

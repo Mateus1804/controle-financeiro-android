@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class FinanceUiTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
 
     @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
@@ -138,7 +138,7 @@ class FinanceUiTest {
         rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
         rule.waitForIdle()
         screenshot("resumo-claro")
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Últimos lançamentos"))
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Movimentações do mês"))
         screenshot("recentes-claro")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }; rule.waitForIdle()
         screenshot("recentes-escuro")
@@ -282,7 +282,9 @@ class FinanceUiTest {
     @Test fun hiddenAmountsAlsoHideChartLabelsAndSemantics() = runBlocking<Unit> {
         app.repository.save(Record("privacidade-grafico", 123456, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
             "Conta exemplo", "Exemplo privado", System.currentTimeMillis()), null)
-        rule.waitUntil(5000) { rule.onAllNodesWithText(Money.format(123456)).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("expense-group-FOOD"))
+        rule.onNodeWithTag("expense-group-FOOD").assertTextContains(Money.format(123456))
+        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Ocultar"))
         rule.onNodeWithText("Ocultar").performClick()
         rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("expense-group-FOOD"))
         rule.onAllNodesWithText(Money.format(123456)).assertCountEquals(0)
@@ -328,7 +330,8 @@ class FinanceUiTest {
             rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
             val alertAction = rule.onNodeWithText("Permitir alertas de revisão")
             if (android.os.Build.VERSION.SDK_INT >= 33) {
-                assertFalse(androidx.core.content.ContextCompat.checkSelfPermission(app, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+                // O app-op bloqueia os alertas efetivos sem revogar a permissão runtime.
+                assertFalse(androidx.core.app.NotificationManagerCompat.from(app).areNotificationsEnabled())
                 alertAction.assertExists()
             } else {
                 // Nessas versões não há POST_NOTIFICATIONS runtime; a ação reflete o bloqueio global efetivo do sistema.
@@ -339,7 +342,8 @@ class FinanceUiTest {
             resume()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Falta autorizar o acesso às notificações no Android.").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithText("Resumo").performClick()
-            rule.onNodeWithText("Autorizar acesso").assertExists()
+            rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Autorizar acesso"))
+            rule.onNodeWithText("Autorizar acesso").assertIsDisplayed()
         } finally {
             listenerAccess(false)
             if (android.os.Build.VERSION.SDK_INT >= 33)
@@ -403,8 +407,7 @@ class FinanceUiTest {
 
     private fun assertStatusBarBackground(dark: Boolean) {
         rule.waitUntil(5000) {
-            val bitmap = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-                ?: return@waitUntil false
+            val bitmap = captureEmulatorScreen() ?: return@waitUntil false
             val pixel = bitmap.getPixel(bitmap.width / 2, 2)
             bitmap.recycle()
             val brightness = (android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) + android.graphics.Color.blue(pixel)) / 3
@@ -415,8 +418,17 @@ class FinanceUiTest {
     private fun screenshot(name: String) {
         val directory = File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         rule.waitForIdle()
-        val bitmap = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-            ?: error("Não foi possível capturar a tela do emulador.")
+        val bitmap = captureEmulatorScreen() ?: error("Não foi possível capturar a tela do emulador.")
         try { File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } } finally { bitmap.recycle() }
+    }
+
+    private fun captureEmulatorScreen(): Bitmap? {
+        val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        if (android.os.Build.VERSION.SDK_INT != 26) return automation.takeScreenshot()
+        // Na API 26, takeScreenshot usa o tamanho lógico e falha se wm size exceder a tela física.
+        // O screencap solicita as dimensões nativas e mantém a proteção de janelas seguras.
+        return android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("screencap -p")).use {
+            android.graphics.BitmapFactory.decodeStream(it)
+        }
     }
 }

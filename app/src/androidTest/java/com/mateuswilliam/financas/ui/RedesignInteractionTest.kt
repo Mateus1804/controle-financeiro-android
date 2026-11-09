@@ -1,5 +1,6 @@
 package com.mateuswilliam.financas.ui
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
@@ -14,7 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class RedesignInteractionTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
 
@@ -34,12 +35,18 @@ class RedesignInteractionTest {
     }
 
     @Test fun quickTransferShowsDestinationAndCannotSaveWithoutOne() {
+        runBlocking { app.repository.addAccount("Origem fictícia") }
+        app.settings.rememberOrigin("Origem fictícia")
+        rule.waitForIdle()
         openQuick("transfer")
         rule.onNodeWithTag("amount-input").performTextInput("2500")
+        rule.onNodeWithTag("amount-input").performImeAction()
+        waitKeyboard()
         rule.onNodeWithText("Conta de destino").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Transferência fictícia")
         rule.onNodeWithText("Descrição").performImeAction(); waitKeyboard()
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        rule.onNode(hasText("Confirmar") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        rule.onNodeWithText("Informe a conta de destino.").performScrollTo().assertIsDisplayed()
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
     }
 
@@ -150,7 +157,8 @@ class RedesignInteractionTest {
                 Category.FOOD, "Conta fictícia", "Lançamento fictício $index", now - index * 1000L), null)
         }
         rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("30 lançamento(s)").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(30, app.repository.exportRecords().size)
+        rule.onNodeWithTag("records-list").assertExists()
         rule.onNodeWithTag("records-list").performScrollToNode(hasText("Lançamento fictício 29"))
         val record = rule.onNodeWithText("Lançamento fictício 29").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val action = rule.onNodeWithContentDescription("Novo lançamento").fetchSemanticsNode().boundsInRoot

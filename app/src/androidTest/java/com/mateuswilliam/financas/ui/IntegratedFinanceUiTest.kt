@@ -17,7 +17,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 
 class IntegratedFinanceUiTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rule = createLegacyFinanceRule()
     private val app get() = rule.activity.application as FinanceApplication
     @Before fun reset() {
         runBlocking { app.repository.clear() }
