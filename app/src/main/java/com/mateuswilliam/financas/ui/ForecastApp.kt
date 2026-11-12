@@ -30,7 +30,6 @@ import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.ForecastViewModel
 import com.mateuswilliam.financas.R
 import com.mateuswilliam.financas.core.*
-import com.mateuswilliam.financas.data.MonthlyPlanEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -214,7 +213,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("rendly-greeting"), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                     IconButton({ finance.preferences.hideAmounts(!hidden) }) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
-                    IconButton({ tab = if (tab == 5) 0 else 5 }, Modifier.testTag("open-notification-review")) {
+                    if (tab != 0) IconButton({ tab = if (tab == 5) 0 else 5 }, Modifier.testTag("open-notification-review")) {
                         BadgedBox(badge = { if (oldState.pending.isNotEmpty()) Badge { Text(oldState.pending.size.toString()) } }) {
                             AppIcon(R.drawable.ic_pending, description = "Revisão de notificações")
                         }
@@ -257,8 +256,17 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onReuse = { old -> legacyMonth = old.month; editItem = null; editKey = null; template = null; editor = true },
                         represented = represented)
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
+                        item {
+                            val reviewLabel = if (oldState.pending.isEmpty()) "Revisar notificações"
+                                else "Revisar notificações (${oldState.pending.size})"
+                            FilledTonalButton({ tab = 5 }, Modifier.fillMaxWidth().testTag("dashboard-notification-review")) {
+                                AppIcon(R.drawable.ic_pending)
+                                Spacer(Modifier.width(8.dp))
+                                Text(reviewLabel)
+                            }
+                        }
                         item { MonthPicker(month) { monthText = it.toString() } }
-                        item { SalaryMonthCard(salarySummary, hidden) { salaryEditor = true } }
+                        item { MonthlyResultCard(salarySummary, hidden) { salaryEditor = true } }
                         item { TextButton({ expenseDimension = null; recordCategory = null; tab = 4 }) { Text("Ver extrato do mês") } }
                         item { ExpenseChart(realized, month, hidden) {
                             expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; recordCategory = null; tab = 4
@@ -266,16 +274,11 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
                         item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { followingCurrent = true; browsing = today.toString() }, { cycleEditor = true }) }
                         item { Text(if (closed) "Ciclo encerrado · valores estimados" else "Planejamento do ciclo · valores estimados", style = MaterialTheme.typography.labelMedium) }
-                        item { ForecastSummary(report, hidden) }
                         item { RendlyCategories(report, hidden) }
                         item { TextButton({ dueDates = true },
                             enabled = report.lines.any { it.included && !it.ignored && it.date >= today }, modifier = Modifier.fillMaxWidth()) {
                             AppIcon(R.drawable.ic_chevron_right); Spacer(Modifier.width(8.dp)); Text("Próximos vencimentos · consultar previsão")
                         } }
-                        if (report.incomeCents <= 0) item {
-                            EmptyCard("Informe sua renda prevista", "Cadastre o salário uma única vez. O mesmo valor alimenta o orçamento e todas as projeções.")
-                            TextButton({ newItem(ForecastKind.INCOME) }, modifier = Modifier.testTag("forecast-setup-salary")) { Text("Cadastrar salário mensal") }
-                        }
                         if (closed && report.unallocatedCents > 0) item {
                             OutlinedButton({ if (balance == null) showReserve(ReserveEventKind.SET) else showReserve(ReserveEventKind.ADD, true) }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("forecast-allocate-surplus")) {
                                 Text(if (balance == null) "Informar reserva para destinar a sobra" else "Guardar parte da sobra")
@@ -304,7 +307,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     if (salaryEditor) key(monthText) {
-        SalaryMonthEditor(month, salaryReference?.incomeCents, hidden, busy, { salaryEditor = false }) { cents ->
+        SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { salaryEditor = false }) { cents ->
             finance.saveMonthlyIncome(MonthlyIncomePlan(month, cents, salaryReference?.healthyLimitBasisPoints ?: 3000)) {
                 salaryEditor = false; model.refresh()
             }

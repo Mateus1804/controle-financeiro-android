@@ -306,7 +306,7 @@ fun RecordEditor(
                         }
                     }
                 }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
-                    Text(if (busy) "Salvando…" else if (recurringMode) if (recurrenceOnlyMonth) "Salvar só este mês" else "Salvar recorrência" else if (purchaseMode) "Salvar compra parcelada" else if (realizedOnly && existing == null && movement == Movement.EXPENSE) "Registrar despesa" else if (realizedOnly) "Salvar lançamento" else "Confirmar")
+                    Text(if (busy) "Salvando…" else if (recurringMode) if (recurrenceOnlyMonth) "Salvar só este mês" else "Salvar recorrência" else if (purchaseMode) "Salvar compra parcelada" else if (realizedOnly && draft != null) "Confirmar lançamento" else if (realizedOnly && existing == null && movement == Movement.EXPENSE) "Registrar despesa" else if (realizedOnly) "Salvar lançamento" else "Confirmar")
                 }
             }
         }

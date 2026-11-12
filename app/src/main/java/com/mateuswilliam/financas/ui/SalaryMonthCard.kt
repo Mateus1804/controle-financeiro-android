@@ -13,7 +13,7 @@ import com.mateuswilliam.financas.core.*
 import java.time.YearMonth
 
 @Composable
-internal fun SalaryMonthCard(summary: SalarySummary, hidden: Boolean, onSalary: () -> Unit) {
+internal fun MonthlyResultCard(summary: SalarySummary, hidden: Boolean, onSalary: () -> Unit) {
     val salaryCents = summary.salaryCents
     val remaining = summary.remainingCents
     val exceeded = remaining != null && remaining < 0
@@ -21,13 +21,13 @@ internal fun SalaryMonthCard(summary: SalarySummary, hidden: Boolean, onSalary: 
     Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(Modifier.fillMaxWidth().testTag("salary-month-summary").padding(FinanceSpacing.card),
             verticalArrangement = Arrangement.spacedBy(FinanceSpacing.medium)) {
-            SectionTitle("Meu salário no mês", "Gastos realizados e sobra estimada")
+            SectionTitle("Resultado do mês", "Gastos realizados e previsão até o fim do mês")
             if (salaryCents == null || remaining == null) {
-                // Sem salário: o gasto continua visível e a ação para informá-lo fica em destaque.
                 Text("Gastos realizados (líquidos)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Amount(summary.spentCents, hidden, Modifier.testTag("salary-spent"), size = 32)
-                Text("Informe o salário líquido do mês para calcular a sobra e o percentual utilizado.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                summary.pendingExpensesCents?.takeIf { it != 0L }?.let {
+                    SalaryLine("Despesas previstas pendentes", it, hidden)
+                }
                 FilledTonalButton(onSalary, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Informar salário líquido") }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -36,8 +36,6 @@ internal fun SalaryMonthCard(summary: SalarySummary, hidden: Boolean, onSalary: 
                     CompositionLocalProvider(LocalContentColor provides accent) {
                         Amount(if (exceeded) -remaining else remaining, hidden, Modifier.testTag("salary-remaining"), size = 32)
                     }
-                    Text("Referência de orçamento, não é o saldo da conta.", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 val percentage = summary.usedPercentage
                 if (percentage != null && !hidden) {
@@ -56,24 +54,23 @@ internal fun SalaryMonthCard(summary: SalarySummary, hidden: Boolean, onSalary: 
                 summary.projectedRemainingCents?.let { projected ->
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Estimativa para o fim do mês", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        SalaryLine(if (projected < 0) "Falta prevista · estimativa" else "Sobra prevista · estimativa",
-                            if (projected < 0) -projected else projected, hidden)
-                        Text("Considera previsões pendentes; não é valor realizado.", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        SalaryLine("Despesas previstas pendentes", summary.pendingExpensesCents ?: 0, hidden)
+                        SalaryLine("Sobra estimada no fim do mês", projected, hidden, Modifier.testTag("salary-projected"))
                     }
                 }
-                TextButton(onSalary, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Informar salário líquido") }
+                if (summary.isEstimatedSalary) {
+                    TextButton(onSalary, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Editar salário do mês") }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SalaryLine(label: String, cents: Long, hidden: Boolean) {
+private fun SalaryLine(label: String, cents: Long, hidden: Boolean, amountModifier: Modifier = Modifier) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Amount(cents, hidden, Modifier.widthIn(max = 160.dp), size = 16)
+        Amount(cents, hidden, amountModifier.widthIn(max = 160.dp), size = 16)
     }
 }
 
@@ -87,7 +84,7 @@ internal fun SalaryMonthEditor(month: YearMonth, current: Long?, hidden: Boolean
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() },
         title = { DialogSystemBars(); Text("Salário líquido do mês") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Referência de $month. Se houver salário já registrado neste mês, o lançamento será usado no resumo.")
+            Text("Valor líquido usado no resultado de $month.")
             PrivateValueGate(hidden, "Mostrar salário para edição") {
                 MoneyAmountField(amount, attempted, !busy, label = "Salário líquido (R$)", tag = "salary-month-amount",
                     onInvalidInput = { invalid = it })
