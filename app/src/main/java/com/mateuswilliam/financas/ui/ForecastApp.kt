@@ -126,7 +126,12 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     fun openActual(kind: Movement = Movement.EXPENSE, recordId: String? = null) {
         actualKind = kind; editingRecordId = recordId; editingDraftId = null; draftRevision = null; recordEditor = true
     }
-    fun openReview(draft: com.mateuswilliam.financas.data.DraftEntity) {
+    // A fila da sessão é fixada ao abrir a primeira pendência; "Revisar próxima" continua nela.
+    var reviewIds by remember { mutableStateOf(emptyList<String>()) }
+    var reviewAfter by rememberSaveable { mutableStateOf<String?>(null) }
+    fun openReview(draft: com.mateuswilliam.financas.data.DraftEntity, continuing: Boolean = false) {
+        if (!continuing) reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, draft.id)
+        reviewAfter = null
         editingDraftId = draft.id; editingRecordId = null; draftRevision = draft.revision; recordEditor = true
     }
     LaunchedEffect(incomingDraft, oldState.loaded, oldState.pending, busy, recordEditor, editor, backupDialog, staged) {
@@ -237,7 +242,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     tab == 5 -> Column {
                         TextButton({ tab = 3 }, Modifier.padding(horizontal = FinanceSpacing.page)) { Text("Configurar captura") }
                         Box(Modifier.weight(1f)) {
-                            PendingScreen(oldState.pending, hidden, ::openReview, { finance.dismiss(it) }, busy, captureActive)
+                            PendingScreen(oldState.pending, hidden, { openReview(it) }, { id -> finance.dismiss(id) { reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, id); reviewAfter = id } }, busy, captureActive)
                         }
                     }
                     tab == 4 -> RecordsScreen(realized, month, { monthText = it.toString() }, hidden, recordCategory,
@@ -334,8 +339,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val record = oldState.records.firstOrNull { it.id == editingRecordId }
     if (recordEditor && (editingDraftId == null || draft != null) && (editingRecordId == null || record != null)) key(editingDraftId, editingRecordId, actualKind) {
         RecordEditor(draft, record, busy, onDismiss = { recordEditor = false },
-            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = draftRevision) { recordEditor = false } },
-            onIgnore = draft?.let { { finance.dismiss(it.id) { recordEditor = false } } },
+            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = draftRevision) { recordEditor = false; if (draft != null) reviewAfter = draft.id } },
+            onIgnore = draft?.let { { finance.dismiss(it.id) { recordEditor = false; reviewAfter = it.id } } },
             onDelete = record?.let { { finance.delete(it.id) } },
             accounts = oldState.accounts, lastOrigin = settings.lastOrigin, onAddAccount = finance::addAccount,
             initialMovement = actualKind, hideAmounts = hidden, duplicateIndex = duplicateIndex,
@@ -345,6 +350,17 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             realizedOnly = true, onOpenExpenseForecast = if (draft == null && record == null && snapshot != null) {
                 { recordEditor = false; newItem(ForecastKind.EXPENSE) }
             } else null)
+    }
+    reviewAfter?.takeIf { !recordEditor && tab == 5 }?.let { done ->
+        val pendingIds = oldState.pending.map { it.id }.toSet()
+        val next = ReviewQueue.next(reviewIds, done, pendingIds)?.let { id -> oldState.pending.firstOrNull { it.id == id } }
+            ?: oldState.pending.firstOrNull { it.id != done }
+        AlertDialog(onDismissRequest = { reviewAfter = null }, title = { DialogSystemBars(); Text("Sugestão tratada") },
+            text = { Text(if (next != null) "Há mais notificações para revisar. Cada lançamento continua exigindo a sua confirmação."
+                else "Não há mais notificações pendentes para revisar.") },
+            confirmButton = { if (next != null) TextButton({ openReview(next, continuing = true) }, Modifier.testTag("review-next")) { Text("Revisar próxima") }
+                else TextButton({ reviewAfter = null }, Modifier.testTag("review-empty-done")) { Text("Concluir") } },
+            dismissButton = { if (next != null) TextButton({ reviewAfter = null }) { Text("Agora não") } })
     }
     LaunchedEffect(oldState.loaded, draft, record, editingDraftId, editingRecordId) {
         if (oldState.loaded && ((editingDraftId != null && draft == null) || (editingRecordId != null && record == null))) recordEditor = false
