@@ -110,6 +110,18 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             SalarySummaries.month(oldState.records, null, month, zone, asOf, salaryReference?.incomeCents)
         }
     }
+    val knownBalances = remember(oldState.accountBalances) { oldState.accountBalances.filter { !it.archived && it.balanceCents != null } }
+    val paydayBudget = remember(data, oldState.records, oldState.recurring, knownBalances, asOf) {
+        runCatching {
+            val todayDate = LocalDate.now()
+            val lines = data?.let { PaydayBudgets.upcomingLines(it, SalarySummaries.represented(oldState.records, it, asOf), todayDate) }.orEmpty()
+            val recurringDates = oldState.recurring.filter { it.active && it.movement == Movement.INCOME && it.category == Category.SALARY }
+                .mapNotNull { runCatching { LocalDate.parse(it.nextDate) }.getOrNull() }
+            PaydayBudgets.nextPayday(lines, recurringDates, todayDate)?.let { payday ->
+                PaydayBudgets.compute(knownBalances.sumOf { it.balanceCents ?: 0L }, lines, data?.reserveGoalCents ?: 0L, todayDate, payday)
+            }
+        }.getOrNull()
+    }
     fun openActual(kind: Movement = Movement.EXPENSE, recordId: String? = null) {
         actualKind = kind; editingRecordId = recordId; editingDraftId = null; draftRevision = null; recordEditor = true
     }
@@ -267,6 +279,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         }
                         item { MonthPicker(month) { monthText = it.toString() } }
                         item { MonthlyResultCard(salarySummary, hidden) { salaryEditor = true } }
+                        item { PaydayBudgetCard(paydayBudget, knownBalances.isNotEmpty(), hidden) { newItem(ForecastKind.INCOME, "Salário") } }
                         item { TextButton({ expenseDimension = null; recordCategory = null; tab = 4 }) { Text("Ver extrato do mês") } }
                         item { ExpenseChart(realized, month, hidden) {
                             expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; recordCategory = null; tab = 4
