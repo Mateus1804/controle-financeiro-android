@@ -71,13 +71,13 @@ class UnifiedMovementsUiTest {
         val plan = RecurringPlan("unified", "Conta mensal", 5000, Movement.EXPENSE, PaymentMethod.PIX,
             Category.HOME, "Carteira", month.atDay(12).toString(), 12)
         app.repository.saveRecurring(plan); app.repository.setFixedRecurring(plan.id, month)
-        actions(plan.id); click("Editar só este mês")
+        actions(plan.id); click("Alterar só este mês")
         rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("7500")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         click("Salvar só este mês")
         rule.waitUntil(5000) { runBlocking { app.repository.commitmentReport(month).committedCents == 7500L } }
         assertEquals(5000L, app.repository.commitmentReport(month.plusMonths(1)).committedCents)
-        actions(plan.id); click("Ignorar este mês"); click("Confirmar")
+        actions(plan.id); click("Pular este mês"); click("Confirmar")
         rule.waitUntil(5000) { runBlocking { app.repository.observeRecurringMonths(month).first().single().status == RecurringMonthStatus.SKIPPED } }
         assertEquals(0L, app.repository.commitmentReport(month).committedCents)
         assertEquals(RecurringMonthStatus.PENDING, app.repository.observeRecurringMonths(month.plusMonths(1)).first().single().status)

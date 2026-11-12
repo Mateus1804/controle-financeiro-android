@@ -34,7 +34,7 @@ class MonthlyRecurringUiTest {
         openPlanning()
         rule.openPlanningActions("recurring-${plan.id}")
         rule.onNodeWithTag("edit-month-${plan.id}").performClick()
-        rule.onNodeWithText("Editar só este mês").assertIsDisplayed()
+        rule.onNodeWithText("Alterar só este mês").assertIsDisplayed()
         rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("7500")
         rule.onNodeWithTag("recurring-title").performScrollTo().performTextReplacement("Conta ajustada só neste mês")
         rule.onNodeWithTag("recurring-title").performImeAction()

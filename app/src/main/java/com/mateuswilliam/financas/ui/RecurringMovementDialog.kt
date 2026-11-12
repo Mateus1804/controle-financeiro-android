@@ -37,8 +37,8 @@ internal fun RecurringMovementDialog(model: FinanceViewModel, state: FinanceStat
     }
     val skipping = action == RecurringAction.SKIP
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() },
-        title = { DialogSystemBars(); Text(if (skipping) "Ignorar este mês?" else "Excluir recorrência?") },
-        text = { Text(if (skipping) "Somente esta ocorrência será ignorada. Os outros meses e os pagamentos registrados serão mantidos."
+        title = { DialogSystemBars(); Text(if (skipping) "Pular este mês?" else "Excluir recorrência?") },
+        text = { Text(if (skipping) "Somente esta ocorrência será pulada. Os outros meses e os pagamentos registrados serão mantidos."
             else "As previsões desta recorrência deixarão de aparecer. Os pagamentos já registrados serão mantidos no histórico.") },
         confirmButton = { TextButton(enabled = !busy, modifier = Modifier.testTag(if (skipping) "confirm-skip" else "confirm-exclude-recurring"), onClick = {
             if (skipping) { model.skipRecurringMonth(expected); onDismiss() }

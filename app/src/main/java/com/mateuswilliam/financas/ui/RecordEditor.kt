@@ -144,7 +144,7 @@ fun RecordEditor(
         Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding().then(scroll)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(when {
-                    recurring != null -> if (recurrenceOnlyMonth) "Editar só este mês" else "Editar desta e futuras"
+                    recurring != null -> if (recurrenceOnlyMonth) "Alterar só este mês" else "Aplicar deste mês em diante"
                     draft != null -> "Conferir movimentação"
                     installmentConfirmation -> "Conferir parcela"
                     preset != null -> "Conferir previsão"
