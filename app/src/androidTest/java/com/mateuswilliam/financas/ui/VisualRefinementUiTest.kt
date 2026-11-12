@@ -51,6 +51,14 @@ class VisualRefinementUiTest {
         ExpenseChart(emptyList(), month, hidden = false) {}
     }) { rule.onNodeWithText("Nenhuma despesa confirmada neste período.").assertExists() }
 
+    @Test fun expenseRefundIsVisibleEvenWhenThereAreNoNewExpenses() = both({
+        val refund = expense("refund", 10000, Category.FOOD).copy(movement = Movement.REFUND)
+        ExpenseChart(listOf(refund), month, hidden = false) {}
+    }) {
+        rule.onNodeWithTag("expense-refunds").assertExists()
+        rule.onNodeWithText("Estornos do período: R$", substring = true).assertExists()
+    }
+
     @Test fun manyCategoriesGroupSmallestInOthersAndHiddenHidesPercentages() {
         val records = Category.entries.take(8).mapIndexed { i, c -> expense("e$i", (800L - i * 90), c) }
         rule.setContent { FinanceTheme { ExpenseChart(records, month, hidden = true) {} } }

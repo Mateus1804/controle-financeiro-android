@@ -2,6 +2,7 @@ package com.mateuswilliam.financas.core
 
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.YearMonth
 
 enum class ForecastKind { INCOME, EXPENSE }
 enum class ForecastFrequency { ONCE, MONTHLY, INSTALLMENTS }
@@ -36,6 +37,7 @@ data class ForecastDataset(
     val cycleRules: List<CycleRule> = emptyList(), val reserveEvents: List<ReserveEvent> = emptyList(),
     val reserveGoalCents: Long? = null,
     val recordLinks: Map<Pair<String, String>, Set<String>> = emptyMap(),
+    val monthlySalaryReferences: Map<YearMonth, Long> = emptyMap(),
 )
 data class ForecastLine(
     val itemId: String, val occurrenceKey: String, val title: String, val date: LocalDate,

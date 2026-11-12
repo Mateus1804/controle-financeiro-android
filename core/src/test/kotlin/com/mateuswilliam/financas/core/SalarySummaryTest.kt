@@ -18,6 +18,25 @@ class SalarySummaryTest {
         ForecastRule(id, day, id, if (category == Category.SALARY) ForecastKind.INCOME else ForecastKind.EXPENSE,
             cents, category, ForecastFrequency.ONCE, day, legacySource = source)
 
+    @Test fun oneMonthSalaryOverridesRecurringAndLegacyInBothReports() {
+        val next = month.plusMonths(1)
+        val data = ForecastDataset(
+            rules = listOf(
+                forecast("previous-salary", 290000, Category.SALARY),
+                SalaryForecasts.rule(month, 325000, repeat = true),
+                SalaryForecasts.rule(month, 350000, repeat = false),
+            ),
+            monthlySalaryReferences = mapOf(month to 300000L),
+        )
+        val currentPeriod = BudgetPeriod(month.atDay(1), next.atDay(1))
+        val nextPeriod = BudgetPeriod(next.atDay(1), next.plusMonths(1).atDay(1))
+        assertEquals(350000L, ForecastCalculator.report(data, currentPeriod).incomeCents)
+        assertEquals(350000L, SalarySummaries.month(emptyList(), data, month, zone, at).salaryCents)
+        assertEquals(325000L, ForecastCalculator.report(data, nextPeriod).incomeCents)
+        val legacy = data.copy(rules = listOf(forecast("previous-salary", 290000, Category.SALARY)))
+        assertEquals(300000L, ForecastCalculator.report(legacy, currentPeriod).incomeCents)
+    }
+
     @Test fun salaryAndRemainingExpensesUseDifferentSources() {
         val records = listOf(record("gasto", 120000, Movement.EXPENSE, Category.FOOD),
             record("pix", 900000, Movement.INCOME, Category.OTHER_INCOME))

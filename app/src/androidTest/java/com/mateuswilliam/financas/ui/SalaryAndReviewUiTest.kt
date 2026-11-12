@@ -49,7 +49,11 @@ class SalaryAndReviewUiTest {
             app.repository.capture(NotificationInput("test.bank", "test-purchase", "Banco de teste",
                 "Compra aprovada", "Compra aprovada no cartão de R$ 35,90", System.currentTimeMillis()), simulation = true)
         }!!
-        rule.waitUntil(10000) { rule.onAllNodesWithText("Revisar notificações (1)").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10000) {
+            runCatching {
+                rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("dashboard-notification-review"))
+            }.isSuccess
+        }
         rule.onNodeWithText("Revisar notificações (1)").performClick()
         rule.onNodeWithTag("review-${captured.id}").performClick()
         rule.onNodeWithText("Conferir movimentação").assertExists()
@@ -61,8 +65,20 @@ class SalaryAndReviewUiTest {
         assertEquals(Movement.EXPENSE, saved.movement)
     }
 
+    @Test fun salaryEditorUsesOneValueInTheDashboardAndProjections() {
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Informar salário líquido"))
+        rule.onNodeWithText("Informar salário líquido").performClick()
+        rule.onNodeWithTag("salary-month-amount").performTextInput("325000")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        rule.onNodeWithText("Salvar").performClick()
+        rule.waitUntil(10000) { rule.onAllNodesWithText("3.250,00", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Projeções").performClick()
+        rule.onAllNodesWithText("3.250,00", substring = true).assertCountEquals(1)
+    }
+
     @Test fun reviewIsReachableWithCaptureOff() {
-        rule.onNodeWithTag("dashboard-notification-review").performClick()
+        rule.onNodeWithTag("dashboard-notification-review").assertDoesNotExist()
+        rule.onNodeWithTag("open-notification-review").performClick()
         rule.onNodeWithText("Caixa de revisão").assertExists()
         rule.onNodeWithText("Captura desativada").assertExists()
         rule.onNodeWithText("Configurar captura").performClick()

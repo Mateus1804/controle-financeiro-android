@@ -12,7 +12,10 @@ object ForecastCalculator {
     fun report(dataset: ForecastDataset, period: BudgetPeriod, excluded: Set<Pair<String, String>> = emptySet()): ForecastReport {
         val overrides = dataset.overrides.associateBy { it.itemId to it.occurrenceKey }
         val lines = mutableListOf<ForecastLine>()
-        dataset.rules.groupBy { it.itemId }.forEach { (itemId, versions) ->
+        val salaryMonths = listOf(YearMonth.from(period.start), YearMonth.from(period.endExclusive.minusDays(1)))
+            .distinct().mapNotNull { month -> SalaryForecasts.forMonth(dataset, month)?.let { month to it } }.toMap()
+        val rules = dataset.rules.filterNot { SalaryForecasts.manages(it.itemId) }
+        rules.groupBy { it.itemId }.forEach { (itemId, versions) ->
             val ordered = versions.sortedBy { it.effectiveFrom }
             val candidates = linkedMapOf<String, Pair<ForecastRule, Occurrence>>()
             ordered.forEach { rule ->
@@ -65,6 +68,14 @@ object ForecastCalculator {
                         rule.statementKey, rule.statementTotal, rule)
                 }
             }
+        }
+        lines.removeAll { line ->
+            line.kind == ForecastKind.INCOME && line.category == Category.SALARY &&
+                YearMonth.from(line.date) in salaryMonths
+        }
+        salaryMonths.values.filter { it.startDate in period }.forEach { rule ->
+            lines += ForecastLine(rule.itemId, "once", rule.title, rule.startDate, rule.amountCents,
+                rule.kind, rule.category, rule.group, rule.frequency, false, false, true, "", false, rule)
         }
         val statements = lines.filter { it.included && it.statementTotal && it.statementKey.isNotBlank() }
             .map { it.statementKey to it.kind }.toSet()

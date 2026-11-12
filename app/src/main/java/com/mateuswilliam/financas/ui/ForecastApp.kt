@@ -47,7 +47,6 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val forecastMessage by model.message.collectAsStateWithLifecycle()
     val financeMessage by finance.message.collectAsStateWithLifecycle()
     val loadError by model.loadError.collectAsStateWithLifecycle()
-    val legacyIncome by model.legacyIncome.collectAsStateWithLifecycle()
     val oldState by finance.state.collectAsStateWithLifecycle()
     val staged by finance.stagedRestore.collectAsStateWithLifecycle()
     val busy = busyForecast || busyFinance
@@ -61,7 +60,6 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     var editKey by rememberSaveable { mutableStateOf<String?>(null) }
     var initialKind by rememberSaveable { mutableStateOf(ForecastKind.EXPENSE) }
     var template by rememberSaveable { mutableStateOf<String?>(null) }
-    var legacyMonth by rememberSaveable { mutableStateOf<String?>(null) }
     var dueDates by rememberSaveable { mutableStateOf(false) }
     var templates by rememberSaveable { mutableStateOf(false) }
     var cycleEditor by rememberSaveable { mutableStateOf(false) }
@@ -101,13 +99,9 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val asOf = remember(resumeCount, oldState.records) { System.currentTimeMillis() }
     val realized = remember(oldState.records, asOf) { oldState.records.filter { it.occurredAt <= asOf } }
     val duplicateIndex = remember(oldState.manualRecords) { DuplicateCandidates(oldState.manualRecords) }
-    val salaryReference = key(monthText) {
-        val reference by remember(month) { model.monthlyPlan(month) }.collectAsStateWithLifecycle(initialValue = null)
-        reference
-    }
-    val salarySummary = remember(oldState.records, data, month, zone, asOf, salaryReference) {
-        runCatching { SalarySummaries.month(oldState.records, data, month, zone, asOf, salaryReference?.incomeCents) }.getOrElse {
-            SalarySummaries.month(oldState.records, null, month, zone, asOf, salaryReference?.incomeCents)
+    val salarySummary = remember(oldState.records, data, month, zone, asOf) {
+        runCatching { SalarySummaries.month(oldState.records, data, month, zone, asOf) }.getOrElse {
+            SalarySummaries.month(oldState.records, null, month, zone, asOf)
         }
     }
     fun openActual(kind: Movement = Movement.EXPENSE, recordId: String? = null) {
@@ -116,8 +110,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     fun openReview(draft: com.mateuswilliam.financas.data.DraftEntity) {
         editingDraftId = draft.id; editingRecordId = null; draftRevision = draft.revision; recordEditor = true
     }
-    LaunchedEffect(incomingDraft, oldState.loaded, oldState.pending, busy, recordEditor, editor, backupDialog, staged) {
-        if (incomingDraft != null && oldState.loaded && !busy && !recordEditor && !editor && backupDialog == 0 && staged == null) {
+    LaunchedEffect(incomingDraft, oldState.loaded, oldState.pending, busy, recordEditor, editor, salaryEditor, backupDialog, staged) {
+        if (incomingDraft != null && oldState.loaded && !busy && !recordEditor && !editor && !salaryEditor && backupDialog == 0 && staged == null) {
             oldState.pending.firstOrNull { it.id == incomingDraft }?.let { tab = 5; openReview(it) }
             consumeDraft()
         }
@@ -175,9 +169,9 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         if (uri != null) { restoreUri = uri.toString(); backupDialog = 2 }
     }
     fun newItem(kind: ForecastKind, title: String? = null) {
-        editItem = null; editKey = null; legacyMonth = null; template = title; initialKind = kind; editor = true
+        editItem = null; editKey = null; template = title; initialKind = kind; editor = true
     }
-    fun edit(line: ForecastLine) { editItem = line.itemId; editKey = line.occurrenceKey; legacyMonth = null; template = null; editor = true }
+    fun edit(line: ForecastLine) { editItem = line.itemId; editKey = line.occurrenceKey; template = null; editor = true }
     fun showReserve(kind: ReserveEventKind, allocation: Boolean = false) { allocating = allocation; reserveKind = kind }
     fun select(date: LocalDate) { followingCurrent = false; browsing = date.toString() }
     BackHandler(tab >= 3 && !editor) { tab = 0 }
@@ -213,7 +207,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("rendly-greeting"), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                     IconButton({ finance.preferences.hideAmounts(!hidden) }) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
-                    if (tab != 0) IconButton({ tab = if (tab == 5) 0 else 5 }, Modifier.testTag("open-notification-review")) {
+                    IconButton({ tab = if (tab == 5) 0 else 5 }, Modifier.testTag("open-notification-review")) {
                         BadgedBox(badge = { if (oldState.pending.isNotEmpty()) Badge { Text(oldState.pending.size.toString()) } }) {
                             AppIcon(R.drawable.ic_pending, description = "Revisão de notificações")
                         }
@@ -252,21 +246,21 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     tab == 1 -> ForecastProjectionScreen(snapshot, period, simulation, hidden, busy,
                         onSimulate = { simulationEditor = true }, onDiscard = { simulation = null },
                         onAdopt = { simulation?.let { value -> model.saveRule(value) { simulation = null } } }, onOpen = { select(it.start); tab = 0 },
-                        legacyIncome = legacyIncome.filterNot { old -> snapshot.rules.any { it.legacySource == "monthly-reference:${old.month}" } },
-                        onReuse = { old -> legacyMonth = old.month; editItem = null; editKey = null; template = null; editor = true },
                         represented = represented)
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
                         item {
-                            val reviewLabel = if (oldState.pending.isEmpty()) "Revisar notificações"
-                                else "Revisar notificações (${oldState.pending.size})"
-                            FilledTonalButton({ tab = 5 }, Modifier.fillMaxWidth().testTag("dashboard-notification-review")) {
-                                AppIcon(R.drawable.ic_pending)
-                                Spacer(Modifier.width(8.dp))
-                                Text(reviewLabel)
+                            Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.medium)) {
+                                MonthPicker(month) { monthText = it.toString() }
+                                MonthlyResultCard(salarySummary, hidden) { salaryEditor = true }
                             }
                         }
-                        item { MonthPicker(month) { monthText = it.toString() } }
-                        item { MonthlyResultCard(salarySummary, hidden) { salaryEditor = true } }
+                        if (oldState.pending.isNotEmpty()) item {
+                            Button({ tab = 5 }, Modifier.fillMaxWidth().testTag("dashboard-notification-review")) {
+                                AppIcon(R.drawable.ic_pending)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Revisar notificações (${oldState.pending.size})")
+                            }
+                        }
                         item { TextButton({ expenseDimension = null; recordCategory = null; tab = 4 }) { Text("Ver extrato do mês") } }
                         item { ExpenseChart(realized, month, hidden) {
                             expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; recordCategory = null; tab = 4
@@ -295,10 +289,14 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             }
                             Text("O vencimento organiza as datas; seu orçamento não depende de confirmar pagamentos.", style = MaterialTheme.typography.bodySmall)
                         }
-                        forecastLineItems(report.lines, hidden, busy, ::edit, model::ignore, model::stop)
+                        forecastLineItems(report.lines, hidden, busy, onEdit = { line ->
+                            if (line.kind == ForecastKind.INCOME && line.category == Category.SALARY) {
+                                monthText = YearMonth.from(line.date).toString()
+                                salaryEditor = true
+                            } else edit(line)
+                        }, onIgnore = model::ignore, onStop = model::stop)
                         item { FinanceDisclosure("Histórico e dados anteriores", "forecast-legacy-data") {
-                            Text("As fontes antigas foram preservadas. Recorrências, parcelas e registros vinculados foram aproveitados uma única vez. Rendas de referência antigas precisam de revisão antes de virar previsão.", style = MaterialTheme.typography.bodySmall)
-                            TextButton({ tab = 1 }) { Text("Revisar rendas de referência antigas") }
+                            Text("As fontes antigas foram preservadas. Recorrências, parcelas e registros vinculados foram aproveitados uma única vez.", style = MaterialTheme.typography.bodySmall)
                             TextButton({ tab = 4 }) { Text("Consultar lançamentos anteriores") }
                         } }
                     }
@@ -307,10 +305,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     if (salaryEditor) key(monthText) {
-        SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { salaryEditor = false }) { cents ->
-            finance.saveMonthlyIncome(MonthlyIncomePlan(month, cents, salaryReference?.healthyLimitBasisPoints ?: 3000)) {
-                salaryEditor = false; model.refresh()
-            }
+        SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { salaryEditor = false }) { cents, repeat ->
+            model.saveSalary(month, cents, repeat) { salaryEditor = false }
         }
     }
     val draft = oldState.pending.firstOrNull { it.id == editingDraftId }
@@ -353,13 +349,11 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             }
         }, confirmButton = { TextButton({ dueDates = false }) { Text("Fechar") } })
     val selectedRule = snapshot?.rules?.filter { it.itemId == editItem }?.maxByOrNull { it.effectiveFrom }
-    val oldIncome = legacyIncome.firstOrNull { it.month == legacyMonth }
-    val referenceRule = oldIncome?.let { ForecastRule("monthly-reference:${it.month}", period.start, "Renda anterior · revisar", ForecastKind.INCOME,
-        it.incomeCents, Category.OTHER_INCOME, ForecastFrequency.ONCE, period.start, legacySource = "monthly-reference:${it.month}") }
-    if (editor && snapshot != null) key(editItem, editKey, template, legacyMonth, initialKind) {
-        ForecastEditor(rule = selectedLine?.rule ?: selectedRule ?: referenceRule, line = selectedLine, period = period, busy = busy, hidden = hidden,
+    if (editor && snapshot != null) key(editItem, editKey, template, initialKind) {
+        ForecastEditor(rule = selectedLine?.rule ?: selectedRule, line = selectedLine, period = period, busy = busy, hidden = hidden,
             onDismiss = { editor = false }, onSaveRule = { model.saveRule(it) { editor = false } }, onSaveOverride = { model.saveOverride(it) { editor = false } },
             initialKind = initialKind, initialFrequency = if (initialKind == ForecastKind.EXPENSE && template == null) ForecastFrequency.ONCE else ForecastFrequency.MONTHLY, initialTitle = template.orEmpty(), initialCategory = fixedExpenseTemplates.firstOrNull { it.title == template }?.category,
+            allowNewSalary = false,
             knownStatements = snapshot.rules.map { it.statementKey }.filter { it.isNotBlank() }.distinct(),
             existingOverride = snapshot.overrides.firstOrNull { it.itemId == selectedLine?.itemId && it.occurrenceKey == selectedLine?.occurrenceKey })
     }

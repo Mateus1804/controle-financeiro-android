@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
-import com.mateuswilliam.financas.data.MonthlyPlanEntity
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -73,7 +72,6 @@ internal fun ReserveGoalEditor(existing: Long?, busy: Boolean, hidden: Boolean, 
 @Composable
 internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPeriod, simulation: ForecastRule?, hidden: Boolean, busy: Boolean,
     onSimulate: () -> Unit, onDiscard: () -> Unit, onAdopt: () -> Unit, onOpen: (BudgetPeriod) -> Unit,
-    legacyIncome: List<MonthlyPlanEntity>, onReuse: (MonthlyPlanEntity) -> Unit,
     represented: Set<Pair<String, String>> = emptySet()) {
     val periods = remember(data.cycleRules, selected) {
         buildList { var next = selected; repeat(6) { add(next); next = CycleCalendar.periodContaining(next.endExclusive, data.cycleRules) } }
@@ -111,15 +109,5 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
                 }
             }
         } }
-        if (legacyIncome.isNotEmpty()) item {
-            FinanceDisclosure("Rendas de referência antigas", "forecast-legacy-income") {
-                Text("Valores preservados do cadastro anterior. Confira se o salário já está previsto antes de reaproveitar uma referência. Nenhuma delas foi somada automaticamente.", style = MaterialTheme.typography.bodySmall)
-                legacyIncome.sortedByDescending { it.month }.forEach { old ->
-                    Text("Referência de ${old.month}", style = MaterialTheme.typography.titleSmall)
-                    Amount(old.incomeCents, hidden)
-                    TextButton({ onReuse(old) }, enabled = !busy) { Text("Revisar como previsão única") }
-                }
-            }
-        }
     }
 }

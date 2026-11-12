@@ -50,9 +50,9 @@ class ForecastJourneyTest {
             Category.FOOD, ForecastFrequency.MONTHLY, date, cycleAnchored = true, group = ForecastGroup.VARIABLE, estimated = true))
     }
 
-    @Test fun salaryRegisteredOnceFeedsAllExpensesAndOneCycleEditPreservesFuture() {
+    @Test fun recurringIncomeFeedsAllExpensesAndOneCycleEditPreservesFuture() {
         clickTag("forecast-add-income")
-        rule.onNodeWithTag("forecast-title").performTextInput("Salário")
+        rule.onNodeWithTag("forecast-title").performTextInput("Renda extra")
         rule.onNodeWithTag("forecast-amount").performScrollTo().performTextInput("300000")
         androidx.test.espresso.Espresso.closeSoftKeyboard(); clickTag("forecast-save")
         waitRules(1); rule.dismissFeedback("Previsão salva")

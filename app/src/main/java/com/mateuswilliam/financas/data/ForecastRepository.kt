@@ -6,12 +6,13 @@ import com.mateuswilliam.financas.core.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import java.time.LocalDate
+import java.time.YearMonth
 
 /** Every emission and validation reads the five tables in a single Room transaction. */
 class ForecastRepository(private val database:FinanceDatabase) {
     private val dao = database.financeDao()
     val dataset:Flow<ForecastDataset> = callbackFlow {
-        val observer = object:InvalidationTracker.Observer("forecast_rules","forecast_overrides","cycle_rules","reserve_events","forecast_meta","recurring_months","occurrences","commitments") {
+        val observer = object:InvalidationTracker.Observer("forecast_rules","forecast_overrides","cycle_rules","reserve_events","forecast_meta","recurring_months","occurrences","commitments","monthly_plans") {
             override fun onInvalidated(tables:Set<String>) { trySend(Unit) }
         }
         database.invalidationTracker.addObserver(observer)
@@ -21,7 +22,8 @@ class ForecastRepository(private val database:FinanceDatabase) {
 
     private suspend fun readDataset() = ForecastDataset(dao.allForecastRules().map { it.model() },
         dao.allForecastOverrides().map { it.model() },dao.allCycleRules().map { it.model() },
-        dao.allReserveEvents().map { it.model() },dao.allForecastMeta().firstOrNull { it.key=="reserveGoal" }?.value?.toLong(), readRecordLinks())
+        dao.allReserveEvents().map { it.model() },dao.allForecastMeta().firstOrNull { it.key=="reserveGoal" }?.value?.toLong(), readRecordLinks(),
+        dao.allMonthlyPlans().filter { it.incomeCents > 0 }.associate { YearMonth.parse(it.month) to it.incomeCents })
 
     // These keys match the importer. Links can span months; a payment is counted on its own date.
     private suspend fun readRecordLinks(): Map<Pair<String, String>, Set<String>> {
@@ -68,6 +70,15 @@ class ForecastRepository(private val database:FinanceDatabase) {
         require(ForecastValidation.error(rule)==null) { ForecastValidation.error(rule) ?: "Previsão inválida." }
         if(replaceFuture) dao.deleteFutureForecastRules(rule.itemId,rule.effectiveFrom.toString())
         dao.upsertForecastRule(ForecastRuleEntity.from(rule))
+    }
+    suspend fun saveSalary(month: YearMonth, cents: Long, repeat: Boolean) = database.withTransaction {
+        val rule = SalaryForecasts.rule(month, cents, repeat)
+        saveRule(rule, replaceFuture = repeat)
+        // Changing the series from this month also updates an existing exception for this month.
+        val monthRule = SalaryForecasts.rule(month, cents, repeat = false)
+        if (repeat && dao.allForecastRules().any { it.itemId == monthRule.itemId }) {
+            saveRule(monthRule, replaceFuture = false)
+        }
     }
     suspend fun saveOverride(value:ForecastOverride) = database.withTransaction {
         require(dao.allForecastRules().any { it.itemId==value.itemId }) { "Previsão não encontrada." }
