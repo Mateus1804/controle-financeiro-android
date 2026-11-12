@@ -58,9 +58,7 @@ internal fun MonthlyResultCard(summary: SalarySummary, hidden: Boolean, onSalary
                         SalaryLine("Sobra estimada no fim do mês", projected, hidden, Modifier.testTag("salary-projected"))
                     }
                 }
-                if (summary.isEstimatedSalary) {
-                    TextButton(onSalary, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Editar salário do mês") }
-                }
+                TextButton(onSalary, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Editar salário previsto") }
             }
         }
     }
@@ -76,24 +74,27 @@ private fun SalaryLine(label: String, cents: Long, hidden: Boolean, amountModifi
 
 @Composable
 internal fun SalaryMonthEditor(month: YearMonth, current: Long?, hidden: Boolean, busy: Boolean,
-    onDismiss: () -> Unit, onSave: (Long) -> Unit) {
+    onDismiss: () -> Unit, onSave: (Long, Boolean) -> Unit) {
     val amount = rememberTextFieldState(current?.let(MoneyInput::fromCents).orEmpty())
+    var repeat by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var attempted by remember { mutableStateOf(false) }
     var invalid by remember { mutableStateOf(false) }
     val cents = if (invalid) null else MoneyInput.cents(amount.text.toString())
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() },
         title = { DialogSystemBars(); Text("Salário líquido do mês") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Valor líquido usado no resultado de $month.")
+            Text("Salário de referência de $month. O valor recebido tem prioridade no resultado do mês.")
             PrivateValueGate(hidden, "Mostrar salário para edição") {
                 MoneyAmountField(amount, attempted, !busy, label = "Salário líquido (R$)", tag = "salary-month-amount",
                     onInvalidInput = { invalid = it })
             }
+            ChoiceField("Aplicar alteração", repeat, listOf(false, true),
+                { if (it) "Deste mês em diante" else "Só neste mês" }) { if (!busy) repeat = it }
             if (attempted && (cents == null || cents <= 0)) Text("Informe um valor maior que zero.", color = MaterialTheme.colorScheme.error)
         } },
         confirmButton = { TextButton({
             attempted = true
-            cents?.takeIf { it > 0 }?.let(onSave)
+            cents?.takeIf { it > 0 }?.let { onSave(it, repeat) }
         }, enabled = !busy) { Text("Salvar") } },
         dismissButton = { TextButton(onDismiss, enabled = !busy) { Text("Cancelar") } })
 }

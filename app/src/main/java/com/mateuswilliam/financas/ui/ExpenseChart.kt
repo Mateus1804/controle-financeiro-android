@@ -79,8 +79,8 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (legend.hasOthers) TextButton(onClick = { allGroups = true }, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Ver todos os ${report.groups.size} grupos") }
             }
-            FinanceDisclosure("Sobre os estornos do período", "expense-refunds") {
-                Text("Estornos do período: ${if (hidden) "••••" else Money.format(report.refunds)}. Eles reduzem as despesas líquidas do resumo.",
+            if (report.refunds > 0) Column(Modifier.testTag("expense-refunds")) {
+                Text("Estornos do período: ${if (hidden) "••••" else Money.format(report.refunds)}. O gráfico mostra os gastos brutos. O resumo desconta os estornos.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

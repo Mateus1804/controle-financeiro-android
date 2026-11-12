@@ -30,12 +30,15 @@ internal fun ForecastEditor(
     initialCategory: Category? = null, initialFrequency: ForecastFrequency = ForecastFrequency.MONTHLY,
     knownStatements: List<String> = emptyList(),
     existingOverride: ForecastOverride? = null,
+    allowNewSalary: Boolean = true,
 ) {
     val source = rule ?: line?.rule
+    val allowSalary = allowNewSalary || source?.category == Category.SALARY || line?.category == Category.SALARY
+    val incomeCategory = if (allowSalary) Category.SALARY else Category.OTHER_INCOME
     val id = rememberSaveable { source?.itemId ?: UUID.randomUUID().toString() }
     var title by rememberSaveable { mutableStateOf(line?.title ?: source?.title ?: initialTitle) }
     var kind by rememberSaveable { mutableStateOf(source?.kind ?: initialKind) }
-    var category by rememberSaveable { mutableStateOf(line?.category ?: source?.category ?: initialCategory ?: if (initialKind == ForecastKind.INCOME) Category.SALARY else Category.OTHER) }
+    var category by rememberSaveable { mutableStateOf(line?.category ?: source?.category ?: initialCategory ?: if (initialKind == ForecastKind.INCOME) incomeCategory else Category.OTHER) }
     var frequency by rememberSaveable { mutableStateOf(source?.frequency ?: initialFrequency) }
     var group by rememberSaveable { mutableStateOf(source?.group ?: ForecastGroup.COMMITMENT) }
     var estimated by rememberSaveable { mutableStateOf(source?.estimated ?: false) }
@@ -85,9 +88,9 @@ internal fun ForecastEditor(
             }
             if (signedRefund) Text("Estorno importado: o ajuste mantém sua natureza e seu sinal negativo.", style = MaterialTheme.typography.bodySmall)
             if (!scoped && !signedRefund) ChoiceField("Tipo", kind, ForecastKind.entries, { if (it == ForecastKind.INCOME) "Receita" else "Despesa" }) {
-                if (!busy) { kind = it; category = if (it == ForecastKind.INCOME) Category.SALARY else Category.OTHER }
+                if (!busy) { kind = it; category = if (it == ForecastKind.INCOME) incomeCategory else Category.OTHER }
             }
-            ChoiceField("Categoria", category, categoriesFor(if (kind == ForecastKind.INCOME) Movement.INCOME else Movement.EXPENSE), { it.label }) { if (!busy) category = it }
+            ChoiceField("Categoria", category, categoriesFor(if (kind == ForecastKind.INCOME) Movement.INCOME else Movement.EXPENSE).filter { allowSalary || it != Category.SALARY }, { it.label }) { if (!busy) category = it }
             if (!scoped) ChoiceField("Frequência", frequency, ForecastFrequency.entries.filter { kind == ForecastKind.EXPENSE || it != ForecastFrequency.INSTALLMENTS }, {
                 when (it) { ForecastFrequency.ONCE -> "Uma vez"; ForecastFrequency.MONTHLY -> "Mensal"; ForecastFrequency.INSTALLMENTS -> "Parcelada" }
             }) { if (!busy) frequency = it }
