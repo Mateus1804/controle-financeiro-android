@@ -60,10 +60,8 @@ class ForecastJourneyTest {
         assertEquals(ForecastFrequency.MONTHLY, salary.frequency)
         assertEquals("", salary.account)
         runBlocking { seed(includeSalary = false) }; waitRules(4)
-        rule.waitUntil(10000) {
-            try { scroll("forecast-summary"); rule.onNodeWithText("73,33% da renda em gastos").assertExists(); true }
-            catch (_: AssertionError) { false }
-        }
+        scroll("salary-month-summary")
+        rule.onNodeWithText("Resultado do mês").assertExists()
         val base = ForecastCalculator.report(current(), period())
         assertEquals(220000L, base.totalExpensesCents); assertEquals(80000L, base.marginCents)
         val line = base.lines.single { it.kind == ForecastKind.INCOME }

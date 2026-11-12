@@ -90,7 +90,7 @@ Os [registros de qualidade](docs/qualidade.md) distinguem validação automatiza
 
 Rendly utiliza uma paleta própria em creme, menta e teal, com temas Sistema, Claro e Escuro. A aparência acompanha o aparelho quando Sistema está selecionado; cores dinâmicas não substituem a identidade.
 
-Em Ajustes, **Como você quer ser chamado?** permite informar, editar ou apagar um nome opcional de até 40 caracteres. A saudação é atualizada imediatamente. Essa preferência fica no aparelho e não integra o backup. Resultado do mês corresponde à diferença entre receitas e despesas previstas do ciclo selecionado, sem representar saldo bancário.
+Em Ajustes, **Como você quer ser chamado?** permite informar, editar ou apagar um nome opcional de até 40 caracteres. A saudação é atualizada imediatamente. Essa preferência fica no aparelho e não integra o backup. O cartão **Resultado do mês** usa o salário líquido do mês selecionado para mostrar a sobra após os gastos registrados e a estimativa após as despesas previstas pendentes. **Revisar notificações** abre as sugestões para conferência e confirmação antes de entrarem no extrato.
 
 A [renomeação do repositório](docs/renomeacao-rendly.md) está preparada para uma etapa posterior à revisão e autorização. Os identificadores Android e os dados existentes permanecem compatíveis.
 

@@ -32,6 +32,7 @@ object ReviewNotifications {
             .setContentTitle("Nova notificação para revisar")
             .setContentText("Confira os dados antes de registrar uma movimentação.")
             .setContentIntent(pending)
+            .addAction(R.drawable.ic_pending, "Revisar lançamento", pending)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
