@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
@@ -13,33 +15,66 @@ import java.time.YearMonth
 @Composable
 internal fun SalaryMonthCard(summary: SalarySummary, hidden: Boolean, onSalary: () -> Unit) {
     val salaryCents = summary.salaryCents
-    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
+    val remaining = summary.remainingCents
+    val exceeded = remaining != null && remaining < 0
+    val accent = if (exceeded) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(Modifier.fillMaxWidth().testTag("salary-month-summary").padding(FinanceSpacing.card),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.medium)) {
             SectionTitle("Meu salário no mês", "Gastos realizados e sobra estimada")
-            if (salaryCents == null) {
-                Text("Informe o salário líquido do mês para calcular a sobra e o percentual utilizado.")
+            if (salaryCents == null || remaining == null) {
+                // Sem salário: o gasto continua visível e a ação para informá-lo fica em destaque.
+                Text("Gastos realizados (líquidos)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Amount(summary.spentCents, hidden, Modifier.testTag("salary-spent"), size = 32)
+                Text("Informe o salário líquido do mês para calcular a sobra e o percentual utilizado.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FilledTonalButton(onSalary, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Informar salário líquido") }
             } else {
-                SalaryMetric(if (summary.isEstimatedSalary) "Salário do mês · referência" else "Salário do mês · registrado",
-                    salaryCents, hidden)
-                summary.usedPercentage?.let {
-                    Text(if (hidden) "Salário utilizado: ••••" else "Salário utilizado: ${it.toPlainString().replace('.', ',')}%")
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(if (exceeded) "Gastos acima do salário" else "Sobra até agora",
+                        style = MaterialTheme.typography.labelLarge, color = accent)
+                    CompositionLocalProvider(LocalContentColor provides accent) {
+                        Amount(if (exceeded) -remaining else remaining, hidden, Modifier.testTag("salary-remaining"), size = 32)
+                    }
+                    Text("Referência de orçamento, não é o saldo da conta.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                val percentage = summary.usedPercentage
+                if (percentage != null && !hidden) {
+                    // A barra limita o preenchimento a 100%, mas o texto mantém o percentual real.
+                    LinearProgressIndicator(progress = { (percentage.toFloat() / 100f).coerceIn(0f, 1f) },
+                        Modifier.fillMaxWidth().height(8.dp).clearAndSetSemantics { },
+                        color = if (exceeded) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh, gapSize = 0.dp, drawStopIndicator = {})
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SalaryLine(if (summary.isEstimatedSalary) "Salário líquido · referência" else "Salário líquido · registrado", salaryCents, hidden)
+                    SalaryLine("Gastos realizados (líquidos)", summary.spentCents, hidden)
+                    Text(if (hidden) "Salário utilizado: ••••" else "Salário utilizado: ${percentage?.toPlainString()?.replace('.', ',')}%",
+                        style = MaterialTheme.typography.bodyMedium)
+                }
+                summary.projectedRemainingCents?.let { projected ->
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Estimativa para o fim do mês", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        SalaryLine(if (projected < 0) "Falta prevista · estimativa" else "Sobra prevista · estimativa",
+                            if (projected < 0) -projected else projected, hidden)
+                        Text("Considera previsões pendentes; não é valor realizado.", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                TextButton(onSalary, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Informar salário líquido") }
             }
-            SalaryMetric("Gastos realizados (líquidos)", summary.spentCents, hidden)
-            summary.remainingCents?.let { SalaryMetric(if (it < 0) "Gastos acima do salário" else "Sobra até agora", if (it < 0) -it else it, hidden) }
-            summary.projectedRemainingCents?.let { SalaryMetric(
-                if (it < 0) "Falta prevista no fim do mês · estimativa" else "Sobra prevista no fim do mês · estimativa",
-                if (it < 0) -it else it, hidden) }
-            TextButton(onSalary, Modifier.heightIn(min = 48.dp)) { Text("Informar salário líquido") }
         }
     }
 }
 
 @Composable
-private fun SalaryMetric(label: String, cents: Long, hidden: Boolean) {
-    Text(label, style = MaterialTheme.typography.bodyMedium)
-    Amount(cents, hidden)
+private fun SalaryLine(label: String, cents: Long, hidden: Boolean) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Amount(cents, hidden, Modifier.widthIn(max = 160.dp), size = 16)
+    }
 }
 
 @Composable

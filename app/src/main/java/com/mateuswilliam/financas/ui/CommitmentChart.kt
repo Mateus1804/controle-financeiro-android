@@ -51,7 +51,7 @@ internal fun MonthlyCommitmentCard(
     ) {
         Column(Modifier.padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Comprometimento da renda", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-            Text("Parcelas e despesas fixas do mês, previstas ou já registradas.",
+            Text("Parcelas e despesas fixas do mês, previstas ou já registradas. Os percentuais usam a renda como base, não o total gasto.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             Text("A renda informada aqui é uma referência de análise. Para entrar no resultado e no saldo, cadastre o recebimento em Movimentações.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)

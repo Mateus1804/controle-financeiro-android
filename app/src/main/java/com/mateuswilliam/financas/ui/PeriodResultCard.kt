@@ -14,10 +14,13 @@ internal fun PeriodResultCard(projection: PeriodProjection, hidden: Boolean, for
         color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
         Column(Modifier.padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Resultado realizado do período", style = MaterialTheme.typography.titleSmall)
-            Amount(projection.realized.result, hidden, size = 28)
-            Text(if (hidden) "Receitas e despesas ocultas" else
-                "Receitas líquidas: ${com.mateuswilliam.financas.core.Money.format(projection.realized.income)} · Despesas líquidas: ${com.mateuswilliam.financas.core.Money.format(projection.realized.expenses)}",
-                style = MaterialTheme.typography.bodySmall)
+            Amount(projection.realized.result, hidden, size = 36)
+            Text("Receitas menos despesas do mês. Não é o saldo das contas.", style = MaterialTheme.typography.bodySmall)
+            if (hidden) Text("Receitas e despesas ocultas", style = MaterialTheme.typography.bodySmall)
+            else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.card)) {
+                PeriodFigure("Receitas líquidas", projection.realized.income, Modifier.weight(1f))
+                PeriodFigure("Despesas líquidas", projection.realized.expenses, Modifier.weight(1f))
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
             Text("Resultado projetado do período", style = MaterialTheme.typography.titleSmall)
             if (forecastsLoaded) {
@@ -33,5 +36,13 @@ internal fun PeriodResultCard(projection: PeriodProjection, hidden: Boolean, for
                     style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+@Composable
+private fun PeriodFigure(label: String, cents: Long, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
+        Amount(cents, false, size = 18)
     }
 }
