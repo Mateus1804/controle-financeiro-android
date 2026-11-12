@@ -110,6 +110,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             SalarySummaries.month(oldState.records, null, month, zone, asOf, salaryReference?.incomeCents)
         }
     }
+    val monthComparison = remember(realized, month, zone) { MonthComparisons.compare(realized, month, LocalDate.now(), zone) }
     val knownBalances = remember(oldState.accountBalances) { oldState.accountBalances.filter { !it.archived && it.balanceCents != null } }
     val paydayBudget = remember(data, oldState.records, oldState.recurring, knownBalances, asOf) {
         runCatching {
@@ -283,6 +284,9 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         item { TextButton({ expenseDimension = null; recordCategory = null; tab = 4 }) { Text("Ver extrato do mês") } }
                         item { ExpenseChart(realized, month, hidden) {
                             expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; recordCategory = null; tab = 4
+                        } }
+                        item { MonthComparisonCard(monthComparison, hidden) {
+                            expenseDimension = null; recordCategory = it; tab = 4
                         } }
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
                         item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { followingCurrent = true; browsing = today.toString() }, { cycleEditor = true }) }
