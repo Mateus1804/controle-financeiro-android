@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.ForecastViewModel
 import com.mateuswilliam.financas.R
@@ -92,6 +93,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val apps by finance.apps.collectAsStateWithLifecycle()
     val loadingApps by finance.loadingApps.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val merchantStore = (context.applicationContext as FinanceApplication).merchantCategories
     val hasAccess = remember(resumeCount, connected) { hasCaptureAccess(context) }
     val canAlert = remember(resumeCount, permissionVersion) { NotificationManagerCompat.from(context).areNotificationsEnabled() &&
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
@@ -129,6 +131,14 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     // A fila da sessão é fixada ao abrir a primeira pendência; "Revisar próxima" continua nela.
     var reviewIds by remember { mutableStateOf(emptyList<String>()) }
     var reviewAfter by rememberSaveable { mutableStateOf<String?>(null) }
+    fun rememberMerchantCategory(source: com.mateuswilliam.financas.data.DraftEntity, confirmed: Category) {
+        val found = source.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } ?: return
+        when (val change = MerchantCategoryPolicy.change(source.category, confirmed, merchantStore.get(found.key))) {
+            is MerchantCategoryPolicy.Change.Remember -> merchantStore.remember(found.key, change.category)
+            MerchantCategoryPolicy.Change.Forget -> merchantStore.forget(found.key)
+            MerchantCategoryPolicy.Change.None -> Unit
+        }
+    }
     fun openReview(draft: com.mateuswilliam.financas.data.DraftEntity, continuing: Boolean = false) {
         if (!continuing) reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, draft.id)
         reviewAfter = null
@@ -336,15 +346,20 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     val draft = oldState.pending.firstOrNull { it.id == editingDraftId }
+    val merchant = remember(draft?.id) { draft?.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } }
     val record = oldState.records.firstOrNull { it.id == editingRecordId }
     if (recordEditor && (editingDraftId == null || draft != null) && (editingRecordId == null || record != null)) key(editingDraftId, editingRecordId, actualKind) {
         RecordEditor(draft, record, busy, onDismiss = { recordEditor = false },
-            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = draftRevision) { recordEditor = false; if (draft != null) reviewAfter = draft.id } },
+            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = draftRevision) {
+                recordEditor = false
+                if (draft != null) { reviewAfter = draft.id; rememberMerchantCategory(draft, value.category) }
+            } },
             onIgnore = draft?.let { { finance.dismiss(it.id) { recordEditor = false; reviewAfter = it.id } } },
             onDelete = record?.let { { finance.delete(it.id) } },
             accounts = oldState.accounts, lastOrigin = settings.lastOrigin, onAddAccount = finance::addAccount,
             initialMovement = actualKind, hideAmounts = hidden, duplicateIndex = duplicateIndex,
             balances = oldState.accountBalances, history = oldState.records,
+            rememberedCategory = merchant?.let { merchantStore.get(it.key) }, merchantLabel = merchant?.label,
             notificationChanged = draft != null && draft.revision != draftRevision,
             onAcceptUpdate = { draftRevision = draft?.revision },
             realizedOnly = true, onOpenExpenseForecast = if (draft == null && record == null && snapshot != null) {
