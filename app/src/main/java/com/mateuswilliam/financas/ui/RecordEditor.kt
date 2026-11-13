@@ -68,6 +68,8 @@ fun RecordEditor(
     initialRecurring: Boolean = false,
     realizedOnly: Boolean = false,
     onOpenExpenseForecast: (() -> Unit)? = null,
+    rememberedCategory: Category? = null,
+    merchantLabel: String? = null,
 ) {
     val initial = existing ?: preset ?: recurring?.proposedRecord(recurring.id, ZoneId.systemDefault())
     val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: initialDate?.atTime(java.time.LocalTime.now())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis() }
@@ -88,7 +90,7 @@ fun RecordEditor(
     var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200) ?: initialDescription) }
     var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: initialMovement) }
     var method by rememberSaveable { mutableStateOf(initial?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
-    var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.let { source -> source.category.takeIf { it in categoriesFor(source.movement) } }
+    var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.let { source -> (rememberedCategory ?: source.category).takeIf { it in categoriesFor(source.movement) } }
         ?: initialCategory ?: if ((draft?.movement ?: initialMovement) == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER) }
     var categoryEdited by rememberSaveable { mutableStateOf(false) }
     var accountEdited by rememberSaveable { mutableStateOf(false) }
@@ -144,7 +146,7 @@ fun RecordEditor(
         Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).imePadding().then(scroll)) {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(when {
-                    recurring != null -> if (recurrenceOnlyMonth) "Editar só este mês" else "Editar desta e futuras"
+                    recurring != null -> if (recurrenceOnlyMonth) "Alterar só este mês" else "Aplicar deste mês em diante"
                     draft != null -> "Conferir movimentação"
                     installmentConfirmation -> "Conferir parcela"
                     preset != null -> "Conferir previsão"
@@ -252,8 +254,13 @@ fun RecordEditor(
                     if (movement == Movement.REFUND && originalRecordId != null) {
                         Text("Categoria do lançamento original: ${category.label}", style = MaterialTheme.typography.bodyMedium)
                         Text("Remova o vínculo para editar a categoria.", style = MaterialTheme.typography.bodySmall)
-                    } else ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category,
-                        categoryOptions, { it.label }) { category = it; categoryEdited = true }
+                    } else {
+                        ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category,
+                            categoryOptions, { it.label }) { category = it; categoryEdited = true }
+                        if (draft != null && rememberedCategory != null && merchantLabel != null && !categoryEdited) Text(
+                            "Categoria lembrada para ${privateDisplayText(merchantLabel, hideAmounts)}. Você pode alterá-la antes de confirmar.",
+                            Modifier.testTag("remembered-category"), style = MaterialTheme.typography.bodySmall)
+                    }
                 } else Text("Transferência entre minhas contas", style = MaterialTheme.typography.titleSmall)
                 AccountPickerField("Conta ou banco de origem", bank, activeAccounts, { bank = it; accountEdited = true }, onAddAccount, hidden = hideAmounts)
                 if (movement == Movement.TRANSFER) {

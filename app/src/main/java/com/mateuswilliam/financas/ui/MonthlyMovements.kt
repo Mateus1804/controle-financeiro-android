@@ -96,11 +96,11 @@ private fun MonthlyMovementRow(item: MonthlyMovement, hidden: Boolean, busy: Boo
             val pending = recurrence.status == RecurringMonthStatus.PENDING
             if (pending && recurrence.plan.active) add(FinanceAction(if (item.value.movement == Movement.INCOME) "Registrar recebimento" else "Registrar pagamento",
                 { actions.recurring(recurrence, RecurringAction.CONFIRM) }, "confirm-recurring-${recurrence.recurringId}"))
-            if (pending) add(FinanceAction("Editar só este mês", { actions.recurring(recurrence, RecurringAction.EDIT_MONTH) }, "edit-month-${recurrence.recurringId}"))
-            add(FinanceAction("Alterar desta e futuras", { actions.recurring(recurrence, RecurringAction.EDIT_FUTURE) }, "edit-recurring-${recurrence.recurringId}"))
+            if (pending) add(FinanceAction("Alterar só este mês", { actions.recurring(recurrence, RecurringAction.EDIT_MONTH) }, "edit-month-${recurrence.recurringId}"))
+            add(FinanceAction("Aplicar deste mês em diante", { actions.recurring(recurrence, RecurringAction.EDIT_FUTURE) }, "edit-recurring-${recurrence.recurringId}"))
             if (pending) {
                 add(FinanceAction(if (recurrence.plan.active) "Pausar desta e futuras" else "Retomar desta e futuras", { actions.recurring(recurrence, RecurringAction.PAUSE) }, "active-recurring-${recurrence.recurringId}"))
-                if (recurrence.plan.active) add(FinanceAction("Ignorar este mês", { actions.recurring(recurrence, RecurringAction.SKIP) }, "skip-${recurrence.recurringId}"))
+                if (recurrence.plan.active) add(FinanceAction("Pular este mês", { actions.recurring(recurrence, RecurringAction.SKIP) }, "skip-${recurrence.recurringId}"))
             }
             if (pending && recurrence.plan.movement == Movement.EXPENSE) add(FinanceAction(if (recurrence.fixedExpense) "Retirar de despesas fixas" else "Considerar despesa fixa",
                 { actions.recurring(recurrence, RecurringAction.FIXED) }, "fixed-${recurrence.recurringId}"))

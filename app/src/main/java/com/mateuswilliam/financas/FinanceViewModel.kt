@@ -109,6 +109,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun clear() = action {
         val preferencesCleared = repository.clear()
         ReviewNotifications.cancelAll(app)
+        app.merchantCategories.clear()
         if (preferencesCleared) "Dados apagados e captura desativada."
         else "Os dados financeiros foram apagados, mas as preferências não puderam ser limpas. Captura e lembretes permanecem pausados. Confira o armazenamento e tente novamente."
     }

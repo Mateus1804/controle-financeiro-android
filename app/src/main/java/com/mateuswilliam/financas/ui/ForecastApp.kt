@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.ForecastViewModel
 import com.mateuswilliam.financas.R
@@ -92,6 +93,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val apps by finance.apps.collectAsStateWithLifecycle()
     val loadingApps by finance.loadingApps.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val merchantStore = (context.applicationContext as FinanceApplication).merchantCategories
     val hasAccess = remember(resumeCount, connected) { hasCaptureAccess(context) }
     val canAlert = remember(resumeCount, permissionVersion) { NotificationManagerCompat.from(context).areNotificationsEnabled() &&
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
@@ -110,10 +112,36 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             SalarySummaries.month(oldState.records, null, month, zone, asOf, salaryReference?.incomeCents)
         }
     }
+    val monthComparison = remember(realized, month, zone) { MonthComparisons.compare(realized, month, LocalDate.now(), zone) }
+    val knownBalances = remember(oldState.accountBalances) { oldState.accountBalances.filter { !it.archived && it.balanceCents != null } }
+    val paydayBudget = remember(data, oldState.records, oldState.recurring, knownBalances, asOf) {
+        runCatching {
+            val todayDate = LocalDate.now()
+            val lines = data?.let { PaydayBudgets.upcomingLines(it, SalarySummaries.represented(oldState.records, it, asOf), todayDate) }.orEmpty()
+            val recurringDates = oldState.recurring.filter { it.active && it.movement == Movement.INCOME && it.category == Category.SALARY }
+                .mapNotNull { runCatching { LocalDate.parse(it.nextDate) }.getOrNull() }
+            PaydayBudgets.nextPayday(lines, recurringDates, todayDate)?.let { payday ->
+                PaydayBudgets.compute(knownBalances.sumOf { it.balanceCents ?: 0L }, lines, data?.reserveGoalCents ?: 0L, todayDate, payday)
+            }
+        }.getOrNull()
+    }
     fun openActual(kind: Movement = Movement.EXPENSE, recordId: String? = null) {
         actualKind = kind; editingRecordId = recordId; editingDraftId = null; draftRevision = null; recordEditor = true
     }
-    fun openReview(draft: com.mateuswilliam.financas.data.DraftEntity) {
+    // A fila da sessão é fixada ao abrir a primeira pendência; "Revisar próxima" continua nela.
+    var reviewIds by remember { mutableStateOf(emptyList<String>()) }
+    var reviewAfter by rememberSaveable { mutableStateOf<String?>(null) }
+    fun rememberMerchantCategory(source: com.mateuswilliam.financas.data.DraftEntity, confirmed: Category) {
+        val found = source.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } ?: return
+        when (val change = MerchantCategoryPolicy.change(source.category, confirmed, merchantStore.get(found.key))) {
+            is MerchantCategoryPolicy.Change.Remember -> merchantStore.remember(found.key, change.category)
+            MerchantCategoryPolicy.Change.Forget -> merchantStore.forget(found.key)
+            MerchantCategoryPolicy.Change.None -> Unit
+        }
+    }
+    fun openReview(draft: com.mateuswilliam.financas.data.DraftEntity, continuing: Boolean = false) {
+        if (!continuing) reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, draft.id)
+        reviewAfter = null
         editingDraftId = draft.id; editingRecordId = null; draftRevision = draft.revision; recordEditor = true
     }
     LaunchedEffect(incomingDraft, oldState.loaded, oldState.pending, busy, recordEditor, editor, backupDialog, staged) {
@@ -224,7 +252,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     tab == 5 -> Column {
                         TextButton({ tab = 3 }, Modifier.padding(horizontal = FinanceSpacing.page)) { Text("Configurar captura") }
                         Box(Modifier.weight(1f)) {
-                            PendingScreen(oldState.pending, hidden, ::openReview, { finance.dismiss(it) }, busy, captureActive)
+                            PendingScreen(oldState.pending, hidden, { openReview(it) }, { id -> finance.dismiss(id) { reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, id); reviewAfter = id } }, busy, captureActive)
                         }
                     }
                     tab == 4 -> RecordsScreen(realized, month, { monthText = it.toString() }, hidden, recordCategory,
@@ -267,9 +295,13 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         }
                         item { MonthPicker(month) { monthText = it.toString() } }
                         item { MonthlyResultCard(salarySummary, hidden) { salaryEditor = true } }
+                        item { PaydayBudgetCard(paydayBudget, knownBalances.isNotEmpty(), hidden) { newItem(ForecastKind.INCOME, "Salário") } }
                         item { TextButton({ expenseDimension = null; recordCategory = null; tab = 4 }) { Text("Ver extrato do mês") } }
                         item { ExpenseChart(realized, month, hidden) {
                             expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; recordCategory = null; tab = 4
+                        } }
+                        item { MonthComparisonCard(monthComparison, hidden) {
+                            expenseDimension = null; recordCategory = it; tab = 4
                         } }
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
                         item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { followingCurrent = true; browsing = today.toString() }, { cycleEditor = true }) }
@@ -314,20 +346,36 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     val draft = oldState.pending.firstOrNull { it.id == editingDraftId }
+    val merchant = remember(draft?.id) { draft?.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } }
     val record = oldState.records.firstOrNull { it.id == editingRecordId }
     if (recordEditor && (editingDraftId == null || draft != null) && (editingRecordId == null || record != null)) key(editingDraftId, editingRecordId, actualKind) {
         RecordEditor(draft, record, busy, onDismiss = { recordEditor = false },
-            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = draftRevision) { recordEditor = false } },
-            onIgnore = draft?.let { { finance.dismiss(it.id) { recordEditor = false } } },
+            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = draftRevision) {
+                recordEditor = false
+                if (draft != null) { reviewAfter = draft.id; rememberMerchantCategory(draft, value.category) }
+            } },
+            onIgnore = draft?.let { { finance.dismiss(it.id) { recordEditor = false; reviewAfter = it.id } } },
             onDelete = record?.let { { finance.delete(it.id) } },
             accounts = oldState.accounts, lastOrigin = settings.lastOrigin, onAddAccount = finance::addAccount,
             initialMovement = actualKind, hideAmounts = hidden, duplicateIndex = duplicateIndex,
             balances = oldState.accountBalances, history = oldState.records,
+            rememberedCategory = merchant?.let { merchantStore.get(it.key) }, merchantLabel = merchant?.label,
             notificationChanged = draft != null && draft.revision != draftRevision,
             onAcceptUpdate = { draftRevision = draft?.revision },
             realizedOnly = true, onOpenExpenseForecast = if (draft == null && record == null && snapshot != null) {
                 { recordEditor = false; newItem(ForecastKind.EXPENSE) }
             } else null)
+    }
+    reviewAfter?.takeIf { !recordEditor && tab == 5 }?.let { done ->
+        val pendingIds = oldState.pending.map { it.id }.toSet()
+        val next = ReviewQueue.next(reviewIds, done, pendingIds)?.let { id -> oldState.pending.firstOrNull { it.id == id } }
+            ?: oldState.pending.firstOrNull { it.id != done }
+        AlertDialog(onDismissRequest = { reviewAfter = null }, title = { DialogSystemBars(); Text("Sugestão tratada") },
+            text = { Text(if (next != null) "Há mais notificações para revisar. Cada lançamento continua exigindo a sua confirmação."
+                else "Não há mais notificações pendentes para revisar.") },
+            confirmButton = { if (next != null) TextButton({ openReview(next, continuing = true) }, Modifier.testTag("review-next")) { Text("Revisar próxima") }
+                else TextButton({ reviewAfter = null }, Modifier.testTag("review-empty-done")) { Text("Concluir") } },
+            dismissButton = { if (next != null) TextButton({ reviewAfter = null }) { Text("Agora não") } })
     }
     LaunchedEffect(oldState.loaded, draft, record, editingDraftId, editingRecordId) {
         if (oldState.loaded && ((editingDraftId != null && draft == null) || (editingRecordId != null && record == null))) recordEditor = false
