@@ -32,3 +32,5 @@ O gestor de contas ainda não tem uma entrada na interface principal. O teste fo
 ## Verificação desta alteração
 
 A preparação desta migração realizou somente inspeção estática e `git diff --check`. Compilação e instrumentação não foram executadas nesta tarefa; a validação serial do responsável deve executar os 12 testes na API 35, além das verificações exigidas pelo repositório. Capturas e notificações usam dados fictícios; esta migração não constitui validação de notificações bancárias reais ou avaliação humana de TalkBack.
+
+A navegação em fonte ampliada usa itens empilhados com rótulo na largura da tela e sem limitar a altura do texto. Aumentar apenas a altura da NavigationBar manteve a falha de corte no CI API 35; o teste de overflow foi preservado.
