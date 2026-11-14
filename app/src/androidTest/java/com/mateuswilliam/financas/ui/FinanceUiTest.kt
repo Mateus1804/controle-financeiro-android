@@ -2,6 +2,7 @@ package com.mateuswilliam.financas.ui
 
 import android.graphics.Bitmap
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -22,25 +23,32 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class FinanceUiTest {
-    @get:Rule val rule = createLegacyFinanceRule()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private val app get() = rule.activity.application as FinanceApplication
 
-    @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
+    @Before fun reset() {
+        runBlocking { app.maintenanceReady.await(); app.repository.clear(); app.forecasts.initialize() }
+        app.settings.finishIntro()
+        app.settings.dismissNamePrompt()
+        waitForDashboard()
+    }
 
     @Test fun manualEntryWorksWithoutNotificationAccess() {
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        openExpense()
         rule.onNodeWithTag("amount-input").performTextInput("4290")
-        rule.onNodeWithText("Descrição").performTextInput("Mercado de exemplo")
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Novo lançamento").fetchSemanticsNodes().isEmpty() }
-        rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Mercado de exemplo").fetchSemanticsNodes().isNotEmpty() }
+        confirmEntry("Mercado de exemplo")
+        openStatement()
+        scrollRecordsTo("Mercado de exemplo")
         rule.onNodeWithText("Mercado de exemplo").assertIsDisplayed()
-        assertEquals(4290L, runBlocking { app.repository.exportRecords().single().amountCents })
+        val saved = runBlocking { app.repository.exportRecords().single() }
+        assertEquals(4290L, saved.amountCents)
+        assertEquals(Movement.EXPENSE, saved.movement)
+        assertFalse(app.settings.snapshot().consented)
+        assertFalse(app.settings.snapshot().enabled)
     }
 
     @Test fun formattedPasteKeepsItsValueInReais() {
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        openExpense()
         rule.onNodeWithTag("amount-input").performTextInput("R$ 1.234,56")
         confirmEntry()
         assertEquals(123456L, runBlocking { app.repository.exportRecords().single().amountCents })
@@ -48,7 +56,7 @@ class FinanceUiTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test fun cursorSelectionReplacementAndBackspaceKeepCents() {
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        openExpense()
         val field = rule.onNodeWithTag("amount-input")
         field.performTextInput("1234")
         field.performTextInputSelection(TextRange(2), relativeToOriginalText = true)
@@ -62,14 +70,15 @@ class FinanceUiTest {
     }
 
     @Test fun clearingTheAmountDoesNotSaveZeroOrReuseTheOldValue() {
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        openExpense()
         val field = rule.onNodeWithTag("amount-input")
         field.performTextInput("1234")
         field.performTextClearance()
         rule.onNodeWithText("Descrição").performTextInput("Teste de valor apagado")
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        clickEnabled(hasText("Registrar despesa") and hasClickAction())
+        rule.onNodeWithText("Informe um valor maior que zero.").assertExists()
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
-        field.performTextInput("1")
+        field.assertExists().performTextInput("1")
         confirmEntry()
         assertEquals(1L, runBlocking { app.repository.exportRecords().single().amountCents })
     }
@@ -77,16 +86,16 @@ class FinanceUiTest {
     @Test fun existingAmountIsNotScaledAgainWhenEditing() = runBlocking {
         app.repository.save(Record("editar-exemplo", 4290, Movement.EXPENSE, PaymentMethod.PIX,
             Category.FOOD, "Conta de exemplo", "Editar valor de exemplo", System.currentTimeMillis()), null)
-        rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Editar valor de exemplo").fetchSemanticsNodes().isNotEmpty() }
+        openStatement()
+        scrollRecordsTo("Editar valor de exemplo")
         rule.onNodeWithText("Editar valor de exemplo").performClick()
-        confirmEntry()
+        confirmEntry(saveLabel = "Salvar lançamento")
         assertEquals(4290L, app.repository.exportRecords().single().amountCents)
     }
 
     @Test fun appearancePersistsAfterActivityRecreationAndUpdatesSystemBars() {
-        rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
-        rule.onNodeWithText("Escuro").performClick()
+        openSettings()
+        clickEnabled(hasText("Escuro") and hasClickAction())
         rule.runOnIdle {
             assertEquals(Appearance.DARK, app.settings.state.value.appearance)
             assertFalse(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
@@ -94,11 +103,11 @@ class FinanceUiTest {
         }
         assertStatusBarBackground(dark = true)
         rule.activityRule.scenario.recreate()
-        rule.waitForIdle()
-        rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("settings-list").fetchSemanticsNodes().isNotEmpty() }
+        openSettings()
         rule.onNodeWithText("Escuro").assertIsSelected()
         screenshot("ajustes-escuro")
-        rule.onNodeWithText("Claro").performClick()
+        clickEnabled(hasText("Claro") and hasClickAction())
         rule.onNodeWithText("Claro").assertIsSelected()
         rule.runOnIdle {
             assertEquals(Appearance.LIGHT, app.settings.state.value.appearance)
@@ -107,88 +116,104 @@ class FinanceUiTest {
         }
         assertStatusBarBackground(dark = false)
         screenshot("ajustes-claro")
-        rule.onNodeWithText("Sistema").performClick()
+        clickEnabled(hasText("Sistema") and hasClickAction())
         rule.onNodeWithText("Sistema").assertIsSelected()
     }
 
     @Test fun decliningDisclosureKeepsCaptureDisabled() {
-        rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
-        rule.onNodeWithContentDescription("Capturar notificações").performClick()
+        openSettings()
+        clickEnabled(hasContentDescription("Capturar notificações"))
         rule.onNodeWithText("Antes de ativar a captura").assertIsDisplayed()
-        rule.onNodeWithText("Agora não").performClick()
+        clickEnabled(hasText("Agora não") and hasClickAction())
         rule.onNodeWithText("Captura desativada. O cadastro manual continua disponível.").assertIsDisplayed()
     }
 
-    @Test fun screenshotsUseOnlyFictionalRecords() = runBlocking {
+    @Test fun screenshotsUseOnlyFictionalRecords() = runBlocking<Unit> {
         val now = System.currentTimeMillis()
-        listOf(
-            Record("exemplo-1", 300000, Movement.INCOME, PaymentMethod.PIX, Category.OTHER, "Conta de exemplo", "Receita de exemplo", now),
+        val examples = listOf(
+            Record("exemplo-1", 300000, Movement.INCOME, PaymentMethod.PIX, Category.SALARY, "Conta de exemplo", "Receita de exemplo", now),
             Record("exemplo-2", 6850, Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Conta de exemplo", "Almoço de exemplo", now - 1000),
             Record("exemplo-3", 11990, Movement.EXPENSE, PaymentMethod.PIX, Category.TRANSPORT, "Conta de exemplo", "Combustível de exemplo", now - 2000),
-        ).forEach { app.repository.save(it, null) }
+        )
+        examples.forEach { app.repository.save(it, null) }
         app.database.financeDao().insertDraft(DraftEntity("pendencia-exemplo", "captura-exemplo", "simulacao.local",
             "Banco de exemplo", "EXEMPLO — compra aprovada", "Compra aprovada de R$ 42,90 no supermercado de exemplo.",
             4290, Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Confira os dados sugeridos antes de confirmar.", now, now - 60_000))
-        rule.waitUntil(5000) { rule.onAllNodesWithText(Money.format(281160)).fetchSemanticsNodes().isNotEmpty() }
-        rule.waitForIdle()
+        rule.waitUntil(10000) {
+            rule.onAllNodes(hasTestTag("salary-remaining") and hasText("2.811,60", substring = true),
+                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
         screenshot("resumo")
-        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
-        rule.waitForIdle()
-        screenshot("resumo-escuro")
-        rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
-        rule.waitForIdle()
-        screenshot("resumo-claro")
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Movimentações do mês"))
-        screenshot("recentes-claro")
-        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }; rule.waitForIdle()
-        screenshot("recentes-escuro")
-        rule.onNode(hasText("Movimentações") and hasClickAction()).performClick()
-        screenshot("extrato-escuro")
-        rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }; rule.waitForIdle()
-        screenshot("extrato-claro")
-        rule.onNodeWithText("Revisar").performClick()
+        for (theme in listOf(Appearance.DARK, Appearance.LIGHT)) {
+            rule.runOnIdle { app.settings.setAppearance(theme) }
+            screenshot("resumo-${if (theme == Appearance.DARK) "escuro" else "claro"}")
+        }
+        openStatement()
+        for (theme in listOf(Appearance.DARK, Appearance.LIGHT)) {
+            rule.runOnIdle { app.settings.setAppearance(theme) }
+            rule.onNodeWithTag("records-list").performScrollToNode(hasText("Combustível de exemplo"))
+            rule.onNodeWithText("Combustível de exemplo").assertIsDisplayed()
+            screenshot("extrato-${if (theme == Appearance.DARK) "escuro" else "claro"}")
+        }
+        clickEnabled(hasTestTag("open-notification-review"))
         rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
         screenshot("pendencias")
-        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }; rule.waitForIdle()
+        rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
         screenshot("pendencias-escuro")
-        rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }; rule.waitForIdle()
-        rule.onNodeWithTag("review-pendencia-exemplo").performClick()
+        rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
+        clickEnabled(hasTestTag("review-pendencia-exemplo"))
         rule.onNodeWithText("Conferir movimentação").assertIsDisplayed()
         screenshot("revisao")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
-        rule.waitForIdle()
         screenshot("revisao-escuro")
+        assertEquals(examples.map { it.id }.toSet(), app.repository.exportRecords().map { it.id }.toSet())
+        assertEquals(1, app.database.financeDao().allDrafts().size)
     }
 
 
-    @Test fun firstUseCanContinueManuallyWithoutConsent() {
-        app.settings.reset()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Usar manualmente").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Usar manualmente").performClick()
-        rule.runOnIdle { assertTrue(app.settings.state.value.introSeen); assertFalse(app.settings.state.value.consented) }
-        rule.onNodeWithContentDescription("Novo lançamento").assertIsDisplayed()
+    @Test fun optionalNameCanBeSkippedBeforeManualEntryWithoutConsent() {
+        rule.runOnIdle { app.settings.reset() }
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("display-name-input").fetchSemanticsNodes().isNotEmpty() }
+        clickEnabled(hasText("Agora não") and hasClickAction())
+        assertTrue(app.settings.snapshot().namePromptSeen)
+        assertFalse(app.settings.snapshot().consented)
+        assertFalse(app.settings.snapshot().enabled)
+        openExpense()
+        rule.onNodeWithTag("amount-input").assertIsDisplayed()
+        assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
     }
 
-    @Test fun introductionDoesNotReplaceDisclosureConsent() {
-        app.settings.reset()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Ativar preenchimento por notificações").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Ativar preenchimento por notificações").performClick()
+    @Test fun savingOptionalNameDoesNotReplaceDisclosureConsent() {
+        rule.runOnIdle { app.settings.reset() }
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("display-name-input").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("display-name-input").performTextInput("Pessoa de exemplo")
+        clickEnabled(hasText("Salvar") and hasClickAction())
+        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá, Pessoa de exemplo! 👋🏼")
+        assertFalse(app.settings.snapshot().consented)
+        assertFalse(app.settings.snapshot().enabled)
+        openSettings()
+        clickEnabled(hasContentDescription("Capturar notificações"))
         rule.onNodeWithText("Antes de ativar a captura").assertIsDisplayed()
-        rule.onNodeWithText("Agora não").performClick()
-        rule.runOnIdle { assertFalse(app.settings.state.value.consented) }
+        clickEnabled(hasText("Agora não") and hasClickAction())
+        assertFalse(app.settings.snapshot().consented)
+        assertFalse(app.settings.snapshot().enabled)
     }
 
-    @Test fun closedCaptureNoticeStaysClosedAfterRecreation() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasContentDescription("Fechar aviso de captura"))
-        rule.onNodeWithContentDescription("Fechar aviso de captura").performClick()
+    @Test fun skippedOptionalNameStaysClosedAfterRecreationWithoutEnablingCapture() {
+        rule.runOnIdle { app.settings.reset() }
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("display-name-input").fetchSemanticsNodes().isNotEmpty() }
+        clickEnabled(hasText("Agora não") and hasClickAction())
         rule.activityRule.scenario.recreate()
-        rule.waitUntil(5000) { app.settings.state.value.captureCondition == "CONSENT" }
-        rule.onAllNodesWithContentDescription("Fechar aviso de captura").assertCountEquals(0)
-        rule.runOnIdle { assertFalse(app.settings.state.value.consented) }
+        waitForDashboard()
+        rule.onAllNodesWithTag("display-name-input").assertCountEquals(0)
+        rule.onNodeWithTag("rendly-greeting").assertTextEquals("Olá! 👋🏼")
+        assertTrue(app.settings.snapshot().namePromptSeen)
+        assertFalse(app.settings.snapshot().consented)
+        assertFalse(app.settings.snapshot().enabled)
     }
 
     @Test fun accountCanBeAddedWithoutLosingTheAmount() {
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        openExpense()
         rule.onNodeWithTag("amount-input").performTextInput("1234")
         // O teclado mede a janela fora do relógio Compose; o toque só ocorre após estabilizar a geometria.
         waitForStableBounds(rule.onNodeWithTag("amount-input"))
@@ -210,14 +235,16 @@ class FinanceUiTest {
     }
 
     @Test fun amountAndDescriptionSurviveFormRecreation() {
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        openExpense()
         rule.onNodeWithTag("amount-input").performTextInput("1234")
         rule.onNodeWithText("Descrição").performTextInput("Formulário de exemplo")
         rule.activityRule.scenario.recreate()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Descrição").assertTextContains("Formulário de exemplo")
-        confirmEntry()
-        assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
+        confirmEntry("Formulário de exemplo")
+        val saved = runBlocking { app.repository.exportRecords().single() }
+        assertEquals(1234L, saved.amountCents)
+        assertEquals("Formulário de exemplo", saved.description)
     }
 
     @Test fun chartOpensOnlyTheSelectedExpenseGroup() = runBlocking<Unit> {
@@ -226,26 +253,30 @@ class FinanceUiTest {
             "Conta teste", "Despesa do gráfico", now), null)
         app.repository.save(Record("grafico-receita", 20000, Movement.INCOME, PaymentMethod.PIX, Category.FOOD,
             "Conta teste", "Receita excluída do gráfico", now), null)
-        rule.waitUntil(5000) { rule.onAllNodesWithText(Money.format(10000)).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("expense-group-FOOD"))
+        rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().size == 2 } }
+        scrollDashboardTo(hasTestTag("expense-group-FOOD"))
         screenshot("grafico-categorias")
         rule.onNodeWithTag("expense-group-FOOD").performClick()
+        scrollRecordsTo("Despesa do gráfico")
         rule.onNodeWithText("Despesa do gráfico").assertIsDisplayed()
         rule.onAllNodesWithText("Receita excluída do gráfico").assertCountEquals(0)
     }
 
 
     @Test fun rejectedPasteShowsAnErrorAndCannotSaveThePreviousAmount() {
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
+        openExpense()
         rule.onNodeWithTag("amount-input").performTextInput("1234")
         rule.onNodeWithTag("amount-input").performTextReplacement("1,234")
         rule.onNodeWithText("Entrada inválida ou acima do limite. Digite números ou cole um valor como 1.234,56.").assertExists()
         rule.onNodeWithText("Descrição").performTextInput("Teste de colagem inválida")
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        clickEnabled(hasText("Registrar despesa") and hasClickAction())
+        rule.onNodeWithTag("amount-input").assertExists()
+        rule.onNodeWithText("Entrada inválida ou acima do limite. Digite números ou cole um valor como 1.234,56.").assertExists()
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
     }
 
     @Test fun largeTextAndOpenKeyboardAllowManualEntry() {
+        val previousFontScale = rule.activity.resources.configuration.fontScale.toString()
         fun fontScale(value: String) {
             val command = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
                 .executeShellCommand("settings put system font_scale " + value)
@@ -254,27 +285,28 @@ class FinanceUiTest {
         try {
             fontScale("1.5")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.4f }
-            rule.onNodeWithContentDescription("Novo lançamento").performClick()
+            openExpense()
             rule.onNodeWithTag("amount-input").performClick().performTextInput("1234")
             rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Fonte ampliada")
             screenshot("formulario-fonte-ampliada")
             confirmEntry()
             assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
-        } finally { fontScale("1.0") }
+        } finally { fontScale(previousFontScale) }
     }
 
     @Test fun landscapeLayoutKeepsTheFormUsable() {
+        val previousOrientation = rule.activity.requestedOrientation
         try {
             rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
-            rule.onNodeWithContentDescription("Novo lançamento").performClick()
+            openExpense()
             rule.onNodeWithTag("amount-input").performTextInput("1234")
             rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Paisagem")
             screenshot("formulario-paisagem")
             confirmEntry()
             assertEquals(1234L, runBlocking { app.repository.exportRecords().single().amountCents })
         } finally {
-            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = previousOrientation }
         }
     }
 
@@ -282,14 +314,14 @@ class FinanceUiTest {
     @Test fun hiddenAmountsAlsoHideChartLabelsAndSemantics() = runBlocking<Unit> {
         app.repository.save(Record("privacidade-grafico", 123456, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
             "Conta exemplo", "Exemplo privado", System.currentTimeMillis()), null)
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("expense-group-FOOD"))
+        scrollDashboardTo(hasTestTag("expense-group-FOOD"))
         rule.onNodeWithTag("expense-group-FOOD").assertTextContains(Money.format(123456))
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Ocultar"))
-        rule.onNodeWithText("Ocultar").performClick()
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("expense-group-FOOD"))
-        rule.onAllNodesWithText(Money.format(123456)).assertCountEquals(0)
-        rule.onAllNodesWithContentDescription(Money.format(123456), substring = true).assertCountEquals(0)
-        rule.onAllNodesWithText("100,00%").assertCountEquals(0)
+        clickEnabled(hasContentDescription("Ocultar valores"))
+        scrollDashboardTo(hasTestTag("expense-group-FOOD"))
+        rule.onAllNodesWithText(Money.format(123456), substring = true, useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodesWithContentDescription(Money.format(123456), substring = true, useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodesWithText("100,00%", substring = true, useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodesWithContentDescription("100,00%", substring = true, useUnmergedTree = true).assertCountEquals(0)
     }
 
 
@@ -306,6 +338,7 @@ class FinanceUiTest {
         }
         val shellListenerCommand = command("cmd notification help").contains("allow_listener")
         val previousListeners = command("settings get secure enabled_notification_listeners").trim().takeUnless { it == "null" }.orEmpty()
+        val listenerWasAllowed = component in previousListeners.split(':')
         val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
         val alertsWereGranted = android.os.Build.VERSION.SDK_INT >= 33 &&
             androidx.core.content.ContextCompat.checkSelfPermission(app, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -341,7 +374,7 @@ class FinanceUiTest {
             listenerAccess(true)
             resume()
             rule.waitUntil(10000) { app.listenerConnected.value }
-            rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
+            openSettings()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Captura ativa para 1 aplicativo(s).").fetchSemanticsNodes().isNotEmpty() }
             val alertAction = rule.onNodeWithText("Permitir alertas de revisão")
             if (android.os.Build.VERSION.SDK_INT >= 33) {
@@ -355,11 +388,16 @@ class FinanceUiTest {
             listenerAccess(false)
             resume()
             rule.waitUntil(10000) { rule.onAllNodesWithText("Falta autorizar o acesso às notificações no Android.").fetchSemanticsNodes().isNotEmpty() }
-            rule.onNodeWithText("Resumo").performClick()
-            rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Autorizar acesso"))
-            rule.onNodeWithText("Autorizar acesso").assertIsDisplayed()
+            rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Autorizar no Android"))
+            rule.onNodeWithText("Autorizar no Android").assertIsDisplayed().assertIsEnabled()
+            clickEnabled(hasTestTag("forecast-settings"))
+            waitForDashboard()
+            clickEnabled(hasTestTag("dashboard-notification-review"))
+            rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
+            clickEnabled(hasText("Configurar captura") and hasClickAction())
+            rule.onNodeWithText("Falta autorizar o acesso às notificações no Android.").assertExists()
         } finally {
-            try { listenerAccess(false) }
+            try { listenerAccess(listenerWasAllowed) }
             finally {
                 if (alertsWereGranted) automation.grantRuntimePermission(app.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
                 rule.runOnIdle { app.settings.setEnabled(false) }
@@ -368,19 +406,23 @@ class FinanceUiTest {
     }
 
 
-    @Test fun choosingManualPausesPreviouslyEnabledCapture() {
-        app.settings.reset()
+    @Test fun pausingCaptureKeepsConsentAndManualEntryAvailableAfterRecreation() {
         rule.runOnIdle {
             app.settings.acceptDisclosure()
             app.settings.selectPackages(setOf("banco.exemplo"))
         }
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Usar manualmente").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Usar manualmente").performClick()
-        rule.runOnIdle {
-            assertTrue(app.settings.state.value.consented)
-            assertFalse(app.settings.state.value.enabled)
-            assertTrue(app.settings.state.value.introSeen)
-        }
+        openSettings()
+        clickEnabled(hasContentDescription("Capturar notificações"))
+        assertTrue(app.settings.snapshot().consented)
+        assertFalse(app.settings.snapshot().enabled)
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("settings-list").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithContentDescription("Capturar notificações").assertIsOff()
+        assertTrue(app.settings.snapshot().consented)
+        assertFalse(app.settings.snapshot().enabled)
+        clickEnabled(hasTestTag("forecast-settings"))
+        openExpense()
+        rule.onNodeWithTag("amount-input").assertIsDisplayed()
     }
 
     private fun waitForStableBounds(node: SemanticsNodeInteraction) {
@@ -397,21 +439,71 @@ class FinanceUiTest {
         node.assertIsDisplayed()
     }
 
-    private fun confirmEntry() {
-        rule.onNodeWithText("Descrição").performTextReplacement("Lançamento fictício de teste")
+    private fun waitForDashboard() {
+        rule.waitUntil(10000) {
+            rule.onAllNodes(hasTestTag("add-realized-expense") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+                rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.waitForIdle()
+    }
+
+    private fun clickEnabled(matcher: SemanticsMatcher) {
+        rule.waitUntil(10000) { rule.onAllNodes(matcher and isEnabled()).fetchSemanticsNodes().size == 1 }
+        rule.onNode(matcher).assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+    }
+
+    private fun openExpense() {
+        clickEnabled(hasTestTag("add-realized-expense"))
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    private fun openSettings() {
+        if (rule.onAllNodesWithTag("settings-list").fetchSemanticsNodes().isEmpty())
+            clickEnabled(hasTestTag("forecast-settings"))
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("settings-list").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    private fun scrollDashboardTo(matcher: SemanticsMatcher) {
+        rule.waitUntil(10000) {
+            try {
+                rule.onNodeWithTag("forecast-dashboard").performScrollToNode(matcher)
+                true
+            } catch (_: AssertionError) { false }
+        }
+    }
+
+    private fun scrollRecordsTo(description: String) {
+        rule.waitUntil(10000) {
+            try {
+                rule.onNodeWithTag("records-list").performScrollToNode(hasText(description))
+                rule.onNodeWithText(description).assertIsDisplayed()
+                true
+            } catch (_: AssertionError) { false }
+        }
+    }
+
+    private fun openStatement() {
+        waitForDashboard()
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Ver extrato do mês"))
+        clickEnabled(hasText("Ver extrato do mês") and hasClickAction())
+        rule.onNodeWithTag("records-list").assertExists()
+    }
+
+    private fun confirmEntry(description: String = "Lançamento fictício de teste", saveLabel: String = "Registrar despesa") {
+        rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement(description)
         rule.onNodeWithText("Descrição").performImeAction()
         rule.waitUntil(5000) {
             val windows = if (android.os.Build.VERSION.SDK_INT >= 29)
                 android.view.inspector.WindowInspector.getGlobalWindowViews() else listOf(rule.activity.window.decorView)
             windows.none { androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
         }
-        rule.waitForIdle()
-        val confirm = rule.onNodeWithText("Confirmar", useUnmergedTree = true)
-        if (rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) confirm.performScrollTo()
-        confirm.assertIsDisplayed().performClick()
+        val confirm = rule.onNode(hasText(saveLabel) and hasClickAction())
+        if (rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE ||
+            rule.activity.resources.configuration.fontScale >= 1.5f) confirm.performScrollTo()
+        clickEnabled(hasText(saveLabel) and hasClickAction())
         try {
-            rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
-            rule.waitUntil(5000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
+            rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
+            rule.waitUntil(10000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isEmpty() }
         } catch (failure: Throwable) {
             val roots = rule.onAllNodes(isRoot()).fetchSemanticsNodes().indices.joinToString("\n") {
                 rule.onAllNodes(isRoot())[it].printToString()
