@@ -2,96 +2,59 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
-import java.time.YearMonth
+import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class ForecastRemovalUiTest {
-    @get:Rule val rule = createLegacyFinanceRule()
-    private val app get() = rule.activity.application as FinanceApplication
-    private val repo get() = app.repository
-    private val month = YearMonth.now()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private val ui by lazy { CurrentForecastUi(rule) }
+    private val month get() = ui.month
 
-    @Before fun reset() {
-        runBlocking { repo.clear() }
-        app.settings.finishIntro()
-        rule.waitForIdle()
+    @Before fun reset() = ui.reset()
+
+    @Test fun ignoringAndRestoringAnInstallmentChangesOnlyTheSelectedForecast() {
+        ui.seed(ForecastRule("compra-ficticia", month.atDay(1), "Compra fictícia", ForecastKind.EXPENSE,
+            20000, Category.OTHER, ForecastFrequency.INSTALLMENTS, month.atDay(1), installmentCount = 2))
+        val first = ui.report().lines.single()
+        ui.action(first, "Ignorar somente ocorrência")
+        ui.waitData { it.overrides.singleOrNull()?.ignored == true }
+        assertEquals(0L, ui.report().totalExpensesCents)
+        assertEquals(10000L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        assertEquals("installment:1", ui.data().overrides.single().occurrenceKey)
+        val ignored = ui.report().lines.single()
+        assertTrue(ignored.ignored)
+        assertFalse(ignored.included)
+        ui.scroll("forecast-line:${first.itemId}:${first.occurrenceKey}")
+        rule.onNodeWithText("Ignorada neste ciclo").assertExists()
+        ui.action(ignored, "Restaurar somente ocorrência")
+        ui.waitData { it.overrides.singleOrNull()?.ignored == false }
+        assertEquals(10000L, ui.report().totalExpensesCents)
+        assertEquals(10000L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        assertEquals(0L, ui.report(month.plusMonths(2)).totalExpensesCents)
+        ui.assertNoRecords()
     }
 
-    @Test fun excludingAnInstallmentUpdatesOnlyTheSelectedForecast() = runBlocking<Unit> {
-        repo.saveMonthlyPlan(MonthlyIncomePlan(month, 100000))
-        assertTrue(repo.createPurchase(InstallmentPurchase("compra-ficticia", "Compra fictícia", "Carteira",
-            Category.OTHER, 20000, 2, month.atDay(12))))
-        openPlanning()
-        assertReport("10% da renda comprometidos; maior gasto: Compra fictícia · 1/2.")
-        val action = "exclude-installment:compra-ficticia:1"
-        tap(action)
-        awaitText("Excluir esta parcela prevista?")
-        rule.onNodeWithTag("keep-installment-forecast").performClick()
-        assertEquals(10000L, repo.commitmentReport(month).committedCents)
-        tap(action)
-        awaitText("Excluir esta parcela prevista?")
-        rule.onNodeWithText("Excluir parcela", substring = false).performClick()
-        assertReport("0% da renda comprometidos; nenhum compromisso.")
-        awaitPlanningText("Sem movimentações neste mês")
-        rule.onNodeWithTag(action).assertDoesNotExist()
-        assertEquals(10000L, repo.commitmentReport(month.plusMonths(1)).committedCents)
-        assertTrue(repo.exportRecords().isEmpty())
-    }
-
-    @Test fun excludingARecurringForecastRemovesItsCardAndItsAmountFromPlanning() = runBlocking<Unit> {
-        val plan = RecurringPlan("conta-ficticia", "Conta fictícia", 5000, Movement.EXPENSE, PaymentMethod.PIX,
-            Category.HOME, "Carteira", month.atDay(8).toString(), 8)
-        repo.saveRecurring(plan)
-        repo.setFixedRecurring(plan.id, month)
-        repo.saveMonthlyPlan(MonthlyIncomePlan(month, 100000))
-        openPlanning()
-        assertReport("5% da renda comprometidos; maior gasto: Conta fictícia.")
-        tap("exclude-recurring-${plan.id}")
-        awaitText("Excluir recorrência?")
-        rule.onNodeWithTag("confirm-exclude-recurring").performClick()
-        assertReport("0% da renda comprometidos; nenhum compromisso.")
-        awaitPlanningText("Sem movimentações neste mês")
-        assertTrue(repo.exportRecords().isEmpty())
-    }
-
-    private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
-        rule.onNodeWithText("Planejamento e análises").performClick()
-    }
-
-    private fun tap(tag: String) {
-        rule.performPlanningAction(tag)
-    }
-
-    private fun awaitText(text: String) {
-        rule.waitUntil(5000) { rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
-    }
-
-    private fun awaitPlanningText(text: String) {
-        // O relatório e a lista recebem atualizações independentes depois da exclusão.
-        rule.waitUntil(5000) {
-            try {
-                rule.showMovements()
-                rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText(text))
-                true
-            } catch (_: AssertionError) {
-                false
-            }
-        }
-        rule.onNodeWithText(text).assertIsDisplayed()
-    }
-
-    private fun assertReport(description: String) {
-        rule.scrollAnalysisTo(hasTestTag("commitment-card"))
-        rule.waitUntil(5000) { rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("commitment-donut").assertContentDescriptionEquals(description)
+    @Test fun stoppingARecurringForecastPreservesEarlierForecastsAndRecordedExpenses() {
+        val previous = month.minusMonths(1)
+        ui.seed(ForecastRule("conta-ficticia", previous.atDay(1), "Conta fictícia", ForecastKind.EXPENSE,
+            5000, Category.HOME, ForecastFrequency.MONTHLY, previous.atDay(1)))
+        val payment = Record("historico", 4500, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+            "Carteira", "Histórico preservado", previous.atDay(8).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
+        runBlocking { assertTrue(ui.app.repository.save(payment, null)) }
+        ui.action(ui.report().lines.single(), "Interromper futuras")
+        ui.waitData { it.rules.any { version -> !version.active } }
+        assertEquals(5000L, ui.report(previous).totalExpensesCents)
+        assertEquals(0L, ui.report().totalExpensesCents)
+        assertEquals(0L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        rule.onNodeWithTag("forecast-line:conta-ficticia:month:$month").assertDoesNotExist()
+        assertEquals(listOf(payment), runBlocking { ui.app.repository.exportRecords() })
+        assertEquals(4500L, Ledger.month(listOf(payment), previous, ZoneId.systemDefault()).expenses)
+        assertEquals(0L, Ledger.month(listOf(payment), month, ZoneId.systemDefault()).expenses)
     }
 }

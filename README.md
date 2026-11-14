@@ -46,7 +46,7 @@ A proteção opcional exige autenticação do aparelho ao iniciar e após 30 seg
 
 A base utiliza Kotlin, Jetpack Compose, Material 3, Room/SQLite, Coroutines e StateFlow. O módulo `core` concentra as regras de dinheiro, ciclos, previsões e reserva; o módulo `app` reúne interface, persistência e integração com o Android. Os valores monetários são armazenados em centavos inteiros.
 
-O planejador utiliza regras versionadas e ajustes por ocorrência sobre intervalos com início inclusivo e fim exclusivo. Orçamento e Projeções compartilham o mesmo cálculo; simulações usam dados temporários. O importador conserva a procedência dos itens antigos e não altera as tabelas de origem. Os componentes do fluxo anterior mantidos para regressão usam um host de testes apenas em debug, sem constituir um caminho do produto.
+O planejador utiliza regras versionadas e ajustes por ocorrência sobre intervalos com início inclusivo e fim exclusivo. Orçamento e Projeções compartilham o mesmo cálculo; simulações usam dados temporários. O importador conserva a procedência dos itens antigos e não altera as tabelas de origem. Os testes de interface abrem a mesma MainActivity usada pelo aplicativo; testes de componentes exercitam apenas os controles compartilhados, sem uma segunda tela principal.
 
 ## Qualidade
 

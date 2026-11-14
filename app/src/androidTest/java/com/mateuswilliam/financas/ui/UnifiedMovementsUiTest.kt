@@ -1,14 +1,11 @@
 package com.mateuswilliam.financas.ui
 
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import com.mateuswilliam.financas.FinanceApplication
-import com.mateuswilliam.financas.MainActivity
-import com.mateuswilliam.financas.FinanceViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.mateuswilliam.financas.FinanceViewModel
+import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
-import java.time.YearMonth
 import java.time.ZoneId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -18,108 +15,137 @@ import org.junit.Rule
 import org.junit.Test
 
 class UnifiedMovementsUiTest {
-    @get:Rule val rule = createLegacyFinanceRule()
-    private val app get() = rule.activity.application as FinanceApplication
-    private val month = YearMonth.now()
-    @Before fun reset() {
-        runBlocking { app.repository.clear(); app.repository.addAccount("Carteira") }
-        app.settings.finishIntro()
-        val model = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
-        rule.waitUntil(10000) { model.state.value.accounts.any { it.label == "Carteira" } }
-        rule.waitForIdle()
-    }
-    private fun click(text: String) {
-        rule.onNodeWithText(text).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-    }
-    private fun scroll(tag: String) {
-        rule.waitUntil(5000) {
-            try { rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag(tag)); true }
-            catch (_: AssertionError) { false }
-        }
-    }
-    private fun actions(id: String) {
-        val tag = "actions-recurring-$id"
-        scroll(tag)
-        rule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-    }
-    @Test fun recurringExpenseIsCreatedAndPaidOnceFromTheMainScreen() = createAndConfirm(Movement.EXPENSE)
-    @Test fun recurringIncomeIsCreatedAndReceivedOnceFromTheMainScreen() = createAndConfirm(Movement.INCOME)
-    private fun createAndConfirm(movement: Movement) {
-        rule.onNodeWithTag("quick-${movement.name.lowercase()}").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-        click("Única"); click("Recorrente")
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private val ui by lazy { CurrentForecastUi(rule) }
+    private val month get() = ui.month
+    private val finance get() = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
+
+    @Before fun reset() = ui.reset()
+
+    @Test fun aRealizedExpenseIsEnteredOnceWithoutPayingTheRecurringForecast() = enterActual(Movement.EXPENSE)
+    @Test fun aRealizedIncomeIsEnteredOnceWithoutReceivingTheRecurringForecast() = enterActual(Movement.INCOME)
+
+    private fun enterActual(movement: Movement) {
+        val kind = if (movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
+        ui.seed(ForecastRule("previsao-separada", month.atDay(1), "Previsão separada", kind, 5000,
+            if (movement == Movement.INCOME) Category.OTHER_INCOME else Category.HOME,
+            ForecastFrequency.MONTHLY, month.atDay(1)))
+        val tag = if (movement == Movement.INCOME) "add-realized-income" else "add-realized-expense"
+        rule.onNodeWithTag(tag).assertIsEnabled()
+        ui.clickTag(tag)
+        rule.onNodeWithText("Recorrente").assertDoesNotExist()
+        rule.onNodeWithText("Parcelada").assertDoesNotExist()
         rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("5000")
-        rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement("Conta unificada")
-        rule.onNodeWithText("Descrição").performImeAction()
+        rule.onNodeWithTag("record-description").performScrollTo().performTextReplacement("Lançamento independente")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
-        click("Salvar recorrência")
-        rule.waitUntil(5000) { runBlocking { app.repository.recurring.first().size == 1 } }
-        val id = runBlocking { app.repository.recurring.first().single().id }
-        assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
-        actions(id); click(if (movement == Movement.INCOME) "Registrar recebimento" else "Registrar pagamento")
-        click("Confirmar")
-        rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().size == 1 } }
-        val record = runBlocking { app.repository.exportRecords().single() }
-        scroll("movement-record:${record.id}")
-        rule.onNodeWithTag("movement-record:${record.id}").assertIsDisplayed()
-        rule.onNodeWithTag("movement-recurring:$id:$month").assertDoesNotExist()
-        val totals = Ledger.month(listOf(record), month, ZoneId.systemDefault())
+        ui.clickText(if (movement == Movement.EXPENSE) "Registrar despesa" else "Salvar lançamento")
+        rule.waitUntil(10000) { finance.state.value.records.size == 1 }
+        val saved = runBlocking { ui.app.repository.exportRecords().single() }
+        assertEquals(movement, saved.movement)
+        assertEquals(5000L, saved.amountCents)
+        val totals = Ledger.month(listOf(saved), month, ZoneId.systemDefault())
         assertEquals(5000L, if (movement == Movement.INCOME) totals.income else totals.expenses)
+        assertEquals(5000L, if (movement == Movement.INCOME) ui.report().incomeCents else ui.report().totalExpensesCents)
+        assertTrue(ui.data().overrides.isEmpty())
+        assertTrue(runBlocking { ui.app.repository.recurring.first().isEmpty() })
         rule.activityRule.scenario.recreate()
-        assertEquals(1, runBlocking { app.repository.exportRecords().size })
+        assertEquals(listOf(saved), runBlocking { ui.app.repository.exportRecords() })
+        assertEquals(1, ui.data().rules.size)
     }
-    @Test fun oneMonthCanBeEditedAndIgnoredWithoutChangingTheNext() = runBlocking<Unit> {
-        val plan = RecurringPlan("unified", "Conta mensal", 5000, Movement.EXPENSE, PaymentMethod.PIX,
-            Category.HOME, "Carteira", month.atDay(12).toString(), 12)
-        app.repository.saveRecurring(plan); app.repository.setFixedRecurring(plan.id, month)
-        actions(plan.id); click("Alterar só este mês")
-        rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("7500")
+
+    @Test fun oneCycleCanBeEditedAndIgnoredWithoutChangingTheNext() {
+        val source = ForecastRule("unified", month.atDay(1), "Conta mensal", ForecastKind.EXPENSE,
+            5000, Category.HOME, ForecastFrequency.MONTHLY, month.atDay(1))
+        ui.seed(source)
+        ui.open(ui.report().lines.single())
+        rule.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("7500")
+        ui.saveEditor()
+        ui.waitData { it.overrides.singleOrNull()?.amountCents == 7500L }
+        assertEquals(7500L, ui.report().totalExpensesCents)
+        assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        ui.action(ui.report().lines.single(), "Ignorar somente ocorrência")
+        ui.waitData { it.overrides.singleOrNull()?.ignored == true }
+        assertEquals(0L, ui.report().totalExpensesCents)
+        assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        assertEquals(7500L, ui.data().overrides.single().amountCents)
+        assertEquals(5000L, ui.data().rules.single().amountCents)
+        ui.assertNoRecords()
+    }
+
+    @Test fun aCrossMonthExpenseAppearsOnlyInTheActualStatementMonth() {
+        val previous = month.minusMonths(1)
+        ui.seed(ForecastRule("cross-month", previous.atDay(1), "Previsão do mês anterior", ForecastKind.EXPENSE,
+            5000, Category.HOME, ForecastFrequency.ONCE, previous.atDay(12)))
+        val payment = Record("payment", 5000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+            "Carteira", "Pagamento em outro mês", month.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
+        seedActual(payment)
+        openStatement()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText(payment.description))
+        rule.onNodeWithText(payment.description).assertExists()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasContentDescription("Mês anterior"))
+        rule.onNodeWithContentDescription("Mês anterior").performClick()
+        rule.onNodeWithText(payment.description).assertDoesNotExist()
+        rule.onNodeWithText("Previsão do mês anterior").assertDoesNotExist()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Somente lançamentos já ocorridos"))
+        rule.onNodeWithText("Somente lançamentos já ocorridos").assertExists()
+        assertEquals(0L, Ledger.month(listOf(payment), previous, ZoneId.systemDefault()).expenses)
+        assertEquals(5000L, Ledger.month(listOf(payment), month, ZoneId.systemDefault()).expenses)
+        assertEquals(5000L, ui.report(previous).totalExpensesCents)
+        assertEquals(0L, ui.report().totalExpensesCents)
+        assertEquals(listOf(payment), runBlocking { ui.app.repository.exportRecords() })
+    }
+
+    @Test fun editingAnActualInstallmentExpenseDoesNotEditItsForecastSchedule() {
+        ui.seed(ForecastRule("unified-purchase", month.atDay(1), "Compra prevista", ForecastKind.EXPENSE,
+            10000, Category.OTHER, ForecastFrequency.INSTALLMENTS, month.atDay(1), installmentCount = 2))
+        val payment = Record("installment-payment", 5000, Movement.EXPENSE, PaymentMethod.CARD, Category.OTHER,
+            "Carteira", "Parcela registrada", System.currentTimeMillis())
+        seedActual(payment)
+        openStatement()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText(payment.description))
+        ui.clickText(payment.description)
+        rule.onNodeWithTag("record-description").assertTextContains(payment.description)
+        rule.onNodeWithTag("forecast-installment-count").assertDoesNotExist()
+        rule.onNodeWithText("Editar compra parcelada").assertDoesNotExist()
+        rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("5500")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
-        click("Salvar só este mês")
-        rule.waitUntil(5000) { runBlocking { app.repository.commitmentReport(month).committedCents == 7500L } }
-        assertEquals(5000L, app.repository.commitmentReport(month.plusMonths(1)).committedCents)
-        actions(plan.id); click("Pular este mês"); click("Confirmar")
-        rule.waitUntil(5000) { runBlocking { app.repository.observeRecurringMonths(month).first().single().status == RecurringMonthStatus.SKIPPED } }
-        assertEquals(0L, app.repository.commitmentReport(month).committedCents)
-        assertEquals(RecurringMonthStatus.PENDING, app.repository.observeRecurringMonths(month.plusMonths(1)).first().single().status)
-        assertTrue(app.repository.exportRecords().isEmpty())
+        ui.clickText("Salvar lançamento")
+        rule.waitUntil(10000) { finance.state.value.records.singleOrNull()?.amountCents == 5500L }
+        val updated = runBlocking { ui.app.repository.exportRecords().single() }
+        assertEquals(payment.id, updated.id)
+        assertEquals(5500L, updated.amountCents)
+        assertEquals(5500L, Ledger.month(listOf(updated), month, ZoneId.systemDefault()).expenses)
+        assertEquals(5000L, ui.report().totalExpensesCents)
+        assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        assertEquals(0L, ui.report(month.plusMonths(2)).totalExpensesCents)
+        assertTrue(ui.data().overrides.isEmpty())
     }
-    @Test fun crossMonthPaymentIsAClosedReferenceInsteadOfASecondRealizedMovement() {
-        val due = month.atDay(12)
-        val plan = RecurringPlan("cross-month", "Conta", 5000, Movement.EXPENSE, PaymentMethod.PIX,
-            Category.HOME, "Carteira", due.toString(), 12)
-        val payment = plan.proposedRecord("payment", ZoneId.systemDefault()).copy(occurredAt =
-            month.plusMonths(1).atDay(2).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
-        val occurrence = RecurringMonth(plan.id, month, plan, RecurringMonthStatus.RECORDED, payment.id, true, 1)
-        val before = monthlyMovements(listOf(payment), month, listOf(occurrence), emptyList(), asOf = Long.MAX_VALUE)
-        assertEquals(1, before.size)
-        assertFalse(before.single().realized)
-        assertTrue(before.single().status.startsWith("Quitada em"))
-        val after = monthlyMovements(listOf(payment), month.plusMonths(1), emptyList(), emptyList(), asOf = Long.MAX_VALUE)
-        assertEquals(1, after.size)
-        assertTrue(after.single().realized)
-        assertEquals(0L, Ledger.month(listOf(payment), month, ZoneId.systemDefault()).expenses)
-        assertEquals(5000L, Ledger.month(listOf(payment), month.plusMonths(1), ZoneId.systemDefault()).expenses)
-    }
-    @Test fun paidInstallmentOffersItsPaymentWithoutAnUnavailablePurchaseAction() = runBlocking<Unit> {
-        app.repository.createPurchase(InstallmentPurchase("unified-purchase", "Compra", "Carteira", Category.OTHER,
-            10000, 2, month.atDay(12)))
-        val due = app.repository.commitmentSetup(month).first().installments.first()
-        val record = Record("installment-payment", due.amountCents, Movement.EXPENSE, due.method, due.category,
-            due.bank, due.title, month.atDay(12).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
-        assertTrue(app.repository.confirmInstallment(due.id, record, due.purchaseRevision))
-        scroll("actions-${due.id}")
-        rule.onNodeWithTag("actions-${due.id}").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-        rule.onNodeWithText("Editar lançamento").assertIsDisplayed()
-        rule.onNodeWithTag("edit-${due.id}").assertDoesNotExist()
-        assertEquals(1, app.repository.exportRecords().size)
-    }
-    @Test fun planningKeepsAnalysisWithoutDuplicatedMovementManagement() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag("open-planning"))
-        rule.onNodeWithTag("open-planning").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-        rule.onNodeWithTag("planning-list").assertIsDisplayed()
+
+    @Test fun projectionsKeepAnalysisSeparateFromActualMovementManagement() {
+        ui.seed(ForecastRule("analysis", month.atDay(1), "Despesa prevista", ForecastKind.EXPENSE,
+            5000, Category.HOME, ForecastFrequency.MONTHLY, month.atDay(1)))
+        val actual = Record("realized", 2500, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+            "Carteira", "Despesa realizada", System.currentTimeMillis())
+        seedActual(actual)
+        ui.clickText("Projeções")
+        rule.onNodeWithTag("forecast-projections").assertExists()
+        rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag("projection-margin-${month.atDay(1)}"))
+        rule.onNodeWithTag("projection-margin-${month.atDay(1)}").assertTextContains(Money.format(-5000))
         rule.onNodeWithText("Adicionar recorrência").assertDoesNotExist()
-        rule.onNodeWithText("Contas e receitas recorrentes").assertDoesNotExist()
-        rule.scrollAnalysisTo(hasText("Orçamentos por categoria"))
-        rule.onNodeWithText("Orçamentos por categoria").assertIsDisplayed()
+        rule.onNodeWithText("Registrar pagamento").assertDoesNotExist()
+        assertEquals(5000L, ui.report().totalExpensesCents)
+        assertEquals(2500L, Ledger.month(listOf(actual), month, ZoneId.systemDefault()).expenses)
+        assertEquals(listOf(actual), runBlocking { ui.app.repository.exportRecords() })
+    }
+
+    private fun seedActual(record: Record) {
+        runBlocking { assertTrue(ui.app.repository.save(record, null)) }
+        rule.waitUntil(10000) { finance.state.value.records.any { it.id == record.id } }
+    }
+
+    private fun openStatement() {
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Ver extrato do mês"))
+        ui.clickText("Ver extrato do mês")
+        rule.onNodeWithTag("records-list").assertExists()
     }
 }

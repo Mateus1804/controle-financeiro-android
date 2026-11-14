@@ -2,12 +2,9 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
-import java.time.YearMonth
+import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
@@ -15,111 +12,70 @@ import org.junit.Rule
 import org.junit.Test
 
 class PurchaseManagementUiTest {
-    @get:Rule val rule = createLegacyFinanceRule()
-    private val app get() = rule.activity.application as FinanceApplication
-    private val repository get() = app.repository
-    private val dao get() = app.database.financeDao()
-    private val month = YearMonth.now()
-    private fun id(number: Int) = "installment:gestao-ficticia:$number"
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private val ui by lazy { CurrentForecastUi(rule) }
+    private val month get() = ui.month
+    private fun purchase(cents: Long, count: Int) = ForecastRule("compra-ficticia", month.atDay(1),
+        "Compra fictícia", ForecastKind.EXPENSE, cents, Category.OTHER, ForecastFrequency.INSTALLMENTS,
+        month.atDay(1), installmentCount = count)
 
-    @Before fun reset() {
-        runBlocking { repository.clear() }
-        app.settings.finishIntro()
-        rule.waitForIdle()
+    @Before fun reset() = ui.reset()
+
+    @Test fun theWholeInstallmentForecastCanBeCorrectedFromTheDashboard() {
+        ui.seed(purchase(20000, 2))
+        ui.open(ui.report().lines.single())
+        ui.clickText("Só neste ciclo"); ui.clickText("Deste ciclo em diante")
+        rule.onNodeWithTag("forecast-title").performScrollTo().performTextReplacement("Compra corrigida")
+        rule.onNodeWithTag("forecast-installment-count").performScrollTo().performTextReplacement("3")
+        rule.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("21000")
+        ui.saveEditor()
+        ui.waitData { it.rules.singleOrNull()?.amountCents == 21000L }
+        val corrected = ui.data().rules.single()
+        assertEquals("Compra corrigida", corrected.title)
+        assertEquals(3, corrected.installmentCount)
+        assertEquals(listOf(7000L, 7000L, 7000L), (0L..2L).map { ui.report(month.plusMonths(it)).totalExpensesCents })
+        assertEquals(0L, ui.report(month.plusMonths(3)).totalExpensesCents)
+        assertTrue(runBlocking { ui.app.database.financeDao().allPurchases().isEmpty() })
+        ui.assertNoRecords()
     }
 
-    @Test fun unconfirmedPurchaseCanBeCorrectedFromPlanning() = runBlocking<Unit> {
-        createPurchase(20000, 2)
-        openPlanning()
-        tapRowAction("edit-${id(1)}")
-        awaitDialog("Editar compra parcelada")
-        rule.onNodeWithTag("purchase-edit-title").performScrollTo().performTextReplacement("Compra corrigida")
-        rule.onNodeWithTag("installment-count").performScrollTo().performTextReplacement("3")
-        replaceMoney("purchase-total", "21000")
-        rule.onNodeWithText("Salvar alterações da compra").performClick()
-        rule.waitUntil(5000) { runBlocking { dao.purchaseById("gestao-ficticia")?.installmentCount == 3 } }
-        assertEquals("Compra corrigida", dao.allPurchases().single().title)
-        assertEquals(listOf(7000L, 7000L, 7000L), dao.allCommitments().map { it.amountCents })
-        assertEquals(7000L, repository.commitmentReport(month).committedCents)
-        assertTrue(repository.exportRecords().isEmpty())
-    }
-
-    @Test fun recordedHistorySurvivesEditingAndCancellingTheRemainingForecasts() = runBlocking<Unit> {
-        createPurchase(60000, 3)
+    @Test fun recordedHistorySurvivesAdjustingAndStoppingTheRemainingForecasts() {
+        val previous = month.minusMonths(1)
+        val source = purchase(60000, 3).copy(effectiveFrom = previous.atDay(1), startDate = previous.atDay(1))
+        ui.seed(source)
         val payment = Record("pagamento-ficticio", 19000, Movement.EXPENSE, PaymentMethod.CARD, Category.OTHER,
-            "Carteira", "Pagamento fictício", System.currentTimeMillis())
-        assertTrue(repository.confirmInstallment(id(1), payment))
-        repository.saveMonthlyPlan(MonthlyIncomePlan(month.plusMonths(1), 100000))
-        openPlanning()
-        rule.scrollAnalysisTo(hasContentDescription("Próximo mês"))
-        rule.onNodeWithContentDescription("Próximo mês").performClick()
-        // Espera o mês novo emitir a programação antes de procurar a parcela na lista.
-        rule.scrollAnalysisTo(hasTestTag("commitment-card"))
-        rule.waitUntil(5000) { rule.onAllNodesWithContentDescription("20% da renda comprometidos; maior gasto: Compra fictícia · 2/3.").fetchSemanticsNodes().isNotEmpty() }
-        tapRowAction("edit-${id(2)}")
-        awaitDialog("Editar parcela em aberto")
-        replaceMoney("adjust-installment-amount", "22001")
-        rule.onNodeWithText("Salvar parcela").performClick()
-        rule.waitUntil(5000) { runBlocking { dao.commitmentById(id(2))?.amountCents == 22001L } }
-        rule.waitUntil(8000) { rule.onAllNodesWithText("Parcela corrigida nas movimentações.").fetchSemanticsNodes().isEmpty() }
-
-        tapRowAction("cancel-${id(2)}")
-        awaitDialog("Cancelar parcelas em aberto?")
-        rule.onNodeWithText("2 parcelas sairão das movimentações, incluindo as de outros meses.").assertExists()
-        rule.onNodeWithTag("keep-open-installments").performClick()
-        assertEquals(22001L, repository.commitmentReport(month.plusMonths(1)).committedCents)
-        tapRowAction("cancel-${id(2)}")
-        awaitDialog("Cancelar parcelas em aberto?")
-        rule.onNodeWithText("Cancelar parcelas").performClick()
-        rule.waitUntil(5000) { runBlocking { dao.purchaseById("gestao-ficticia")?.openCancelled == true } }
-
-        rule.scrollAnalysisTo(hasTestTag("commitment-card"))
-        rule.waitUntil(5000) { rule.onAllNodesWithContentDescription("0% da renda comprometidos; nenhum compromisso.").fetchSemanticsNodes().isNotEmpty() }
-        assertEquals(19000L, repository.commitmentReport(month).committedCents)
-        assertEquals(0L, repository.commitmentReport(month.plusMonths(1)).committedCents)
-        assertEquals(0L, repository.commitmentReport(month.plusMonths(2)).committedCents)
-        assertEquals(listOf(payment), repository.exportRecords())
-        assertEquals(payment.id, dao.commitmentById(id(1))!!.recordId)
+            "Carteira", "Pagamento fictício", previous.atDay(12).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
+        runBlocking { assertTrue(ui.app.repository.save(payment, null)) }
+        ui.open(ui.report().lines.single())
+        rule.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("22001")
+        ui.saveEditor()
+        ui.waitData { it.overrides.singleOrNull()?.amountCents == 22001L }
+        assertEquals(22001L, ui.report().totalExpensesCents)
+        assertEquals(20000L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        ui.action(ui.report().lines.single(), "Interromper futuras")
+        ui.waitData { it.rules.any { version -> !version.active } }
+        assertEquals(20000L, ui.report(previous).totalExpensesCents)
+        assertEquals(0L, ui.report().totalExpensesCents)
+        assertEquals(0L, ui.report(month.plusMonths(1)).totalExpensesCents)
+        assertEquals(listOf(payment), runBlocking { ui.app.repository.exportRecords() })
+        assertEquals(19000L, Ledger.month(listOf(payment), previous, ZoneId.systemDefault()).expenses)
+        assertEquals(0L, Ledger.month(listOf(payment), month, ZoneId.systemDefault()).expenses)
+        assertEquals(22001L, ui.data().overrides.single().amountCents)
     }
 
-    @Test fun purchaseEditorRequiresExplicitRevealWhenValuesAreHidden() = runBlocking<Unit> {
-        createPurchase(60000, 3)
-        rule.runOnIdle { app.settings.hideAmounts(true) }
-        openPlanning()
-        tapRowAction("edit-${id(1)}")
-        awaitDialog("Editar compra parcelada")
-        rule.onNodeWithTag("purchase-total").assertDoesNotExist()
+    @Test fun installmentEditorRequiresExplicitRevealWhenValuesAreHidden() {
+        ui.seed(purchase(60000, 3))
+        rule.runOnIdle { ui.app.settings.hideAmounts(true) }
+        ui.open(ui.report().lines.single())
+        rule.onNodeWithTag("forecast-amount").assertDoesNotExist()
         rule.onAllNodesWithText(Money.format(60000), substring = true).assertCountEquals(0)
-        rule.onNodeWithText("Mostrar valores da compra para edição").performScrollTo().performClick()
-        rule.onNodeWithTag("purchase-total").assertExists()
-    }
-
-    private suspend fun createPurchase(cents: Long, count: Int) {
-        assertTrue(repository.createPurchase(InstallmentPurchase("gestao-ficticia", "Compra fictícia", "Carteira",
-            Category.OTHER, cents, count, month.atDay(12))))
-    }
-
-    private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
-        rule.onNodeWithText("Planejamento e análises").performClick()
-        rule.scrollAnalysisTo(hasTestTag("edit-monthly-income"))
-        rule.waitUntil(5000) { rule.onAllNodes(hasTestTag("edit-monthly-income") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-    }
-
-    private fun tapRowAction(tag: String) {
-        rule.performPlanningAction(tag)
-    }
-
-    private fun awaitDialog(title: String) {
-        rule.waitUntil(5000) { rule.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
-    }
-
-    private fun replaceMoney(tag: String, cents: String) {
-        val field = rule.onNodeWithTag(tag).performScrollTo()
-        field.performTextReplacement(cents)
-        field.performImeAction()
-        rule.waitUntil(5000) {
-            ViewCompat.getRootWindowInsets(rule.activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
-        }
+        rule.onAllNodesWithText(Money.format(20000), substring = true).assertCountEquals(0)
+        rule.onNodeWithText("Mostrar valor da previsão para edição").performScrollTo().performClick()
+        val amount = rule.onNodeWithTag("forecast-amount").assertExists().fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
+        assertEquals(20000L, MoneyInput.normalize(amount)?.toLongOrNull())
+        assertEquals(60000L, ui.data().rules.single().amountCents)
+        assertTrue(ui.data().overrides.isEmpty())
+        ui.assertNoRecords()
     }
 }

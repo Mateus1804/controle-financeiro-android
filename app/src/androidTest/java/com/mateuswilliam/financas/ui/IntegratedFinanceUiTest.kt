@@ -1,12 +1,18 @@
 package com.mateuswilliam.financas.ui
 
+import androidx.compose.runtime.*
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.lifecycle.ViewModelProvider
+import androidx.test.core.app.ApplicationProvider
 import com.mateuswilliam.financas.FinanceApplication
+import com.mateuswilliam.financas.ForecastViewModel
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
@@ -14,48 +20,97 @@ import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.ZoneId
 
 class IntegratedFinanceUiTest {
-    @get:Rule val rule = createLegacyFinanceRule()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private val app get() = rule.activity.application as FinanceApplication
-    @Before fun reset() {
-        runBlocking { app.repository.clear() }
-        app.settings.finishIntro()
-        rule.waitForIdle()
-    }
-    private fun clickTag(tag: String) = rule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-    private fun scrollDashboard(tag: String) = rule.onNodeWithTag("dashboard-list").performScrollToNode(hasTestTag(tag))
+    @Before fun reset() = rule.resetReviewBackupMain()
 
-    @Test fun forecastsUseTheSameResultOnDashboardAndAnalysisWithoutTurningReferenceIncomeIntoRevenue() = runBlocking<Unit> {
-        val month = YearMonth.now()
-        app.repository.saveMonthlyPlan(MonthlyIncomePlan(month, 999999, 3000))
-        app.repository.saveRecurring(RecurringPlan("salary", "Salário", 10000, Movement.INCOME, PaymentMethod.PIX,
-            Category.SALARY, "Minha conta", month.atDay(20).toString(), 20))
-        app.repository.saveRecurring(RecurringPlan("rent", "Aluguel", 5000, Movement.EXPENSE, PaymentMethod.PIX,
-            Category.HOME, "Minha conta", month.atDay(20).toString(), 20))
+    @Test fun projectionsUseForecastIncomeWithoutTurningMonthlyReferenceIntoRevenue() = runBlocking<Unit> {
+        val date = LocalDate.now()
+        app.repository.saveMonthlyPlan(MonthlyIncomePlan(YearMonth.from(date), 999999, 3000))
+        val salary = ForecastRule("salary", date, "Salário fictício", ForecastKind.INCOME,
+            10000, Category.SALARY, ForecastFrequency.MONTHLY, date)
+        val rent = ForecastRule("rent", date, "Aluguel fictício", ForecastKind.EXPENSE,
+            5000, Category.HOME, ForecastFrequency.MONTHLY, date)
+        app.forecasts.saveRule(salary)
+        app.forecasts.saveRule(rent)
+        val model = ViewModelProvider(rule.activity)[ForecastViewModel::class.java]
+        model.refresh()
+        rule.waitUntil(10000) { model.dataset.value?.rules?.size == 2 }
+        val data = app.forecasts.dataset.first()
+        val period = CycleCalendar.periodContaining(date, data.cycleRules)
+        val report = ForecastCalculator.report(data, period)
+        assertEquals(10000L, report.incomeCents)
+        assertEquals(5000L, report.totalExpensesCents)
+        assertEquals(5000L, report.marginCents)
+        assertEquals(setOf(salary.itemId, rent.itemId), data.rules.map { it.itemId }.toSet())
+        assertTrue(app.repository.exportRecords().isEmpty())
+        // O resumo mensal apresenta a referência manual; o ciclo usa somente as previsões cadastradas.
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("salary-month-summary"))
         rule.waitUntil(10000) {
-            try { scrollDashboard("projected-result"); rule.onNodeWithTag("projected-result").assertTextContains("50,00", substring = true); true }
-            catch (_: AssertionError) { false }
+            rule.onAllNodes(hasTestTag("salary-remaining") and hasText(Money.format(999999), substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
-        assertTrue(app.repository.exportRecords().isEmpty())
-        scrollDashboard("open-planning"); clickTag("open-planning")
-        rule.onNodeWithTag("planning-list").performScrollToNode(hasTestTag("projected-result"))
-        rule.onNodeWithTag("projected-result").assertTextContains("50,00", substring = true)
+        rule.onNodeWithTag("salary-remaining").assertTextContains(Money.format(999999))
+        val lineTag = "forecast-actions:rent:${report.lines.single { it.itemId == rent.itemId }.occurrenceKey}"
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(lineTag))
+        rule.onNodeWithText("Aluguel fictício").assertExists()
+        rule.onNode(hasText("Projeções") and hasClickAction()).performClick()
+        val projection = "projection-margin-${period.start}"
+        rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag(projection))
+        rule.onNodeWithTag(projection).assertTextContains(Money.format(report.marginCents))
+        assertEquals(999999L, app.database.financeDao().allMonthlyPlans().single().incomeCents)
         assertTrue(app.repository.exportRecords().isEmpty())
     }
+}
 
-    @Test fun initialZeroBalanceIsExplicitAndAccountStatementCanBeOpened() {
-        scrollDashboard("open-accounts"); clickTag("open-accounts")
-        clickTag("new-account-balance")
+/** O componente compartilhado ainda não tem entrada no planejador principal; este teste não cria outra raiz. */
+class ReviewBackupAccountsComponentTest {
+    @get:Rule val rule = createComposeRule()
+    private val app get() = ApplicationProvider.getApplicationContext<FinanceApplication>()
+    @Before fun reset() = runBlocking<Unit> {
+        app.maintenanceReady.await()
+        app.repository.clear()
+    }
+
+    @Test fun explicitZeroBalancePersistsWithoutRevenueAndStatementActionSelectsTheAccount() {
+        var requestedStatement: AccountOption? = null
+        rule.setContent {
+            FinanceTheme {
+                val balances by remember { app.repository.observeAccountBalances() }.collectAsState(initial = emptyList())
+                val references by app.repository.accountBalanceEvents.collectAsState(initial = emptyList())
+                val scope = rememberCoroutineScope()
+                AccountsManager(balances, references, hidden = false, busy = false, onDismiss = {},
+                    onStatement = { requestedStatement = it },
+                    onSave = { name, cents, at, reason, saved -> scope.launch {
+                        app.repository.configureAccountBalance(name, cents, at, reason)
+                        saved()
+                    } },
+                    onArchive = { key, archived -> scope.launch { app.repository.setAccountArchived(key, archived) } })
+            }
+        }
+        rule.onNodeWithTag("new-account-balance").performClick()
         rule.onNodeWithTag("balance-account-name").performTextInput("Carteira pessoal")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        rule.onNodeWithTag("save-account-balance").performClick()
+        rule.onNodeWithText("Informe o saldo, inclusive se for zero.").assertExists()
+        assertTrue(runBlocking { app.repository.observeAccountBalances().first().isEmpty() })
         rule.onNodeWithTag("account-balance-input").performScrollTo().performTextInput("0")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
-        clickTag("save-account-balance")
-        rule.waitUntil(10000) { runBlocking { app.repository.observeAccountBalances().first().any { it.account.label == "Carteira pessoal" && it.balanceCents == 0L } } }
+        rule.onNodeWithTag("save-account-balance").performClick()
+        rule.waitUntil(10000) { runBlocking {
+            app.repository.observeAccountBalances().first().any { it.account.label == "Carteira pessoal" && it.balanceCents == 0L }
+        } }
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("save-account-balance").fetchSemanticsNodes().isEmpty() }
         rule.onNodeWithText("Carteira pessoal").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-        rule.onNodeWithTag("records-list").assertExists()
-        rule.onNodeWithText("Conta: Carteira pessoal · Limpar filtro").assertExists()
+        rule.runOnIdle {
+            assertEquals(AccountNames.key("Carteira pessoal"), requestedStatement?.key)
+            assertEquals("Carteira pessoal", requestedStatement?.label)
+        }
+        val balance = runBlocking { app.repository.observeAccountBalances().first().single() }
+        assertEquals(0L, balance.balanceCents)
+        assertEquals(0L, balance.reference!!.balanceCents)
+        assertEquals("Saldo inicial", balance.reference!!.reason)
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
     }
 }

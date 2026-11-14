@@ -2,197 +2,115 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
-import com.mateuswilliam.financas.core.Category
-import com.mateuswilliam.financas.core.Money
-import com.mateuswilliam.financas.core.Movement
-import com.mateuswilliam.financas.core.PaymentMethod
-import com.mateuswilliam.financas.data.DraftEntity
+import com.mateuswilliam.financas.core.*
 import java.io.ByteArrayInputStream
-import java.time.YearMonth
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+/** Current forecasts, independent actual records, occurrence edits and encrypted restore. */
 class CommitmentJourneyTest {
-    @get:Rule val rule = createLegacyFinanceRule()
-    private val app get() = rule.activity.application as FinanceApplication
-    private val repository get() = app.repository
-    private val dao get() = app.database.financeDao()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private val ui by lazy { ForecastReportTestDriver(rule) }
+    private val app get() = ui.app
 
-    @Test fun incomeToPaymentAdjustmentCancellationAndEncryptedRestore() = runBlocking<Unit> {
-        repository.clear()
-        app.settings.finishIntro()
-        rule.waitForIdle()
-        val month = YearMonth.now()
-        val next = month.plusMonths(1)
+    @Before fun reset() = ui.reset()
 
-        rule.onNodeWithContentDescription("Novo lançamento").performClick()
-        setInstallments(count = "4", alreadyPaid = "1")
-        type("purchase-total", "60000")
-        describePurchase("Compra em andamento")
-        rule.onNodeWithText("Salvar compra parcelada").performClick()
-        rule.waitUntil(5000) { runBlocking { dao.allPurchases().size == 1 } }
-        val ongoing = dao.allPurchases().single()
-        assertEquals(listOf(2, 3, 4), dao.installmentsForPurchase(ongoing.id).map { it.installmentNumber })
-        assertTrue(repository.exportRecords().isEmpty())
-        waitForMessageToClose("Compra salva.")
+    @Test fun forecastToIndependentExpenseOccurrenceAdjustmentStopAndEncryptedRestore() = runBlocking<Unit> {
+        ui.clickTag("forecast-add-income", dashboard = true)
+        ui.type("forecast-title", "Salário fictício")
+        ui.type("forecast-amount", "100000")
+        ui.saveForecast()
+        ui.waitRules(1)
+        ui.clickTag("forecast-add-expense", dashboard = true)
+        ui.type("forecast-title", "Compra prevista fictícia")
+        rule.onNodeWithText("Uma vez").performScrollTo().performClick()
+        rule.onNodeWithText("Parcelada").performClick()
+        ui.type("forecast-amount", "60001")
+        ui.type("forecast-installment-count", "3")
+        ui.saveForecast()
+        ui.waitRules(2)
+        val cycle = ui.period()
+        val next = CycleCalendar.periodContaining(cycle.endExclusive, ui.current().cycleRules)
+        val third = CycleCalendar.periodContaining(next.endExclusive, ui.current().cycleRules)
+        val firstPart = ui.report().lines.single { it.kind == ForecastKind.EXPENSE }
+        assertEquals(20001L, firstPart.amountCents)
+        assertEquals(20000L, ui.report(next).totalExpensesCents)
+        assertEquals(20000L, ui.report(third).totalExpensesCents)
+        assertTrue(app.repository.exportRecords().isEmpty())
 
-        val draftId = "jornada-ficticia"
-        val now = System.currentTimeMillis()
-        dao.insertDraft(DraftEntity(draftId, "fixture:jornada", "fixture.local", "Banco fictício",
-            "EXEMPLO FICTÍCIO", "Compra aprovada no cartão de R$ 600,00.", 60000, Movement.EXPENSE,
-            PaymentMethod.CARD, Category.OTHER, "Dados fictícios", now, now - 60_000))
-        rule.onNodeWithText("Revisar").performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithTag("review-$draftId").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("review-$draftId").performClick()
-        setInstallments(count = "3")
-        rule.onNodeWithTag("purchase-preview-total").assertTextEquals("Total da compra: ${Money.format(60000)}")
-        describePurchase("Compra revisada")
-        rule.onNodeWithText("Salvar compra parcelada").performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Ver pendências").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Ver pendências").performClick()
-        waitForMessageToClose("Compra salva.")
-        val reviewed = dao.allPurchases().single { it.sourceDraftId == draftId }
-        assertEquals("SAVED", dao.draftById(draftId)?.status)
-        assertTrue(repository.exportRecords().isEmpty())
+        // Registering an actual expense never confirms or consumes a forecast occurrence.
+        ui.clickTag("add-realized-expense")
+        ui.type("amount-input", "22000")
+        rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement("Despesa realizada fictícia")
+        rule.onNodeWithText("Descrição").performImeAction()
+        ui.clickText("Registrar despesa")
+        rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().size == 1 } }
+        val actual = app.repository.exportRecords().single()
+        assertEquals(22000L, actual.amountCents)
+        assertEquals(Movement.EXPENSE, actual.movement)
+        assertEquals(20001L, ui.report().totalExpensesCents)
+        assertEquals(79999L, ui.report().marginCents)
+        assertTrue(app.database.financeDao().allCommitments().isEmpty())
 
-        rule.onNodeWithText("Resumo").performClick()
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
-        rule.onNodeWithText("Planejamento e análises").performClick()
-        saveIncome(month, "36")
-        assertChart("35%", "Compra revisada · 1/3", 65000)
-        rule.onNodeWithText("Atenção").assertExists()
-        assertTrue(repository.exportRecords().isEmpty())
-
-        val paidId = "installment:${reviewed.id}:1"
-        tapPlanning("confirm-$paidId")
-        rule.onNodeWithText("Conferir parcela").assertExists()
-        typeAndCloseKeyboard("amount-input", "22000")
-        rule.onNodeWithText("Confirmar").performClick()
-        rule.waitUntil(5000) { runBlocking { repository.exportRecords().size == 1 } }
-        val payment = repository.exportRecords().single()
-        assertEquals(22000L, payment.amountCents)
-        assertEquals(payment.id, dao.commitmentById(paidId)?.recordId)
-        assertChart("37%", "Compra revisada · 1/3", 63000)
-        rule.onNodeWithText("Acima do limite").assertExists()
-
+        ui.edit(firstPart)
+        rule.onNodeWithText("Só neste ciclo").assertExists()
+        ui.type("forecast-amount", "22500")
+        ui.saveForecast()
+        ui.waitData { it.overrides.singleOrNull()?.amountCents == 22500L }
+        assertEquals(22500L, ui.report().totalExpensesCents)
+        assertEquals(77500L, ui.report().marginCents)
+        assertEquals("22.50", ui.report().expensePercentage?.toPlainString())
+        assertEquals(20000L, ui.report(next).totalExpensesCents)
+        assertEquals(listOf(actual), app.repository.exportRecords())
+        ui.openProjections()
+        ui.assertProjection(cycle, "22,50", 77500)
         rule.runOnIdle { app.settings.hideAmounts(true) }
-        rule.onNodeWithText("Renda e limite ocultos").assertExists()
-        rule.onNodeWithTag("commitment-donut").assertDoesNotExist()
-        rule.onAllNodes(hasText("37%", substring = true) or hasContentDescription("37%", substring = true)).assertCountEquals(0)
+        rule.onAllNodesWithText("Percentual oculto").onFirst().assertExists()
+        rule.onAllNodes(hasText("22,50%", substring = true) or hasContentDescription("22,50%", substring = true)).assertCountEquals(0)
+        rule.onAllNodes(hasText(Money.format(77500), substring = true) or
+            hasContentDescription(Money.format(77500), substring = true)).assertCountEquals(0)
         rule.runOnIdle { app.settings.hideAmounts(false) }
 
-        rule.scrollAnalysisTo(hasContentDescription("Próximo mês"))
-        rule.onNodeWithContentDescription("Próximo mês").performClick()
-        scrollTo("commitment-card")
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Renda ainda não informada").fetchSemanticsNodes().isNotEmpty() }
-        saveIncome(next, "30")
-        assertChart("35%", "Compra revisada · 2/3", 65000)
+        ui.clickText("Orçamento")
+        ui.clickTag("forecast-cycle-next", dashboard = true)
+        val nextPart = ui.report(next).lines.single { it.kind == ForecastKind.EXPENSE }
+        ui.openActions(nextPart)
+        ui.clickText("Interromper futuras")
+        ui.waitData { it.rules.any { value -> value.itemId == firstPart.itemId && !value.active } }
+        assertEquals(22500L, ui.report(cycle).totalExpensesCents)
+        assertEquals(0L, ui.report(next).totalExpensesCents)
+        assertEquals(0L, ui.report(third).totalExpensesCents)
+        assertEquals(listOf(actual), app.repository.exportRecords())
 
-        val openId = "installment:${reviewed.id}:2"
-        tapPlanning("edit-$openId")
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Editar parcela em aberto").fetchSemanticsNodes().isNotEmpty() }
-        typeAndCloseKeyboard("adjust-installment-amount", "22500")
-        rule.onNodeWithText("Salvar parcela").performClick()
-        assertChart("37,5%", "Compra revisada · 2/3", 62500)
-        waitForMessageToClose("Parcela corrigida nas movimentações.")
-
-        tapPlanning("cancel-$openId")
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Cancelar parcelas em aberto?").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("2 parcelas sairão das movimentações, incluindo as de outros meses.").assertExists()
-        rule.onNodeWithText("Cancelar parcelas").performClick()
-        assertChart("15%", "Compra em andamento · 3/4", 85000)
-        rule.onNodeWithText("Confortável").assertExists()
-        assertEquals(15000L, repository.commitmentReport(next.plusMonths(1)).committedCents)
-        assertEquals(listOf(payment), repository.exportRecords())
-
-        // O seletor e a confirmação visual são cobertos em BackupDocumentFlowTest.
-        val before = repository.snapshot()
+        // The document picker is covered by BackupDocumentFlowTest; this checks encrypted data.
+        val before = app.repository.snapshot()
         val encrypted = app.backups.create(testPassword())
-        repository.saveMonthlyPlan(before.monthlyPlans.single { it.month == next.toString() }.toPlan().copy(incomeCents = 200000))
+        app.forecasts.saveOverride(ForecastOverride(firstPart.itemId, firstPart.occurrenceKey, 23000))
+        ui.waitData { it.overrides.singleOrNull()?.amountCents == 23000L }
+        assertEquals(23000L, ui.report(cycle).totalExpensesCents)
         val preview = app.backups.stage(ByteArrayInputStream(encrypted), testPassword())
-        assertEquals(2, preview.purchases)
-        assertEquals(200000L, repository.commitmentReport(next).incomeCents)
-        assertChart("7,5%", "Compra em andamento · 3/4", 185000)
+        assertEquals(23000L, ui.report(cycle).totalExpensesCents)
         app.backups.restore(preview)
-        assertChart("15%", "Compra em andamento · 3/4", 85000)
-        val restored = repository.snapshot()
-        assertEquals(before.monthlyPlans, restored.monthlyPlans)
-        assertEquals(before.purchases, restored.purchases)
-        assertEquals(before.commitments, restored.commitments)
-        assertEquals(listOf(payment), repository.exportRecords())
-        assertEquals(37000L, repository.commitmentReport(month).committedCents)
-        assertEquals(15000L, repository.commitmentReport(next.plusMonths(1)).committedCents)
-    }
-
-    private fun setInstallments(count: String, alreadyPaid: String? = null) {
-        rule.chooseInstallments()
-        type("installment-count", count)
-        alreadyPaid?.let { type("installments-paid", it) }
-    }
-
-    private fun describePurchase(description: String) {
-        val field = rule.onNodeWithText("Descrição").performScrollTo()
-        field.performTextReplacement(description)
-        field.performImeAction()
-        waitForKeyboard()
-    }
-
-    private fun saveIncome(month: YearMonth, limit: String) {
-        scrollTo("edit-monthly-income")
-        rule.waitUntil(5000) {
-            rule.onAllNodes(hasTestTag("edit-monthly-income") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
-        }
-        rule.onNodeWithTag("edit-monthly-income").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
-        rule.waitUntil(5000) { rule.onAllNodesWithTag("monthly-income").fetchSemanticsNodes().isNotEmpty() }
-        type("monthly-income", "100000")
-        typeAndCloseKeyboard("monthly-commitment-limit", limit)
-        rule.onNodeWithText("Salvar renda e limite").performClick()
-        rule.waitUntil(5000) { runBlocking { dao.monthlyPlan(month.toString())?.incomeCents == 100000L } }
-        waitForMessageToClose("Renda prevista e limite salvos")
-    }
-
-    private fun assertChart(percentage: String, largest: String, freeCents: Long) {
-        scrollTo("commitment-card")
-        val description = "$percentage da renda comprometidos; maior gasto: $largest."
-        rule.waitUntil(5000) { rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("commitment-donut").assertContentDescriptionEquals(description)
-        scrollTo("commitment-legend-free")
-        rule.onNodeWithTag("commitment-legend-free").assertTextContains(Money.format(freeCents))
-        scrollTo("commitment-card")
-    }
-
-    private fun tapPlanning(tag: String) {
-        rule.performPlanningAction(tag)
-    }
-
-    private fun scrollTo(tag: String) {
-        rule.scrollPlanningToTag(tag)
-    }
-
-    private fun type(tag: String, value: String) {
-        rule.onNodeWithTag(tag).performScrollTo().performTextReplacement(value)
-    }
-
-    private fun typeAndCloseKeyboard(tag: String, value: String) {
-        type(tag, value)
-        rule.onNodeWithTag(tag).performImeAction()
-        waitForKeyboard()
-    }
-
-    private fun waitForKeyboard() {
-        rule.waitUntil(5000) {
-            ViewCompat.getRootWindowInsets(rule.activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) != true
-        }
-    }
-
-    private fun waitForMessageToClose(prefix: String) {
-        rule.dismissFeedback(prefix)
+        ui.model.refresh()
+        ui.waitData { it.overrides.singleOrNull()?.amountCents == 22500L }
+        val restored = app.repository.snapshot()
+        assertEquals(before.forecastRules, restored.forecastRules)
+        assertEquals(before.forecastOverrides, restored.forecastOverrides)
+        assertEquals(before.cycleRules, restored.cycleRules)
+        assertEquals(before.records, restored.records)
+        assertEquals(listOf(actual), app.repository.exportRecords())
+        assertEquals(22500L, ui.report(cycle).totalExpensesCents)
+        assertEquals(0L, ui.report(next).totalExpensesCents)
+        assertEquals(0L, ui.report(third).totalExpensesCents)
+        rule.activityRule.scenario.recreate()
+        ui.waitData { it.overrides.singleOrNull()?.amountCents == 22500L }
+        ui.openProjections()
+        ui.assertProjection(next, "0,00", 100000)
+        assertEquals(listOf(actual), app.repository.exportRecords())
     }
 
     private fun testPassword() = "Senha fictícia de teste 2026!".toCharArray()
