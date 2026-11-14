@@ -221,7 +221,10 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     navigation.tab == 4 -> RecordsScreen(realized, month, { navigation.monthText = it.toString() }, hidden, navigation.recordCategory,
                         { navigation.recordCategory = it }, { openActual(recordId = it.id) },
                         expenseFilter = navigation.expenseDimension?.let { ExpenseFilter(it, navigation.expenseKey, navigation.expenseLabel) },
-                        onClearExpenseFilter = { navigation.expenseDimension = null }, realizedOnly = true)
+                        onClearExpenseFilter = { navigation.expenseDimension = null },
+                        accountFilter = oldState.accountBalances.firstOrNull { it.account.key == navigation.accountFilterKey }?.account
+                            ?: oldState.accounts.firstOrNull { it.key == navigation.accountFilterKey },
+                        onClearAccount = { navigation.accountFilterKey = null }, realizedOnly = true)
                     navigation.tab == 3 -> SettingsScreen(settings, connected, hasAccess, canAlert, captureError,
                         onToggle = { enabled -> if (enabled && !settings.consented) editors.disclosure = true else finance.preferences.setEnabled(enabled) },
                         onApps = { if (!settings.consented) editors.disclosure = true else { editors.appPicker = true; finance.loadApps() } },
@@ -248,7 +251,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         represented = represented)
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
                         monthlyDashboardCards(navigation, editors, month, salarySummary, paydayBudget,
-                            monthComparison, realized, oldState.pending.size, knownBalances.isNotEmpty(), hidden,
+                            monthComparison, realized, oldState.pending.size, oldState.accountBalances, knownBalances.isNotEmpty(), hidden,
                             onNewSalary = { newItem(ForecastKind.INCOME, "Salário") })
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
                         item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { navigation.followingCurrent = true; navigation.browsing = today.toString() }, { editors.cycleEditor = true }) }
@@ -285,6 +288,12 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             }
         }
     }
+    if (editors.accountsOpen) AccountsManager(oldState.accountBalances, oldState.balanceReferences, hidden, busy,
+        onDismiss = { editors.accountsOpen = false },
+        onStatement = { account ->
+            navigation.accountFilterKey = account.key; navigation.recordCategory = null; navigation.expenseDimension = null
+            editors.accountsOpen = false; navigation.tab = 4
+        }, onSave = finance::configureAccountBalance, onArchive = finance::setAccountArchived)
     if (editors.salaryEditor) key(navigation.monthText) {
         SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { editors.salaryEditor = false }) { cents ->
             finance.saveMonthlyIncome(MonthlyIncomePlan(month, cents, salaryReference?.healthyLimitBasisPoints ?: 3000)) {

@@ -64,31 +64,15 @@ class IntegratedFinanceUiTest {
     }
 }
 
-/** O componente compartilhado ainda não tem entrada no planejador principal; este teste não cria outra raiz. */
-class ReviewBackupAccountsComponentTest {
-    @get:Rule val rule = createComposeRule()
-    private val app get() = ApplicationProvider.getApplicationContext<FinanceApplication>()
-    @Before fun reset() = runBlocking<Unit> {
-        app.maintenanceReady.await()
-        app.repository.clear()
-    }
+/** Exercita o cadastro pelo caminho oferecido na tela principal. */
+class MainAccountsUiTest {
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private val app get() = rule.activity.application as FinanceApplication
+    @Before fun reset() = rule.resetReviewBackupMain()
 
     @Test fun explicitZeroBalancePersistsWithoutRevenueAndStatementActionSelectsTheAccount() {
-        var requestedStatement: AccountOption? = null
-        rule.setContent {
-            FinanceTheme {
-                val balances by remember { app.repository.observeAccountBalances() }.collectAsState(initial = emptyList())
-                val references by app.repository.accountBalanceEvents.collectAsState(initial = emptyList())
-                val scope = rememberCoroutineScope()
-                AccountsManager(balances, references, hidden = false, busy = false, onDismiss = {},
-                    onStatement = { requestedStatement = it },
-                    onSave = { name, cents, at, reason, saved -> scope.launch {
-                        app.repository.configureAccountBalance(name, cents, at, reason)
-                        saved()
-                    } },
-                    onArchive = { key, archived -> scope.launch { app.repository.setAccountArchived(key, archived) } })
-            }
-        }
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("payday-accounts"))
+        rule.onNodeWithTag("payday-accounts").performClick()
         rule.onNodeWithTag("new-account-balance").performClick()
         rule.onNodeWithTag("balance-account-name").performTextInput("Carteira pessoal")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
@@ -103,14 +87,24 @@ class ReviewBackupAccountsComponentTest {
         } }
         rule.waitUntil(10000) { rule.onAllNodesWithTag("save-account-balance").fetchSemanticsNodes().isEmpty() }
         rule.onNodeWithText("Carteira pessoal").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-        rule.runOnIdle {
-            assertEquals(AccountNames.key("Carteira pessoal"), requestedStatement?.key)
-            assertEquals("Carteira pessoal", requestedStatement?.label)
-        }
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Conta: Carteira pessoal · Limpar filtro"))
+        rule.onNodeWithText("Conta: Carteira pessoal · Limpar filtro").assertExists()
+        rule.activityRule.scenario.recreate()
+        rule.waitForIdle()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Conta: Carteira pessoal · Limpar filtro"))
+        rule.onNodeWithText("Conta: Carteira pessoal · Limpar filtro").assertExists()
         val balance = runBlocking { app.repository.observeAccountBalances().first().single() }
         assertEquals(0L, balance.balanceCents)
         assertEquals(0L, balance.reference!!.balanceCents)
         assertEquals("Saldo inicial", balance.reference!!.reason)
+        runBlocking { app.repository.setAccountArchived(balance.account.key, true) }
+        rule.onNode(hasText("Orçamento") and hasClickAction()).performClick()
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("open-accounts"))
+        rule.onNodeWithTag("open-accounts").performClick()
+        rule.waitUntil(10000) { rule.onAllNodesWithText("Carteira pessoal · Arquivada").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Carteira pessoal · Arquivada").performClick()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Conta: Carteira pessoal · Limpar filtro"))
+        rule.onNodeWithText("Conta: Carteira pessoal · Limpar filtro").assertExists()
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
     }
 }
