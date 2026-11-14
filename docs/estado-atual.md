@@ -1,11 +1,9 @@
-# Estado atual do Rendly
+A fila foi integrada na main com merge commits e branches mantidas: #24, #25, #26, #27, #28, #29, #35, #30, #31, #32, #33, #37, #38 e #34. Os PRs #39 e #40 também foram integrados. O #36 foi fechado sem merge; a assinatura ficou fora do escopo. Não restam PRs abertos.
 
-A fila foi integrada na main por merge commit, mantendo as branches: #24, #25, #26, #27, #28, #29, #35, #30, #31, #32, #33, #37, #38 e #34. A integração terminou em e333598. O #36 foi fechado sem merge, com comentário de que assinatura está fora do escopo.
+A main reúne a interface principal única, testes migrados, estados separados, acesso aos saldos das contas, edição das categorias lembradas e melhorias no gráfico e na acessibilidade. O cálculo até o salário agora desconta os compromissos sem descontar a reserva, separa os gastos variáveis previstos e avisa quando o saldo das contas está incompleto.
 
-A main contém a tela principal única, testes migrados para a interface real, estados de navegação/edição/revisão separados, acesso ao cadastro de saldos, gestão de categorias lembradas e melhorias no gráfico e na acessibilidade. O banco e o backup ainda são os existentes; o reset solicitado para a próxima etapa ainda não foi aplicado.
+A pedido do usuário, os merges foram concluídos sem executar novos testes nem esperar o CI. Houve uma validação anterior aprovada na API 35, no commit e333598, mas ela não comprova a versão final após os últimos merges. Não foram feitos testes manuais de TalkBack, biometria ou notificações reais em aparelho físico.
 
-Após a instrução de acelerar os merges, não foram aguardados novos testes por PR a partir do #26. Não se apresenta essa integração como retestada individualmente. Depois da integração, o comando local de core, build do app/APK de testes e lint passou; o Gradle reaproveitou tarefas sem mudança. O CI automático da main está executando a validação na API 35. O último conjunto de código anterior à integração tinha 226 testes JVM do core e 240 testes instrumentados aprovados; isso não substitui o resultado do novo CI da main.
+O Prompt 2 está parcialmente implementado: o mapa de telas e a correção do salário entraram; faltam as quatro abas, a tela Mês simplificada, a organização de Gráficos e Fixas e parcelas, o armazenamento novo e a limpeza. O banco atual e os backups continuam preservados. O início vazio, já autorizado, ainda não foi aplicado.
 
-Não foram realizados testes manuais de TalkBack, biometria ou notificações reais em aparelho físico. Os exemplos de notificações disponíveis são sintéticos.
-
-Riscos: a assinatura definitiva está fora do escopo; a previsão até salário ainda desconta a meta total da reserva até a alteração do Prompt 2; a compatibilidade de notificações depende dos textos recebidos. O proprietário confirmou que a próxima estrutura começará vazia, descartando os dados atuais e sem leitura dos backups antigos. Essa perda e a incompatibilidade serão documentadas antes da alteração do armazenamento.
+Riscos restantes: possíveis regressões sem validação final, formatos de notificações não reconhecidos e ausência de assinatura definitiva. A futura troca de armazenamento descartará os dados atuais e não aceitará backups antigos, conforme autorizado.
