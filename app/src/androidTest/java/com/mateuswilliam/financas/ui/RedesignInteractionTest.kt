@@ -115,6 +115,14 @@ class RedesignInteractionTest {
             for (tag in listOf("add-realized-income", "add-realized-expense")) {
                 waitForEnabled(hasTestTag(tag)).assertIsDisplayed().assertHeightIsAtLeast(48.dp)
             }
+            for (label in listOf("Receita", "Despesa")) {
+                rule.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    assertTrue(action(layouts)); assertEquals(1, layouts.size)
+                    assertEquals("Atalho não deve quebrar a palavra em fonte 200%", 1, layouts.single().lineCount)
+                    assertFalse(layouts.single().hasVisualOverflow)
+                }
+            }
             rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
             checkpoint("Capturando orçamento escuro com fonte ampliada")
             rule.waitForIdle(); capture("orcamento-fonte-ampliada-escuro")

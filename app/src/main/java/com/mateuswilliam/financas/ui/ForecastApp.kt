@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -180,12 +181,16 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = { Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column {
+                val largeActions = LocalDensity.current.fontScale > 1.25f
+                val actionPadding = if (largeActions) PaddingValues(horizontal = 8.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding
                 if (navigation.tab == 0 || navigation.tab == 4) Row(Modifier.padding(horizontal = FinanceSpacing.page), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton({ openActual(Movement.INCOME) }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-income")) {
-                        AppIcon(R.drawable.ic_income); Spacer(Modifier.width(6.dp)); Text("Receita")
+                    FilledTonalButton({ openActual(Movement.INCOME) }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-income"), contentPadding = actionPadding) {
+                        if (!largeActions) { AppIcon(R.drawable.ic_income); Spacer(Modifier.width(6.dp)) }
+                        Text("Receita", maxLines = 1)
                     }
-                    Button({ openActual() }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-expense")) {
-                        AppIcon(R.drawable.ic_add); Spacer(Modifier.width(6.dp)); Text("Despesa")
+                    Button({ openActual() }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-expense"), contentPadding = actionPadding) {
+                        if (!largeActions) { AppIcon(R.drawable.ic_add); Spacer(Modifier.width(6.dp)) }
+                        Text("Despesa", maxLines = 1)
                     }
                 }
                 ForecastNavigationBar(navigation.tab) { navigation.tab = it }

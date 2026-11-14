@@ -13,7 +13,7 @@ A automação instrumental desta revisão utiliza somente Android 15/API 35. Os 
 | Valores ocultos | Valores e percentuais não aparecem nos textos ou descrições semânticas do gráfico; o gráfico informa que os dados estão ocultos. |
 | Contraste e categoria pequena | Percentual com fundo da mesma cor da fatia e texto contrastante nos dois temas. A ampliação visual é explicada sem alterar os percentuais reais. |
 
-A legenda usa linhas separadas para nome, valor e percentual quando a fonte cresce ou a tela é estreita. O alvo inteiro mantém a ação de abrir as movimentações daquele grupo. A navegação ampliada usa a largura da tela, preservando a fonte definida pelo Android.
+A legenda usa linhas separadas para nome, valor e percentual quando a fonte cresce ou a tela é estreita. O alvo inteiro mantém a ação de abrir as movimentações daquele grupo. A navegação ampliada usa a largura da tela, preservando a fonte definida pelo Android. Nos atalhos fixos de receita/despesa, fonte ampliada usa menos espaço interno e dispensa os ícones decorativos, para manter cada palavra inteira sem reduzir a fonte. A necessidade foi identificada nas capturas reais do CI API 35.
 
 A compilação e o lint locais não significam que testes instrumentais tenham passado. Os resultados efetivos de cada PR ficam nos seus jobs do CI. Os testes automatizados de semântica e geometria não simulam as falas e os gestos reais de um leitor de tela.
 

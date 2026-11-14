@@ -1,6 +1,6 @@
 # Entrega incremental da revisão Rendly
 
-As mudanças foram preparadas em PRs separados. A main foi preservada em `469d16f`; não houve merge, force-push, publicação ou alteração de banco, backup ou regras financeiras. O PR 22 foi encerrado e sua branch preservada.
+As mudanças foram preparadas em PRs separados. A main foi preservada em `469d16f`; não houve merge na main, force-push, publicação ou alteração de banco, backup ou regras financeiras. O PR 22 foi encerrado e sua branch preservada.
 
 ## Ordem de revisão
 
