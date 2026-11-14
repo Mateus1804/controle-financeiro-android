@@ -105,13 +105,25 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
 
 @Composable
 private fun ExpenseLegendRow(group: ExpenseGroup, hidden: Boolean, color: Color, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().testTag("expense-group-${group.key}").heightIn(min = 48.dp).clickable(onClick = onClick).padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(12.dp).background(color, CircleShape))
-        Text(privateDisplayText(group.label, hidden), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Column(horizontalAlignment = Alignment.End) {
-            Amount(group.cents, hidden, Modifier.widthIn(max = 144.dp), size = 16)
+    val modifier = Modifier.fillMaxWidth().testTag("expense-group-${group.key}").heightIn(min = 48.dp)
+        .clickable(onClickLabel = "Ver movimentações deste grupo", onClick = onClick).padding(vertical = 8.dp)
+    if (LocalDensity.current.fontScale > 1.25f || LocalConfiguration.current.screenWidthDp < 360) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(12.dp).background(color, CircleShape))
+                Text(privateDisplayText(group.label, hidden), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            }
+            Amount(group.cents, hidden, Modifier.fillMaxWidth(), size = 16)
             ExpensePercentageBadge(group.basisPoints, hidden, color)
+        }
+    } else {
+        Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(12.dp).background(color, CircleShape))
+            Text(privateDisplayText(group.label, hidden), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Column(horizontalAlignment = Alignment.End) {
+                Amount(group.cents, hidden, Modifier.widthIn(max = 144.dp), size = 16)
+                ExpensePercentageBadge(group.basisPoints, hidden, color)
+            }
         }
     }
 }

@@ -65,6 +65,10 @@ class RedesignInteractionTest {
     }
 
     @Test fun plannerNavigationAndReviewSettingsKeepReadableTouchTargets() {
+        rule.onNodeWithTag("forecast-settings").assertContentDescriptionEquals("Ajustes").assertHasClickAction()
+        rule.onNodeWithContentDescription("Ocultar valores").assertHasClickAction()
+            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("dashboard-notification-review").assertTextContains("Revisar notificações").assertHasClickAction()
         for (label in listOf("Orçamento", "Projeções", "Reserva", "Orçamento")) {
             waitForEnabled(hasText(label) and hasClickAction())
                 .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
@@ -94,6 +98,11 @@ class RedesignInteractionTest {
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.9f && rule.activity.resources.configuration.screenWidthDp <= 320 }
             checkpoint("Conferindo navegação com fonte ampliada")
             for (label in listOf("Orçamento", "Projeções", "Reserva", "Orçamento")) {
+                rule.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    assertTrue(action(layouts))
+                    assertTrue("Rótulo da navegação cortado em fonte 200%", layouts.none { it.hasVisualOverflow })
+                }
                 waitForEnabled(hasText(label) and hasClickAction())
                     .assertIsDisplayed().assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
             }
