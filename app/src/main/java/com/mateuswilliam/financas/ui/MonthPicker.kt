@@ -22,4 +22,3 @@ fun MonthPicker(month: YearMonth, onMonth: (YearMonth) -> Unit) {
         }
     }
 }
-
