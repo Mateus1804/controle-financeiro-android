@@ -188,11 +188,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         AppIcon(R.drawable.ic_add); Spacer(Modifier.width(6.dp)); Text("Despesa")
                     }
                 }
-                NavigationBar(modifier = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.25f) Modifier.height(160.dp) else Modifier, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                    listOf("Orçamento" to R.drawable.ic_overview, "Projeções" to R.drawable.ic_chevron_right, "Reserva" to R.drawable.ic_wallet).forEachIndexed { index, (label, icon) ->
-                        NavigationBarItem(selected = navigation.tab == index, onClick = { navigation.tab = index }, icon = { AppIcon(selectedIcon(icon, navigation.tab == index)) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
-                    }
-                }
+                ForecastNavigationBar(navigation.tab) { navigation.tab = it }
             }
         } },
     ) { padding ->
