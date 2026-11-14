@@ -214,10 +214,10 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         bottomBar = { Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column {
                 if (tab == 0 || tab == 4) Row(Modifier.padding(horizontal = FinanceSpacing.page), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton({ openActual(Movement.INCOME) }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).testTag("add-realized-income")) {
+                    FilledTonalButton({ openActual(Movement.INCOME) }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-income")) {
                         AppIcon(R.drawable.ic_income); Spacer(Modifier.width(6.dp)); Text("Receita")
                     }
-                    Button({ openActual() }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).testTag("add-realized-expense")) {
+                    Button({ openActual() }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-expense")) {
                         AppIcon(R.drawable.ic_add); Spacer(Modifier.width(6.dp)); Text("Despesa")
                     }
                 }
@@ -240,13 +240,13 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         Text(if (tab >= 3) "Ajustes e histórico" else if (settings.displayName.isBlank()) "Olá! 👋🏼" else "Olá, ${settings.displayName}! 👋🏼",
                             style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("rendly-greeting"), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
-                    IconButton({ finance.preferences.hideAmounts(!hidden) }) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
-                    if (tab != 0) IconButton({ tab = if (tab == 5) 0 else 5 }, Modifier.testTag("open-notification-review")) {
+                    IconButton({ finance.preferences.hideAmounts(!hidden) }, Modifier.size(48.dp)) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
+                    if (tab != 0) IconButton({ tab = if (tab == 5) 0 else 5 }, Modifier.size(48.dp).testTag("open-notification-review")) {
                         BadgedBox(badge = { if (oldState.pending.isNotEmpty()) Badge { Text(oldState.pending.size.toString()) } }) {
                             AppIcon(R.drawable.ic_pending, description = "Revisão de notificações")
                         }
                     }
-                    IconButton({ tab = if (tab == 3) 0 else 3 }, Modifier.testTag("forecast-settings")) { AppIcon(R.drawable.ic_settings, description = "Ajustes") }
+                    IconButton({ tab = if (tab == 3) 0 else 3 }, Modifier.size(48.dp).testTag("forecast-settings")) { AppIcon(R.drawable.ic_settings, description = "Ajustes") }
                 }
                 when {
                     tab == 5 -> Column {
@@ -287,7 +287,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         item {
                             val reviewLabel = if (oldState.pending.isEmpty()) "Revisar notificações"
                                 else "Revisar notificações (${oldState.pending.size})"
-                            FilledTonalButton({ tab = 5 }, Modifier.fillMaxWidth().testTag("dashboard-notification-review")) {
+                            FilledTonalButton({ tab = 5 }, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("dashboard-notification-review")) {
                                 AppIcon(R.drawable.ic_pending)
                                 Spacer(Modifier.width(8.dp))
                                 Text(reviewLabel)
