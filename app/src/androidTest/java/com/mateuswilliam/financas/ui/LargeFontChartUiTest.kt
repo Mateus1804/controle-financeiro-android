@@ -46,12 +46,12 @@ class LargeFontChartUiTest {
         val label = rule.onNode(hasText(name) and inGroup, useUnmergedTree = true)
         val amount = rule.onNode(hasText(Money.format(Money.MAX_CENTS)) and inGroup, useUnmergedTree = true)
         val percentage = rule.onNode(hasText("100,00% do total") and inGroup, useUnmergedTree = true)
-        listOf(label, amount, percentage).forEach { node ->
+        listOf("nome" to label, "valor" to amount, "percentual" to percentage).forEach { (field, node) ->
             node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 assertTrue(action(layouts))
                 assertTrue(layouts.isNotEmpty())
-                assertTrue("Texto não pode ser cortado em 320dp/200%", layouts.none { it.hasVisualOverflow })
+                assertTrue("$field cortado em 320dp/200%: ${layouts.map { it.size to it.lineCount }}", layouts.none { it.hasVisualOverflow })
             }
         }
         assertTrue(label.fetchSemanticsNode().boundsInRoot.bottom <= amount.fetchSemanticsNode().boundsInRoot.top)
