@@ -28,6 +28,7 @@ private class SavedUiProperty<T>(private val handle: SavedStateHandle, private v
 }
 
 internal class ForecastNavigationState(handle: SavedStateHandle) {
+    var accountFilterKey: String? by SavedUiProperty(handle, "navigation.accountFilterKey", null)
     var tab: Int by SavedUiProperty(handle, "navigation.tab", 0)
     var browsing: String by SavedUiProperty(handle, "navigation.browsing", LocalDate.now().toString())
     var followingCurrent: Boolean by SavedUiProperty(handle, "navigation.followingCurrent", true)
@@ -39,6 +40,7 @@ internal class ForecastNavigationState(handle: SavedStateHandle) {
 }
 
 internal class ForecastEditorsState(handle: SavedStateHandle) {
+    var accountsOpen: Boolean by SavedUiProperty(handle, "editors.accountsOpen", false)
     var editor: Boolean by SavedUiProperty(handle, "editors.editor", false)
     var editItem: String? by SavedUiProperty(handle, "editors.editItem", null)
     var editKey: String? by SavedUiProperty(handle, "editors.editKey", null)

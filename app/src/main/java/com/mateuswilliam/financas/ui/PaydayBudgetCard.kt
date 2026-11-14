@@ -15,13 +15,14 @@ private val paydayFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 /** Quanto ainda pode ser gasto até o próximo pagamento; estado nulo pede o dado que falta. */
 @Composable
-internal fun PaydayBudgetCard(budget: PaydayBudget?, hasBalance: Boolean, hidden: Boolean, onSalary: () -> Unit) {
+internal fun PaydayBudgetCard(budget: PaydayBudget?, hasBalance: Boolean, hidden: Boolean, onAccounts: () -> Unit = {}, onSalary: () -> Unit) {
     Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(Modifier.fillMaxWidth().testTag("payday-budget").padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.medium)) {
             SectionTitle("Até o próximo salário", budget?.let { "Pagamento previsto em ${it.payday.format(paydayFormat)} · faltam ${it.daysRemaining} dia(s)" })
             when {
                 !hasBalance -> {
                     Text("Cadastre o saldo de uma conta para calcular quanto você pode gastar até o pagamento.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FilledTonalButton(onAccounts, Modifier.heightIn(min = FinanceSpacing.touch).testTag("payday-accounts")) { Text("Configurar saldo das contas") }
                 }
                 budget == null -> {
                     Text("Informe a data do próximo pagamento do salário para calcular o período.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -42,6 +43,7 @@ internal fun PaydayBudgetCard(budget: PaydayBudget?, hasBalance: Boolean, hidden
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            if (hasBalance) TextButton(onAccounts, Modifier.heightIn(min = FinanceSpacing.touch).testTag("payday-accounts")) { Text("Gerenciar contas") }
         }
     }
 }
