@@ -46,11 +46,22 @@ class LargeFontChartUiTest {
         val label = rule.onNode(hasText(name) and inGroup, useUnmergedTree = true)
         val amount = rule.onNode(hasText(Money.format(Money.MAX_CENTS)) and inGroup, useUnmergedTree = true)
         val percentage = rule.onNode(hasText("100,00% do total") and inGroup, useUnmergedTree = true)
+        val app = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val screenshot = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        checkNotNull(screenshot)
+        try {
+            val folder = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            java.io.File(folder, "diagnostico-grafico-fonte200.png").outputStream().use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        } finally { screenshot.recycle() }
         listOf("nome" to label, "valor" to amount, "percentual" to percentage).forEach { (field, node) ->
             node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 assertTrue(action(layouts))
                 assertTrue(layouts.isNotEmpty())
+                layouts.forEach { layout ->
+                    val message = "TEXT_METRICS $field text=${layout.layoutInput.text.text} size=${layout.size} paragraph=${layout.multiParagraph.width}x${layout.multiParagraph.height} overflowWidth=${layout.didOverflowWidth} overflowHeight=${layout.didOverflowHeight} maxLines=${layout.layoutInput.maxLines} exceeded=${layout.multiParagraph.didExceedMaxLines} constraints=${layout.layoutInput.constraints} font=${layout.layoutInput.style.fontSize} lineHeight=${layout.layoutInput.style.lineHeight} lines=${layout.lineCount} right=${layout.getLineRight(0)} bottom=${layout.getLineBottom(layout.lineCount - 1)}"
+                    androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().sendStatus(2, android.os.Bundle().apply { putString("stream", "\n$message\n") })
+                }
                 assertTrue("$field cortado em 320dp/200%: ${layouts.map { it.size to it.lineCount }}", layouts.none { it.hasVisualOverflow })
             }
         }

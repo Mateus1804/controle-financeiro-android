@@ -115,12 +115,16 @@ class RedesignInteractionTest {
             for (tag in listOf("add-realized-income", "add-realized-expense")) {
                 waitForEnabled(hasTestTag(tag)).assertIsDisplayed().assertHeightIsAtLeast(48.dp)
             }
+            capture("diagnostico-atalhos-fonte200")
             for (label in listOf("Receita", "Despesa")) {
                 rule.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                     val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                     assertTrue(action(layouts)); assertEquals(1, layouts.size)
                     assertEquals("Atalho não deve quebrar a palavra em fonte 200%", 1, layouts.single().lineCount)
-                    assertFalse(layouts.single().hasVisualOverflow)
+                    val layout = layouts.single()
+                    val message = "TEXT_METRICS $label text=${layout.layoutInput.text.text} size=${layout.size} paragraph=${layout.multiParagraph.width}x${layout.multiParagraph.height} overflowWidth=${layout.didOverflowWidth} overflowHeight=${layout.didOverflowHeight} maxLines=${layout.layoutInput.maxLines} exceeded=${layout.multiParagraph.didExceedMaxLines} constraints=${layout.layoutInput.constraints} font=${layout.layoutInput.style.fontSize} lineHeight=${layout.layoutInput.style.lineHeight} lines=${layout.lineCount} right=${layout.getLineRight(0)} bottom=${layout.getLineBottom(layout.lineCount - 1)}"
+                    androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().sendStatus(2, android.os.Bundle().apply { putString("stream", "\n$message\n") })
+                    assertFalse(layout.hasVisualOverflow)
                 }
             }
             rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
