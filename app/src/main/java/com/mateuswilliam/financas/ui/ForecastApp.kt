@@ -221,11 +221,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         AppIcon(R.drawable.ic_add); Spacer(Modifier.width(6.dp)); Text("Despesa")
                     }
                 }
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                    listOf("Orçamento" to R.drawable.ic_overview, "Projeções" to R.drawable.ic_chevron_right, "Reserva" to R.drawable.ic_wallet).forEachIndexed { index, (label, icon) ->
-                        NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { AppIcon(selectedIcon(icon, tab == index)) }, label = { Text(label) })
-                    }
-                }
+                ForecastNavigationBar(tab) { tab = it }
             }
         } },
     ) { padding ->
