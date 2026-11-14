@@ -12,6 +12,7 @@ import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
@@ -20,24 +21,28 @@ import java.util.UUID
 
 /** Usa o seletor real do Android no emulador dedicado, somente com arquivo e senha fictícios. */
 class BackupDocumentFlowTest {
-    @get:Rule val rule = createLegacyFinanceRule()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private val app get() = rule.activity.application as FinanceApplication
     private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
     private val secret = "Arquivo fictício 2026!"
     // PBKDF2 mantém 600 mil iterações; o provedor Java da API 26 é lento sem aceleração.
     private val cryptoWaitMillis = 300_000L
 
-    @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
+    @Before fun reset() = rule.resetReviewBackupMain()
 
     @Test fun createAndRestoreThroughTheAndroidDocumentPicker() = runBlocking<Unit> {
         val expected = Record("backup-document-ui", 123456, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
             "Conta fictícia", "Recuperação fictícia pelo seletor", System.currentTimeMillis())
+        val date = java.time.LocalDate.now()
+        val expectedForecast = ForecastRule("backup-document-forecast", date, "Previsão fictícia do backup", ForecastKind.EXPENSE,
+            25000, Category.HOME, ForecastFrequency.MONTHLY, date)
         app.repository.save(expected, null)
+        app.forecasts.saveRule(expectedForecast)
         val info = automation.serviceInfo
         val oldFlags = info.flags
         automation.serviceInfo = info.apply { flags = flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS }
         try {
-            rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
+            rule.onNodeWithTag("forecast-settings").performClick()
             rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Criar backup criptografado"))
             rule.onNodeWithText("Criar backup criptografado").performClick()
             rule.onNodeWithText("Senha do backup").performTextInput(secret)
@@ -55,9 +60,11 @@ class BackupDocumentFlowTest {
             awaitApplication()
             rule.waitUntil(15000) { rule.onAllNodesWithText("Backup salvo.", substring = true).fetchSemanticsNodes().isNotEmpty() }
             app.repository.clear()
-            rule.runOnIdle { app.settings.finishIntro() }
+            rule.runOnIdle { app.settings.finishIntro(); app.settings.dismissNamePrompt() }
             rule.waitForIdle()
             assertTrue(app.repository.exportRecords().isEmpty())
+            val local = expected.copy(id = "local-before-confirmation", description = "Preservado até confirmar a restauração")
+            app.repository.save(local, null)
             // O aviso temporário fica acima da navegação e não deve receber o toque destinado à restauração.
             rule.dismissFeedback("Backup salvo.")
             rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Restaurar backup"))
@@ -71,13 +78,14 @@ class BackupDocumentFlowTest {
             rule.onNodeWithText("Conferir backup").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
             rule.waitForIdle()
             rule.waitUntil(cryptoWaitMillis) { rule.onAllNodesWithText("Conferir restauração").fetchSemanticsNodes().isNotEmpty() }
-            assertTrue(app.repository.exportRecords().isEmpty())
+            assertEquals(listOf(local), app.repository.exportRecords())
             val restore = rule.onNode(hasText("Restaurar backup") and hasAnyAncestor(hasTestTag("restore-preview-dialog")))
             restore.assertIsNotEnabled()
             rule.onNodeWithText("Substituir os dados locais por este backup").performClick()
             restore.performClick()
-            rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().size == 1 } }
+            rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().singleOrNull()?.id == expected.id } }
             assertEquals(expected, app.repository.exportRecords().single())
+            assertEquals(expectedForecast, app.forecasts.dataset.first().rules.single())
             assertFalse(app.settings.snapshot().enabled)
         } catch (failure: Throwable) {
             val directory = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }

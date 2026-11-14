@@ -9,7 +9,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.lifecycle.ViewModelProvider
 import com.mateuswilliam.financas.FinanceApplication
+import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.Appearance
@@ -23,66 +25,84 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 import java.time.LocalDate
-import java.time.YearMonth
+import java.time.Instant
+import java.time.ZoneId
 
 class OptionalFeaturesUiTest {
-    @get:Rule val rule = createLegacyFinanceRule()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private val app get() = rule.activity.application as FinanceApplication
-    @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
-    private fun forecast() = RecurringPlan("mensal-ficticia", "Aluguel fictício", 60000, Movement.EXPENSE,
-        PaymentMethod.PIX, Category.HOME, "Conta de exemplo", "2026-10-31", 31)
+    @Before fun reset() = rule.resetReviewBackupMain()
+    private fun forecast(cents: Long = 60000) = ForecastRule("mensal-ficticia", LocalDate.now(), "Aluguel fictício", ForecastKind.EXPENSE,
+        cents, Category.HOME, ForecastFrequency.MONTHLY, LocalDate.now())
     private fun draft(id: String, source: String = id) = DraftEntity(id, source, "fixture.local", "Inter pessoal",
-        "EXEMPLO FICTÍCIO", "Compra aprovada no cartão de R$ 42,90. Mercado Exemplo.", 4290,
+        "EXEMPLO FICTÍCIO · $id", "Compra aprovada no cartão de R$ 42,90. Mercado Exemplo.", 4290,
         Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Dados fictícios para revisão.", System.currentTimeMillis(), System.currentTimeMillis() - 60_000)
-    private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
-        rule.onNodeWithText("Planejamento e análises").performClick()
-    }
+    private fun scrollForecast(matcher: SemanticsMatcher) = rule.onNodeWithTag("forecast-dashboard").performScrollToNode(matcher)
     private fun openReview(id: String) {
-        rule.onNodeWithText("Revisar").performClick()
-        rule.waitUntil(5000) { rule.onAllNodesWithTag("review-$id").fetchSemanticsNodes().isNotEmpty() }
+        val model = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
+        rule.waitUntil(10000) { model.state.value.pending.any { it.id == id } }
+        rule.onNodeWithTag("dashboard-notification-review").performClick()
+        rule.waitUntil(5000) { rule.onAllNodesWithTag("pending-list").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("pending-list").performScrollToNode(hasTestTag("review-$id"))
         rule.onNodeWithTag("review-$id").performClick()
     }
 
-    @Test fun monthlyBudgetCanBeCreatedAndRecoveredAfterRecreation() = runBlocking<Unit> {
-        openPlanning()
-        rule.scrollAnalysisTo(hasText("Adicionar limite mensal"))
-        rule.onNodeWithText("Adicionar limite mensal").performClick()
-        rule.onNodeWithTag("amount-input").performTextInput("10000")
-        rule.onNodeWithTag("amount-input").performImeAction()
+    @Test fun monthlyForecastCanBeCreatedAndRecoveredAfterRecreation() = runBlocking<Unit> {
+        scrollForecast(hasTestTag("forecast-add-expense"))
+        rule.onNodeWithTag("forecast-add-expense").performClick()
+        rule.onNodeWithTag("forecast-title").performTextInput("Limite de consumo fictício")
+        rule.onNodeWithTag("forecast-amount").performScrollTo().performTextInput("10000")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
         waitForKeyboard()
-        rule.onNodeWithText("Salvar limite").performClick()
-        rule.waitUntil(5000) { runBlocking { app.repository.budgets.first().isNotEmpty() } }
-        assertEquals(10000L, app.repository.budgets.first().single().limitCents)
+        rule.onNodeWithContentDescription("Frequência").performScrollTo().performClick()
+        rule.onNodeWithText("Mensal").performClick()
+        rule.onNodeWithTag("forecast-save").performClick()
+        rule.waitUntil(10000) { runBlocking { app.forecasts.dataset.first().rules.size == 1 } }
+        val saved = app.forecasts.dataset.first().rules.single()
+        assertEquals(10000L, saved.amountCents)
+        assertEquals(ForecastFrequency.MONTHLY, saved.frequency)
+        assertTrue(app.repository.exportRecords().isEmpty())
+        rule.dismissFeedback("Previsão salva")
         rule.activityRule.scenario.recreate()
-        rule.openPlanningActions("budget-${Category.FOOD.name}")
-        rule.onNodeWithText("Editar limite").assertIsDisplayed()
-        androidx.test.espresso.Espresso.pressBack()
-        rule.waitForIdle()
-        assertEquals(YearMonth.now().toString(), app.repository.budgets.first().single().month)
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }
+        val data = app.forecasts.dataset.first()
+        val period = CycleCalendar.periodContaining(LocalDate.now(), data.cycleRules)
+        val line = ForecastCalculator.report(data, period).lines.single { it.itemId == saved.itemId }
+        val actions = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
+        scrollForecast(hasTestTag(actions))
+        rule.onNodeWithTag(actions).performClick()
+        rule.onNodeWithText("Editar").performClick()
+        rule.onNodeWithTag("forecast-title").assertTextContains("Limite de consumo fictício")
+        assertAmountInput("forecast-amount", 10000)
+        rule.onNodeWithText("Cancelar").performClick()
+        assertEquals(saved, app.forecasts.dataset.first().rules.single())
         screenshot("planejamento-claro")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
         rule.waitForIdle()
         screenshot("planejamento-escuro")
     }
 
-    @Test fun forecastRequiresConfirmationAndRecordsTheEffectiveDateWithoutDuplicating() = runBlocking<Unit> {
-        app.repository.saveRecurring(forecast())
-        openPlanning()
-        rule.performPlanningAction("confirm-recurring-${forecast().id}")
-        rule.onNodeWithText("Conferir previsão").assertExists()
+    @Test fun forecastAndExplicitExpenseKeepSeparateDatesAndDoNotDuplicateOnRecreation() = runBlocking<Unit> {
+        val planned = forecast()
+        app.forecasts.saveRule(planned)
+        rule.waitForIdle()
         assertTrue(app.repository.exportRecords().isEmpty())
+        rule.onNodeWithTag("add-realized-expense").performClick()
+        rule.onNodeWithTag("amount-input").performTextInput("60000")
+        rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Aluguel realizado fictício")
         rule.onNodeWithText("Descrição").performScrollTo().performImeAction()
         waitForKeyboard()
-        rule.onNodeWithText("Confirmar", useUnmergedTree = true).performClick()
+        rule.onNode(hasText("Registrar despesa") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().size == 1 } }
         val record = app.repository.exportRecords().single()
         assertEquals(60000L, record.amountCents)
-        assertEquals(LocalDate.now(), java.time.Instant.ofEpochMilli(record.occurredAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
-        rule.showMovements()
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Realizada · Recorrente mensal"))
-        rule.onNodeWithTag("confirm-recurring-${forecast().id}").assertDoesNotExist()
-        assertEquals("2026-10-31", app.repository.recurring.first().single().nextDate)
+        assertEquals(LocalDate.now(), Instant.ofEpochMilli(record.occurredAt).atZone(ZoneId.systemDefault()).toLocalDate())
+        assertEquals(planned, app.forecasts.dataset.first().rules.single())
+        rule.activityRule.scenario.recreate()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(listOf(record), app.repository.exportRecords())
+        assertEquals(planned, app.forecasts.dataset.first().rules.single())
+        rule.onNodeWithText("Confirmar pagamento").assertDoesNotExist()
     }
 
     @Test fun duplicateWarningLeavesTheManualRecordIntactAndAllowsExplicitConfirmation() = runBlocking<Unit> {
@@ -97,25 +117,37 @@ class OptionalFeaturesUiTest {
         confirmDescription("Outra compra confirmada pelo usuário")
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().size == 2 } }
         assertTrue(app.repository.exportRecords().any { it.id == "manual-ficticio" })
-        rule.onNodeWithText("Movimentação revisada").assertExists()
+        rule.onNodeWithText("Sugestão tratada").assertExists()
     }
 
-    @Test fun newArrivalsPreserveEditsAndRemainOutsideTheCurrentReviewSnapshot() = runBlocking<Unit> {
+    @Test fun newArrivalsPreserveEditsAndFollowTheExistingReviewQueue() = runBlocking<Unit> {
         app.database.financeDao().insertDraft(draft("fila-a"))
         app.database.financeDao().insertDraft(draft("fila-b"))
+        val model = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
+        rule.waitUntil(10000) {
+            model.state.value.pending.map { it.id }.containsAll(listOf("fila-a", "fila-b"))
+        }
         openReview("fila-a")
         rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("9999")
         rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement("Edição preservada")
         app.database.financeDao().insertDraft(draft("fila-nova").copy(capturedAt = System.currentTimeMillis()))
-        rule.waitUntil(5000) { rule.onAllNodesWithText("1 nova(s) pendência(s) disponível(is). Os campos desta revisão foram mantidos.").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(5000) { runBlocking { app.repository.pending.first().size == 3 } }
+        rule.waitForIdle()
         rule.onNodeWithText("Descrição").assertTextContains("Edição preservada")
-        rule.onNodeWithText("Revisão 1 de 2").assertExists()
+        assertAmountInput("amount-input", 9999)
         confirmDescription("Edição preservada")
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
         assertEquals(9999L, app.repository.exportRecords().single().amountCents)
-        rule.onNodeWithText("Revisar próxima").performClick()
-        rule.onNodeWithText("Revisão 2 de 2").assertExists()
+        rule.onNodeWithTag("review-next").performClick()
+        rule.onNodeWithText("EXEMPLO FICTÍCIO · fila-b").assertExists()
+        assertEquals(setOf("fila-b", "fila-nova"), app.repository.pending.first().map { it.id }.toSet())
         screenshot("revisao-em-sequencia")
+        confirmDescription("Segunda revisão explícita")
+        rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().size == 2 } }
+        rule.onNodeWithTag("review-next").performClick()
+        rule.onNodeWithText("EXEMPLO FICTÍCIO · fila-nova").assertExists()
+        assertEquals("fila-nova", app.repository.pending.first().single().id)
+        assertEquals(2, app.repository.exportRecords().size)
     }
 
     @Test fun changedNotificationRequiresAcknowledgementWithoutErasingFormFields() = runBlocking<Unit> {
@@ -126,10 +158,11 @@ class OptionalFeaturesUiTest {
         app.repository.capture(NotificationInput(value.sourcePackage, value.sourceKey, value.bank, "EXEMPLO FICTÍCIO atualizado",
             "Compra aprovada no cartão de R$ 48,90. Mercado Exemplo.", value.occurredAt), simulation = true)
         rule.waitUntil(5000) { rule.onAllNodesWithText("Usar esta versão e manter a edição").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Confirmar").assertIsNotEnabled()
+        rule.onNode(hasText("Confirmar lançamento") and hasClickAction()).assertIsNotEnabled()
         rule.onNodeWithText("Descrição").assertTextContains("Descrição editada")
         rule.onNodeWithText("Descrição").performImeAction(); waitForKeyboard()
         rule.onNodeWithText("Usar esta versão e manter a edição").performScrollTo().performClick()
+        rule.onNode(hasText("Confirmar lançamento") and hasClickAction()).assertIsEnabled()
         rule.onNodeWithText("Descrição").assertTextContains("Descrição editada")
         confirmDescription("Descrição editada")
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
@@ -139,11 +172,13 @@ class OptionalFeaturesUiTest {
 
     @Test fun enabledProtectionHidesFinancialScreensAndNotificationDeepLinks() {
         val originalIntent = Intent(rule.activity.intent)
+        runBlocking { app.database.financeDao().insertDraft(draft("pendencia-privada")) }
         try {
             rule.runOnIdle { app.settings.setLockEnabled(true) }
             rule.waitUntil(5000) { rule.onAllNodesWithText("Acesso protegido").fetchSemanticsNodes().isNotEmpty() }
-            rule.onAllNodesWithText("Finanças").assertCountEquals(0)
-            rule.onAllNodesWithText("Movimentações").assertCountEquals(0)
+            rule.onAllNodesWithText("Rendly").assertCountEquals(0)
+            rule.onAllNodesWithTag("forecast-dashboard").assertCountEquals(0)
+            rule.onAllNodesWithTag("add-realized-expense").assertCountEquals(0)
             rule.runOnIdle { assertTrue(rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
             rule.activityRule.scenario.recreate()
             rule.onNodeWithText("Acesso protegido").assertExists()
@@ -155,12 +190,15 @@ class OptionalFeaturesUiTest {
         } finally {
             // O monitor do ActivityScenario identifica a atividade pelo Intent de abertura.
             rule.activityRule.scenario.onActivity { it.intent = originalIntent }
-            rule.runOnIdle { app.settings.reset(); app.settings.finishIntro() }
+            rule.runOnIdle { app.settings.reset(); app.settings.finishIntro(); app.settings.dismissNamePrompt() }
         }
     }
 
     @Test fun backupPasswordIsNotSavedOnRecreationAndCancellingChangesNothing() = runBlocking<Unit> {
-        rule.onNode(hasText("Ajustes") and hasClickAction()).performClick()
+        val initial = Record("password-cancellation", 12345, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
+            "Conta fictícia", "Registro preservado após cancelar", System.currentTimeMillis())
+        app.repository.save(initial, null)
+        rule.onNodeWithTag("forecast-settings").performClick()
         rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Criar backup criptografado"))
         rule.onNodeWithText("Criar backup criptografado").performClick()
         rule.onNodeWithText("Senha do backup").performTextInput("curta")
@@ -171,10 +209,12 @@ class OptionalFeaturesUiTest {
         rule.onNodeWithText("Use uma senha com pelo menos 12 caracteres.").assertExists()
         rule.activityRule.scenario.recreate()
         rule.waitUntil(5000) { rule.onAllNodesWithText("Senha do backup").fetchSemanticsNodes().isNotEmpty() }
-        assertEquals("", rule.onNodeWithText("Senha do backup").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        for (label in listOf("Senha do backup", "Repetir senha")) {
+            assertEquals("", rule.onNodeWithText(label).fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        }
         rule.onAllNodesWithText("curta", substring = true).assertCountEquals(0)
         rule.onNodeWithText("Cancelar", useUnmergedTree = true).performClick()
-        assertTrue(app.repository.exportRecords().isEmpty())
+        assertEquals(listOf(initial), app.repository.exportRecords())
     }
 
     @Test fun secureScreenAlsoProtectsTheNativeDateDialog() {
@@ -182,8 +222,8 @@ class OptionalFeaturesUiTest {
             rule.runOnIdle { app.settings.setSecureScreen(true) }
             rule.waitForIdle()
             if (android.os.Build.VERSION.SDK_INT >= 29) {
-                rule.onNodeWithContentDescription("Novo lançamento").performClick()
-                rule.onNodeWithText("Data:", substring = true).performScrollTo().performClick()
+                rule.onNodeWithTag("add-realized-expense").performClick()
+                rule.onNodeWithTag("record-date").performScrollTo().performClick()
                 rule.waitUntil(5000) { android.view.inspector.WindowInspector.getGlobalWindowViews().size >= 3 }
                 rule.runOnIdle {
                     val windows = android.view.inspector.WindowInspector.getGlobalWindowViews()
@@ -208,39 +248,53 @@ class OptionalFeaturesUiTest {
     }
 
     @Test fun hiddenPlanningAndLargeTextStayUsableInBothThemes() = runBlocking<Unit> {
-        val month = YearMonth.now().toString()
-        app.repository.saveBudget(MonthlyBudget(month, Category.HOME, 123456))
-        app.repository.saveRecurring(forecast())
+        app.forecasts.saveRule(forecast(123456))
+        val previousFont = shellOutput("settings get system font_scale").trim().takeIf { it.toFloatOrNull() != null }
+        val previousOrientation = rule.activity.requestedOrientation
         try {
             rule.runOnIdle { app.settings.hideAmounts(true); app.settings.setAppearance(Appearance.DARK) }
             checkpoint("Ajustando fonte ampliada")
             command("settings put system font_scale 1.5")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.4f }
-            rule.onNodeWithText("Resumo", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+            rule.onNodeWithText("Orçamento", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                assertTrue(action(layouts)); assertEquals(1, layouts.single().lineCount); assertFalse(layouts.single().isLineEllipsized(0))
+                assertTrue(action(layouts)); assertFalse(layouts.single().hasVisualOverflow)
+                repeat(layouts.single().lineCount) { assertFalse(layouts.single().isLineEllipsized(it)) }
             }
             rule.activityRule.scenario.onActivity { activity ->
                 assertFalse(WindowCompat.getInsetsController(activity.window, activity.window.decorView).isAppearanceLightStatusBars)
             }
-            openPlanning()
-            rule.scrollAnalysisTo(hasText("Gasto e limite ocultos"))
+            scrollForecast(hasTestTag("forecast-add-expense"))
             rule.onAllNodesWithText(Money.format(123456), substring = true).assertCountEquals(0)
             rule.onAllNodesWithContentDescription(Money.format(123456), substring = true).assertCountEquals(0)
             checkpoint("Capturando planejamento com fonte ampliada")
             screenshot("planejamento-fonte-ampliada")
+            rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
+            rule.waitForIdle()
+            rule.runOnIdle {
+                assertTrue(WindowCompat.getInsetsController(rule.activity.window, rule.activity.window.decorView).isAppearanceLightStatusBars)
+            }
+            rule.onAllNodesWithText(Money.format(123456), substring = true).assertCountEquals(0)
+            rule.onAllNodesWithContentDescription(Money.format(123456), substring = true).assertCountEquals(0)
+            screenshot("planejamento-fonte-ampliada-claro")
+            rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
             checkpoint("Mudando orientação")
             rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
-            rule.scrollAnalysisTo(hasText("Adicionar limite mensal"))
-            rule.onNodeWithText("Adicionar limite mensal").assertIsDisplayed()
+            scrollForecast(hasTestTag("forecast-add-expense"))
+            rule.onNodeWithTag("forecast-add-expense").assertIsDisplayed().performClick()
+            rule.onNodeWithTag("forecast-title").assertExists()
+            rule.onNodeWithText("Mostrar valor da previsão para edição").performScrollTo().assertIsDisplayed()
+            rule.onNodeWithTag("forecast-amount").assertDoesNotExist()
+            rule.onNodeWithText("Cancelar").performClick()
             checkpoint("Capturando planejamento em paisagem")
             screenshot("planejamento-paisagem")
             checkpoint("Paisagem conferida")
         } finally {
             checkpoint("Restaurando fonte e orientação")
-            command("settings put system font_scale 1.0")
-            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            if (previousFont != null) command("settings put system font_scale $previousFont")
+            else command("settings delete system font_scale")
+            rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = previousOrientation }
         }
     }
 
@@ -254,22 +308,29 @@ class OptionalFeaturesUiTest {
         rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement(description)
         rule.onNodeWithText("Descrição").performImeAction()
         waitForKeyboard()
-        rule.onNode(hasText("Confirmar") and hasClickAction()).assertIsEnabled()
+        rule.onNode(hasText("Confirmar lançamento") and hasClickAction()).assertIsEnabled()
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { assertTrue(it()) }
     }
     private fun waitForKeyboard() {
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
         rule.waitUntil(5000) {
             val views = if (android.os.Build.VERSION.SDK_INT >= 29) android.view.inspector.WindowInspector.getGlobalWindowViews() else listOf(rule.activity.window.decorView)
             views.none { androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
         }
         rule.waitForIdle()
     }
+    private fun assertAmountInput(tag: String, cents: Long) {
+        val text = rule.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+        assertEquals(cents, MoneyInput.normalize(text)?.toLongOrNull())
+    }
     private fun command(value: String) {
+        shellOutput(value)
+    }
+    private fun shellOutput(value: String): String {
         val fd = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(value)
-        android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
+        return android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().use { it.readText() }
     }
     private fun screenshot(name: String) {
-        rule.waitUntil(8000) { rule.onAllNodesWithText("Limite mensal salvo.").fetchSemanticsNodes().isEmpty() }
         rule.waitForIdle()
         if (app.settings.snapshot().appearance == Appearance.DARK) rule.waitUntil(5000) {
             // Em paisagem, versões antigas podem ocultar os ícones. A configuração de contraste independe de pixels fixos.
