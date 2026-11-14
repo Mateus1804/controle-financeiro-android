@@ -20,6 +20,8 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 
+internal enum class PurchaseManagementAction { EDIT, EXCLUDE, CANCEL_REMAINING }
+
 enum class RecurringAction { CONFIRM, EDIT_MONTH, EDIT_FUTURE, PAUSE, SKIP, EXCLUDE, FIXED }
 
 internal class MovementActions(
