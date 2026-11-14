@@ -3,130 +3,145 @@ package com.mateuswilliam.financas.ui
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.platform.app.InstrumentationRegistry
-import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.Appearance
 import java.io.File
-import java.time.YearMonth
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+/** The current report is the cycle projection; forecasts stay separate from actual records. */
 class CommitmentReportUiTest {
-    @get:Rule val rule = createLegacyFinanceRule()
-    private val app get() = rule.activity.application as FinanceApplication
-    private val repository get() = app.repository
-    private val month = YearMonth.now()
+    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    private val ui by lazy { ForecastReportTestDriver(rule) }
+    private val app get() = ui.app
 
-    @Before fun reset() {
-        runBlocking { repository.clear() }
-        app.settings.finishIntro()
-        rule.waitForIdle()
-    }
+    @Before fun reset() = ui.reset()
 
-    @Test fun selectedMonthGroupsSmallBillsAndUpdatesAfterAParcelIsLinked() = runBlocking<Unit> {
-        repository.saveMonthlyPlan(MonthlyIncomePlan(month, 100000, 4000))
-        repository.saveMonthlyPlan(MonthlyIncomePlan(month.plusMonths(1), 200000, 4000))
-        val rent = RecurringPlan("aluguel-ficticio", "Aluguel fictício", 20000, Movement.EXPENSE, PaymentMethod.PIX,
-            Category.HOME, "Conta fictícia", month.atDay(8).toString(), 8)
-        repository.saveRecurring(rent)
-        repository.setFixedRecurring(rent.id, month)
-        purchase("curso", "Curso fictício", 10000)
-        purchase("livro", "Livro fictício", 2000)
-        purchase("item", "Item fictício", 1000)
-        repository.save(payment("despesa-avulsa", 90000, month), null)
+    @Test fun selectedCycleGroupsCategoriesAndOnlyForecastEditsChangeItsProjection() = runBlocking<Unit> {
+        val cycle = ui.period()
+        val next = CycleCalendar.periodContaining(cycle.endExclusive, ui.current().cycleRules)
+        ui.seed("renda", "Receita deste ciclo", 100000, ForecastKind.INCOME)
+        ui.seed("renda-seguinte", "Receita do próximo ciclo", 200000, ForecastKind.INCOME, start = next.start)
+        ui.seed("aluguel", "Aluguel fictício", 20000, frequency = ForecastFrequency.MONTHLY, category = Category.HOME)
+        ui.seed("curso", "Curso fictício", 10000, category = Category.EDUCATION)
+        ui.seed("livro", "Livro fictício", 2000)
+        ui.seed("item", "Item fictício", 1000)
+        val actual = payment("despesa-avulsa", 90000, cycle)
+        app.repository.save(actual, null)
+        ui.waitRules(6)
+        assertEquals(33000L, ui.report(cycle).totalExpensesCents)
+        assertEquals(67000L, ui.report(cycle).marginCents)
+        scrollCategories()
+        assertCategory(Category.OTHER, 3000)
+        assertCategory(Category.HOME, 20000)
         rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
-        openPlanning()
-        assertChart("33%", "Aluguel fictício")
-        rule.onNodeWithText("Atenção").assertExists()
-        capture("comprometimento-claro")
+        rule.waitForIdle(); capture("previsoes-categorias-claro")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
-        rule.waitForIdle()
-        capture("comprometimento-escuro")
+        rule.waitForIdle(); capture("previsoes-categorias-escuro")
+        ui.openProjections()
+        ui.assertProjection(cycle, "33,00", 67000)
+        ui.assertProjection(next, "10,00", 180000)
 
-        scrollToTag("commitment-legend-other")
-        val others = rule.onNodeWithTag("commitment-legend-other")
-        others.assertTextContains("Outros").assertTextContains(Money.format(3000))
-        rule.onNodeWithTag("commitment-other-details").performScrollTo().performClick()
-        scrollToTag("commitment-entry-installment:livro:1")
-        rule.onNodeWithTag("commitment-entry-installment:livro:1")
-            .assertTextContains("Livro fictício · 1/1").assertTextContains(Money.format(2000))
-
-        assertTrue(repository.confirmInstallment("installment:curso:1", payment("curso-pago", 13000, month.plusMonths(1))))
-        scrollToTag("commitment-card")
-        assertChart("36%", "Aluguel fictício")
-        rule.scrollAnalysisTo(hasContentDescription("Próximo mês"))
-        rule.onNodeWithContentDescription("Próximo mês").performClick()
-        scrollToTag("commitment-card")
-        assertChart("10%", "Aluguel fictício")
-        rule.onNodeWithText("Confortável").assertExists()
+        ui.clickText("Orçamento")
+        ui.edit(ui.report(cycle).lines.single { it.itemId == "curso" })
+        ui.type("forecast-amount", "13000"); ui.saveForecast()
+        ui.waitData { it.rules.singleOrNull { value -> value.itemId == "curso" }?.amountCents == 13000L }
+        assertEquals(36000L, ui.report(cycle).totalExpensesCents)
+        assertEquals(20000L, ui.report(next).totalExpensesCents)
+        assertEquals(listOf(actual), app.repository.exportRecords())
+        ui.openProjections()
+        ui.assertProjection(cycle, "36,00", 64000)
+        ui.assertProjection(next, "10,00", 180000)
     }
 
-    @Test fun aboveIncomeShowsTheActualPercentageAndNoFreePortion() = runBlocking<Unit> {
-        repository.saveMonthlyPlan(MonthlyIncomePlan(month, 100000, 3000))
-        purchase("compra-maior", "Compra fictícia", 125000)
-        openPlanning()
-        assertChart("125%", "Compra fictícia · 1/1")
-        rule.onNodeWithText("Acima do limite").assertExists()
-        rule.onNodeWithText("Valor acima da renda").assertExists()
-        rule.onNodeWithText(Money.format(25000)).assertExists()
-        scrollToTag("commitment-legend-expense:installment:compra-maior:1")
-        rule.onNodeWithTag("commitment-legend-free").assertDoesNotExist()
+    @Test fun aboveIncomeShowsTheActualPercentageAndNegativeMargin() = runBlocking<Unit> {
+        val cycle = ui.period()
+        ui.seed("renda", "Receita prevista", 100000, ForecastKind.INCOME)
+        ui.seed("compra-maior", "Compra fictícia", 125000)
+        ui.waitRules(2)
+        ui.openProjections()
+        ui.assertProjection(cycle, "125,00", -25000)
+        assertEquals(125000L, ui.report(cycle).totalExpensesCents)
+        assertEquals(-25000L, ui.report(cycle).marginCents)
+        assertEquals(0L, ui.report(cycle).unallocatedCents)
+        assertTrue(app.repository.exportRecords().isEmpty())
     }
 
-    @Test fun hiddenValuesRemoveNumbersGeometryAndTheLimitStatusFromTheReport() = runBlocking<Unit> {
-        repository.saveMonthlyPlan(MonthlyIncomePlan(month, 100000, 3000))
-        purchase("compra-maior", "Compra fictícia", 125000)
-        openPlanning()
-        assertChart("125%", "Compra fictícia · 1/1")
+    @Test fun hiddenValuesRemoveAmountsPercentagesAndCategoryGeometry() = runBlocking<Unit> {
+        val cycle = ui.period()
+        ui.seed("renda", "Receita prevista", 100000, ForecastKind.INCOME)
+        ui.seed("compra-maior", "Compra fictícia", 125000)
+        ui.waitRules(2)
+        scrollCategories()
+        val geometry = SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)
+        assertTrue(rule.onAllNodes(geometry, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        ui.openProjections()
+        ui.assertProjection(cycle, "125,00", -25000)
         rule.runOnIdle { app.settings.hideAmounts(true) }
-        rule.onNodeWithText("Renda e limite ocultos").assertIsDisplayed()
-        rule.onNodeWithTag("commitment-donut").assertDoesNotExist()
-        rule.onNodeWithText("Acima do limite").assertDoesNotExist()
-        rule.onNodeWithTag("commitment-legend-expense:installment:compra-maior:1").assertDoesNotExist()
-        rule.onAllNodes(hasText("125%", substring = true) or hasContentDescription("125%", substring = true)).assertCountEquals(0)
-        rule.onAllNodes(hasText(Money.format(125000), substring = true) or
-            hasContentDescription(Money.format(125000), substring = true)).assertCountEquals(0)
+        rule.onNodeWithTag("projection-margin-${cycle.start}")
+            .assertTextEquals("••••").assertContentDescriptionEquals("Valor oculto")
+        rule.onAllNodesWithText("Percentual oculto").onFirst().assertIsDisplayed()
+        assertPrivateNumbersAbsent()
+        ui.clickText("Orçamento")
+        scrollCategories()
+        rule.onAllNodes(geometry, useUnmergedTree = true).assertCountEquals(0)
+        assertPrivateNumbersAbsent()
+        assertEquals(125000L, ui.report(cycle).totalExpensesCents)
+        assertEquals(-25000L, ui.report(cycle).marginCents)
     }
 
-    @Test fun absentIncomeKeepsPlannedExpensesAndOffersTheIncomeEditor() = runBlocking<Unit> {
-        purchase("sem-renda", "Conta fictícia", 9500)
-        openPlanning()
-        rule.waitUntil(5000) { rule.onAllNodesWithText("Renda ainda não informada").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("committed-value").assertTextContains("Valor comprometido").assertTextContains(Money.format(9500))
-        rule.onNodeWithTag("commitment-donut").assertDoesNotExist()
-        rule.onNodeWithTag("edit-monthly-income").performScrollTo().performClick()
-        rule.onNodeWithText("Renda e limite ·", substring = true).assertIsDisplayed()
+    @Test fun absentIncomeKeepsPlannedExpensesAndOffersTheForecastIncomeEditor() = runBlocking<Unit> {
+        val cycle = ui.period()
+        ui.seed("sem-renda", "Conta fictícia", 9500)
+        ui.waitRules(1)
+        scrollCategories(); assertCategory(Category.OTHER, 9500)
+        ui.openProjections()
+        ui.assertProjection(cycle, null, -9500)
+        assertEquals(9500L, ui.report(cycle).totalExpensesCents)
+        assertNull(ui.report(cycle).expensePercentage)
+        ui.clickText("Orçamento")
+        ui.clickTag("forecast-add-income", dashboard = true)
+        rule.onNode(hasText("Nova previsão") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Tipo").assertTextContains("Receita")
+        rule.onNodeWithTag("forecast-amount").assertExists()
+        assertEquals(1, ui.current().rules.size)
+        assertTrue(app.repository.exportRecords().isEmpty())
     }
 
-    @Test fun enlargedFontKeepsTheExactExcessReadable() = runBlocking<Unit> {
-        repository.saveMonthlyPlan(MonthlyIncomePlan(month, Money.MAX_CENTS, 3000))
-        purchase("renda-inteira", "Compra fictícia", Money.MAX_CENTS)
-        purchase("um-centavo", "Ajuste fictício", 1)
+    @Test fun enlargedFontKeepsRoundedPercentageAndExactOneCentExcessReadable() = runBlocking<Unit> {
+        val cycle = ui.period()
+        ui.seed("renda", "Receita prevista", Money.MAX_CENTS, ForecastKind.INCOME)
+        ui.seed("renda-inteira", "Compra fictícia", Money.MAX_CENTS)
+        ui.seed("um-centavo", "Ajuste fictício", 1)
+        ui.waitRules(3)
         val original = shell("settings get system font_scale").trim().toFloatOrNull()
         try {
             shell("settings put system font_scale 1.6")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.5f }
-            openPlanning()
-            assertChart("100,0000000001%", "Compra fictícia · 1/1")
-            scrollToTag("commitment-percentage")
-            capture("comprometimento-fonte-ampliada")
-            rule.onNodeWithTag("commitment-percentage").assertIsDisplayed()
-                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                    val layouts = mutableListOf<TextLayoutResult>()
-                    assertTrue(action(layouts))
-                    val layout = layouts.single()
-                    assertFalse("Percentual cortado nas restrições ${layout.layoutInput.constraints}", layout.hasVisualOverflow)
-                }
+            ui.openProjections()
+            ui.assertProjection(cycle, "100,00", -1)
+            assertEquals(Money.MAX_CENTS + 1, ui.report(cycle).totalExpensesCents)
+            assertEquals(-1L, ui.report(cycle).marginCents)
+            assertEquals("100.00", ui.report(cycle).expensePercentage?.toPlainString())
+            // The product rounds percentages to two places; the margin retains the one-cent excess.
+            rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag("projection-margin-${cycle.start}"))
+            rule.onNodeWithTag("projection-margin-${cycle.start}").assertIsDisplayed()
+                .assertTextEquals(Money.format(-1)).assertReadableLayout()
+            val percentage = hasText("Gastos totais: 100,00% da renda") and
+                hasAnySibling(hasTestTag("projection-margin-${cycle.start}"))
+            rule.onNodeWithTag("forecast-projections").performScrollToNode(percentage)
+            rule.onNode(percentage).assertIsDisplayed().assertReadableLayout()
+            capture("previsoes-fonte-ampliada")
         } finally {
             if (original != null) shell("settings put system font_scale $original")
             else shell("settings delete system font_scale")
@@ -134,30 +149,47 @@ class CommitmentReportUiTest {
         }
     }
 
-    private suspend fun purchase(id: String, title: String, cents: Long) {
-        assertTrue(repository.createPurchase(InstallmentPurchase(id, title, "Conta fictícia", Category.OTHER,
-            cents, 1, month.atDay(12))))
+    private fun scrollCategories() = rule.onNodeWithTag("forecast-dashboard")
+        .performScrollToNode(hasText("Gastos por categoria"))
+
+    private fun assertCategory(category: Category, cents: Long) {
+        val value = Money.format(cents)
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText(value))
+        val labels = rule.onAllNodesWithText(category.label, useUnmergedTree = true).fetchSemanticsNodes()
+        val sameRow = SemanticsMatcher("$value na mesma linha de ${category.label}") { amount ->
+            val amountBounds = amount.boundsInRoot
+            labels.any { label ->
+                val labelBounds = label.boundsInRoot
+                labelBounds.width > 0 && labelBounds.height > 0 &&
+                    amountBounds.width > 0 && amountBounds.height > 0 &&
+                    amountBounds.left >= labelBounds.right &&
+                    kotlin.math.abs(amountBounds.center.y - labelBounds.center.y) <= 1f
+            }
+        }
+        // Layout-only Rows flatten into one semantics parent; sibling membership is insufficient.
+        rule.onNode(hasText(value) and sameRow, useUnmergedTree = true).assertIsDisplayed()
     }
 
-    private fun payment(id: String, cents: Long, paymentMonth: YearMonth) = Record(id, cents, Movement.EXPENSE,
+    private fun assertPrivateNumbersAbsent() {
+        listOf("125,00%", "1.250,00", "1.000,00", "250,00").forEach { value ->
+            rule.onAllNodes(hasText(value, substring = true) or hasContentDescription(value, substring = true),
+                useUnmergedTree = true).assertCountEquals(0)
+        }
+    }
+
+    private fun SemanticsNodeInteraction.assertReadableLayout() =
+        performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            assertTrue(action(layouts))
+            assertTrue("O texto precisa fornecer seu layout", layouts.isNotEmpty())
+            layouts.forEach { layout ->
+                assertFalse("Texto cortado nas restrições ${layout.layoutInput.constraints}", layout.hasVisualOverflow)
+            }
+        }
+
+    private fun payment(id: String, cents: Long, cycle: BudgetPeriod) = Record(id, cents, Movement.EXPENSE,
         PaymentMethod.CARD, Category.OTHER, "Conta fictícia", "Pagamento fictício",
-        paymentMonth.atDay(5).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
-
-    private fun openPlanning() {
-        rule.onNodeWithTag("dashboard-list").performScrollToNode(hasText("Planejamento e análises"))
-        rule.onNodeWithText("Planejamento e análises").performClick()
-        scrollToTag("commitment-card")
-    }
-
-    private fun scrollToTag(tag: String) {
-        rule.scrollAnalysisTo(hasTestTag(tag))
-    }
-
-    private fun assertChart(percentage: String, largest: String) {
-        val description = "$percentage da renda comprometidos; maior gasto: $largest."
-        rule.waitUntil(5000) { rule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("commitment-donut").assertContentDescriptionEquals(description)
-    }
+        cycle.start.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli())
 
     private fun capture(name: String) {
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
