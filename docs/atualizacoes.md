@@ -16,6 +16,8 @@ O workflow executa testes, Android Lint release, APK e AAB. A conferência verif
 
 Uma cópia protegida e recuperável da chave e das senhas é necessária fora do Git. A atualização pessoal por APK e o uso futuro de Play App Signing exigem decisões próprias sobre custódia da chave. A mudança de chave não deve ser resolvida orientando a desinstalação do aplicativo, pois isso pode apagar dados.
 
+O procedimento de definição, cópia e recuperação está em [Custódia da assinatura definitiva](custodia-assinatura.md). A preparação de uma chave real depende dos destinos controlados pelo proprietário e da identificação do certificado da instalação atual.
+
 ## Compatibilidade automatizada
 
 O CI primeiro confere a recusa explícita da preparação sem assinatura. Depois prepara uma chave descartável de dois dias exclusivamente no runner. A versão anterior fica congelada na revisão `7aec1bd102fcfbfb18eed493ceeb9ca0ac89fefe`, com versão 1 e esquema Room 3. Os APKs anterior, atual e de testes são assinados com a mesma chave de teste; o caminho Gradle release também compila APK e AAB, executa lint e confere assinatura, certificado, versão e ausência de depuração. Essa chave não é incluída nos artefatos e não serve para atualizações definitivas.
