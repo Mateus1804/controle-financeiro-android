@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -39,7 +38,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 
 @Composable
-fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount: Int,
+fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount: Int, ui: ForecastUiStateViewModel,
     onLockChange: (Boolean) -> Unit, incomingPlanning: Boolean = false, consumePlanning: () -> Unit = {}, incomingDraft: String? = null, consumeDraft: () -> Unit = {}) {
     val data by model.dataset.collectAsStateWithLifecycle()
     val settings by finance.preferences.state.collectAsStateWithLifecycle()
@@ -53,40 +52,10 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val staged by finance.stagedRestore.collectAsStateWithLifecycle()
     val busy = busyForecast || busyFinance
     val hidden = settings.hideAmounts
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    var browsing by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    var followingCurrent by rememberSaveable { mutableStateOf(true) }
+    val navigation = ui.navigation
+    val editors = ui.editors
+    val review = ui.review
     var today by remember { mutableStateOf(LocalDate.now()) }
-    var editor by rememberSaveable { mutableStateOf(false) }
-    var editItem by rememberSaveable { mutableStateOf<String?>(null) }
-    var editKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var initialKind by rememberSaveable { mutableStateOf(ForecastKind.EXPENSE) }
-    var template by rememberSaveable { mutableStateOf<String?>(null) }
-    var legacyMonth by rememberSaveable { mutableStateOf<String?>(null) }
-    var dueDates by rememberSaveable { mutableStateOf(false) }
-    var templates by rememberSaveable { mutableStateOf(false) }
-    var cycleEditor by rememberSaveable { mutableStateOf(false) }
-    var reserveKind by rememberSaveable { mutableStateOf<ReserveEventKind?>(null) }
-    var allocating by rememberSaveable { mutableStateOf(false) }
-    var goalEditor by rememberSaveable { mutableStateOf(false) }
-    var simulationEditor by rememberSaveable { mutableStateOf(false) }
-    var simulation by remember { mutableStateOf<ForecastRule?>(null) }
-    var backupDialog by rememberSaveable { mutableIntStateOf(0) }
-    var restoreUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var clearing by rememberSaveable { mutableStateOf(false) }
-    var recordEditor by rememberSaveable { mutableStateOf(false) }
-    var editingRecordId by rememberSaveable { mutableStateOf<String?>(null) }
-    var editingDraftId by rememberSaveable { mutableStateOf<String?>(null) }
-    var draftRevision by rememberSaveable { mutableStateOf<Int?>(null) }
-    var actualKind by rememberSaveable { mutableStateOf(Movement.EXPENSE) }
-    var monthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
-    var salaryEditor by rememberSaveable { mutableStateOf(false) }
-    var expenseDimension by rememberSaveable { mutableStateOf<ExpenseDimension?>(null) }
-    var expenseKey by rememberSaveable { mutableStateOf("") }
-    var expenseLabel by rememberSaveable { mutableStateOf("") }
-    var recordCategory by rememberSaveable { mutableStateOf<Category?>(null) }
-    var disclosure by rememberSaveable { mutableStateOf(false) }
-    var appPicker by rememberSaveable { mutableStateOf(false) }
     var permissionVersion by remember { mutableIntStateOf(0) }
     val connected by finance.connected.collectAsStateWithLifecycle()
     val captureError by finance.captureError.collectAsStateWithLifecycle()
@@ -98,12 +67,12 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val canAlert = remember(resumeCount, permissionVersion) { NotificationManagerCompat.from(context).areNotificationsEnabled() &&
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) }
     val captureActive = settings.consented && settings.enabled && settings.packages.isNotEmpty() && hasAccess && connected
-    val month = YearMonth.parse(monthText)
+    val month = YearMonth.parse(navigation.monthText)
     val zone = ZoneId.systemDefault()
     val asOf = remember(resumeCount, oldState.records) { System.currentTimeMillis() }
     val realized = remember(oldState.records, asOf) { oldState.records.filter { it.occurredAt <= asOf } }
     val duplicateIndex = remember(oldState.manualRecords) { DuplicateCandidates(oldState.manualRecords) }
-    val salaryReference = key(monthText) {
+    val salaryReference = key(navigation.monthText) {
         val reference by remember(month) { model.monthlyPlan(month) }.collectAsStateWithLifecycle(initialValue = null)
         reference
     }
@@ -126,11 +95,9 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }.getOrNull()
     }
     fun openActual(kind: Movement = Movement.EXPENSE, recordId: String? = null) {
-        actualKind = kind; editingRecordId = recordId; editingDraftId = null; draftRevision = null; recordEditor = true
+        review.actualKind = kind; review.editingRecordId = recordId; review.editingDraftId = null; review.draftRevision = null; review.recordEditor = true
     }
     // A fila da sessão é fixada ao abrir a primeira pendência; "Revisar próxima" continua nela.
-    var reviewIds by remember { mutableStateOf(emptyList<String>()) }
-    var reviewAfter by rememberSaveable { mutableStateOf<String?>(null) }
     fun rememberMerchantCategory(source: com.mateuswilliam.financas.data.DraftEntity, confirmed: Category) {
         val found = source.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } ?: return
         when (val change = MerchantCategoryPolicy.change(source.category, confirmed, merchantStore.get(found.key))) {
@@ -140,13 +107,13 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     fun openReview(draft: com.mateuswilliam.financas.data.DraftEntity, continuing: Boolean = false) {
-        if (!continuing) reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, draft.id)
-        reviewAfter = null
-        editingDraftId = draft.id; editingRecordId = null; draftRevision = draft.revision; recordEditor = true
+        if (!continuing) review.reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, draft.id)
+        review.reviewAfter = null
+        review.editingDraftId = draft.id; review.editingRecordId = null; review.draftRevision = draft.revision; review.recordEditor = true
     }
-    LaunchedEffect(incomingDraft, oldState.loaded, oldState.pending, busy, recordEditor, editor, backupDialog, staged) {
-        if (incomingDraft != null && oldState.loaded && !busy && !recordEditor && !editor && backupDialog == 0 && staged == null) {
-            oldState.pending.firstOrNull { it.id == incomingDraft }?.let { tab = 5; openReview(it) }
+    LaunchedEffect(incomingDraft, oldState.loaded, oldState.pending, busy, review.recordEditor, editors.editor, editors.backupDialog, staged, settings.namePromptSeen) {
+        if (incomingDraft != null && settings.namePromptSeen && oldState.loaded && !busy && !review.recordEditor && !editors.editor && editors.backupDialog == 0 && staged == null) {
+            oldState.pending.firstOrNull { it.id == incomingDraft }?.let { navigation.tab = 5; openReview(it) }
             consumeDraft()
         }
     }
@@ -154,11 +121,11 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(resumeCount) {
         today = LocalDate.now()
-        if (followingCurrent) browsing = today.toString()
+        if (navigation.followingCurrent) navigation.browsing = today.toString()
         model.refresh()
     }
     LaunchedEffect(incomingPlanning) { if (incomingPlanning) {
-        tab = 0; followingCurrent = true; browsing = LocalDate.now().toString(); consumePlanning()
+        navigation.tab = 0; navigation.followingCurrent = true; navigation.browsing = LocalDate.now().toString(); consumePlanning()
     } }
     LaunchedEffect(forecastMessage) { forecastMessage?.let { snackbar.showSnackbar(it); if (model.message.value == it) model.message.value = null } }
     LaunchedEffect(financeMessage) { financeMessage?.let {
@@ -168,7 +135,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     if (!settings.namePromptSeen) DisplayNameDialog(settings.displayName,
         finance.preferences::dismissNamePrompt, finance.preferences::setDisplayName, firstRun = true)
     val snapshot = data
-    val period = remember(snapshot?.cycleRules, browsing) { CycleCalendar.periodContaining(LocalDate.parse(browsing), snapshot?.cycleRules.orEmpty()) }
+    val period = remember(snapshot?.cycleRules, navigation.browsing) { CycleCalendar.periodContaining(LocalDate.parse(navigation.browsing), snapshot?.cycleRules.orEmpty()) }
     val represented = remember(snapshot, oldState.records, asOf) {
         snapshot?.let { SalarySummaries.represented(oldState.records, it, asOf) }.orEmpty()
     }
@@ -200,20 +167,20 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     }
     val backupExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { finance.writeBackup(it) }
     val backupImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) { restoreUri = uri.toString(); backupDialog = 2 }
+        if (uri != null) { editors.restoreUri = uri.toString(); editors.backupDialog = 2 }
     }
     fun newItem(kind: ForecastKind, title: String? = null) {
-        editItem = null; editKey = null; legacyMonth = null; template = title; initialKind = kind; editor = true
+        editors.editItem = null; editors.editKey = null; editors.legacyMonth = null; editors.template = title; editors.initialKind = kind; editors.editor = true
     }
-    fun edit(line: ForecastLine) { editItem = line.itemId; editKey = line.occurrenceKey; legacyMonth = null; template = null; editor = true }
-    fun showReserve(kind: ReserveEventKind, allocation: Boolean = false) { allocating = allocation; reserveKind = kind }
-    fun select(date: LocalDate) { followingCurrent = false; browsing = date.toString() }
-    BackHandler(tab >= 3 && !editor) { tab = 0 }
+    fun edit(line: ForecastLine) { editors.editItem = line.itemId; editors.editKey = line.occurrenceKey; editors.legacyMonth = null; editors.template = null; editors.editor = true }
+    fun showReserve(kind: ReserveEventKind, allocation: Boolean = false) { editors.allocating = allocation; editors.reserveKind = kind }
+    fun select(date: LocalDate) { navigation.followingCurrent = false; navigation.browsing = date.toString() }
+    BackHandler(navigation.tab >= 3 && !editors.editor) { navigation.tab = 0 }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = { Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             Column {
-                if (tab == 0 || tab == 4) Row(Modifier.padding(horizontal = FinanceSpacing.page), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (navigation.tab == 0 || navigation.tab == 4) Row(Modifier.padding(horizontal = FinanceSpacing.page), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilledTonalButton({ openActual(Movement.INCOME) }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-income")) {
                         AppIcon(R.drawable.ic_income); Spacer(Modifier.width(6.dp)); Text("Receita")
                     }
@@ -223,7 +190,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                 }
                 NavigationBar(modifier = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.25f) Modifier.height(160.dp) else Modifier, containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
                     listOf("Orçamento" to R.drawable.ic_overview, "Projeções" to R.drawable.ic_chevron_right, "Reserva" to R.drawable.ic_wallet).forEachIndexed { index, (label, icon) ->
-                        NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { AppIcon(selectedIcon(icon, tab == index)) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
+                        NavigationBarItem(selected = navigation.tab == index, onClick = { navigation.tab = index }, icon = { AppIcon(selectedIcon(icon, navigation.tab == index)) }, label = { Text(label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
                     }
                 }
             }
@@ -237,77 +204,61 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(32.dp))
                             Text("Rendly", style = MaterialTheme.typography.titleLarge)
                         }
-                        Text(if (tab >= 3) "Ajustes e histórico" else if (settings.displayName.isBlank()) "Olá! 👋🏼" else "Olá, ${settings.displayName}! 👋🏼",
+                        Text(if (navigation.tab >= 3) "Ajustes e histórico" else if (settings.displayName.isBlank()) "Olá! 👋🏼" else "Olá, ${settings.displayName}! 👋🏼",
                             style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("rendly-greeting"), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                     IconButton({ finance.preferences.hideAmounts(!hidden) }, Modifier.size(48.dp)) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
-                    if (tab != 0) IconButton({ tab = if (tab == 5) 0 else 5 }, Modifier.size(48.dp).testTag("open-notification-review")) {
+                    if (navigation.tab != 0) IconButton({ navigation.tab = if (navigation.tab == 5) 0 else 5 }, Modifier.size(48.dp).testTag("open-notification-review")) {
                         BadgedBox(badge = { if (oldState.pending.isNotEmpty()) Badge { Text(oldState.pending.size.toString()) } }) {
                             AppIcon(R.drawable.ic_pending, description = "Revisão de notificações")
                         }
                     }
-                    IconButton({ tab = if (tab == 3) 0 else 3 }, Modifier.size(48.dp).testTag("forecast-settings")) { AppIcon(R.drawable.ic_settings, description = "Ajustes") }
+                    IconButton({ navigation.tab = if (navigation.tab == 3) 0 else 3 }, Modifier.size(48.dp).testTag("forecast-settings")) { AppIcon(R.drawable.ic_settings, description = "Ajustes") }
                 }
                 when {
-                    tab == 5 -> Column {
-                        TextButton({ tab = 3 }, Modifier.padding(horizontal = FinanceSpacing.page)) { Text("Configurar captura") }
+                    navigation.tab == 5 -> Column {
+                        TextButton({ navigation.tab = 3 }, Modifier.padding(horizontal = FinanceSpacing.page)) { Text("Configurar captura") }
                         Box(Modifier.weight(1f)) {
-                            PendingScreen(oldState.pending, hidden, { openReview(it) }, { id -> finance.dismiss(id) { reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, id); reviewAfter = id } }, busy, captureActive)
+                            PendingScreen(oldState.pending, hidden, { openReview(it) }, { id -> finance.dismiss(id) { review.reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, id); review.reviewAfter = id } }, busy, captureActive)
                         }
                     }
-                    tab == 4 -> RecordsScreen(realized, month, { monthText = it.toString() }, hidden, recordCategory,
-                        { recordCategory = it }, { openActual(recordId = it.id) },
-                        expenseFilter = expenseDimension?.let { ExpenseFilter(it, expenseKey, expenseLabel) },
-                        onClearExpenseFilter = { expenseDimension = null }, realizedOnly = true)
-                    tab == 3 -> SettingsScreen(settings, connected, hasAccess, canAlert, captureError,
-                        onToggle = { enabled -> if (enabled && !settings.consented) disclosure = true else finance.preferences.setEnabled(enabled) },
-                        onApps = { if (!settings.consented) disclosure = true else { appPicker = true; finance.loadApps() } },
+                    navigation.tab == 4 -> RecordsScreen(realized, month, { navigation.monthText = it.toString() }, hidden, navigation.recordCategory,
+                        { navigation.recordCategory = it }, { openActual(recordId = it.id) },
+                        expenseFilter = navigation.expenseDimension?.let { ExpenseFilter(it, navigation.expenseKey, navigation.expenseLabel) },
+                        onClearExpenseFilter = { navigation.expenseDimension = null }, realizedOnly = true)
+                    navigation.tab == 3 -> SettingsScreen(settings, connected, hasAccess, canAlert, captureError,
+                        onToggle = { enabled -> if (enabled && !settings.consented) editors.disclosure = true else finance.preferences.setEnabled(enabled) },
+                        onApps = { if (!settings.consented) editors.disclosure = true else { editors.appPicker = true; finance.loadApps() } },
                         onAccess = ::requestCaptureAccess,
                         onReconnect = { NotificationListenerService.requestRebind(ComponentName(context, BankNotificationListener::class.java)) },
                         onAlerts = ::requestAlerts,
-                        onExport = { export.launch("previsoes-${period.start}.csv") }, onClear = { clearing = true }, onSimulate = finance::simulate,
+                        onExport = { export.launch("previsoes-${period.start}.csv") }, onClear = { editors.clearing = true }, onSimulate = finance::simulate,
                         onAppearance = finance.preferences::setAppearance, busy = busy,
-                        onBackup = { backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { tab = 1 },
+                        onBackup = { editors.backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { navigation.tab = 1 },
                         onLockChange = onLockChange, onSecureScreen = finance.preferences::setSecureScreen,
                         onReminders = { finance.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
                         plannerMode = true, showCapture = true, onDisplayName = finance.preferences::setDisplayName)
                     loadError != null -> { Text(loadError!!, Modifier.padding(FinanceSpacing.page)); Button({ model.refresh() }) { Text("Tentar novamente") } }
                     snapshot == null -> Text("Abrindo seu planejamento…", Modifier.padding(FinanceSpacing.page))
                     report == null -> Text("Não foi possível calcular este ciclo. Confira as previsões em seus dados e tente novamente.", Modifier.padding(FinanceSpacing.page))
-                    tab == 2 -> ForecastReserveScreen(snapshot, report, hidden, busy,
+                    navigation.tab == 2 -> ForecastReserveScreen(snapshot, report, hidden, busy,
                         onSet = { showReserve(ReserveEventKind.SET) }, onAdd = { showReserve(ReserveEventKind.ADD) },
-                        onWithdraw = { showReserve(ReserveEventKind.WITHDRAW) }, onGoal = { goalEditor = true })
-                    tab == 1 -> ForecastProjectionScreen(snapshot, period, simulation, hidden, busy,
-                        onSimulate = { simulationEditor = true }, onDiscard = { simulation = null },
-                        onAdopt = { simulation?.let { value -> model.saveRule(value) { simulation = null } } }, onOpen = { select(it.start); tab = 0 },
+                        onWithdraw = { showReserve(ReserveEventKind.WITHDRAW) }, onGoal = { editors.goalEditor = true })
+                    navigation.tab == 1 -> ForecastProjectionScreen(snapshot, period, editors.simulation, hidden, busy,
+                        onSimulate = { editors.simulationEditor = true }, onDiscard = { editors.simulation = null },
+                        onAdopt = { editors.simulation?.let { value -> model.saveRule(value) { editors.simulation = null } } }, onOpen = { select(it.start); navigation.tab = 0 },
                         legacyIncome = legacyIncome.filterNot { old -> snapshot.rules.any { it.legacySource == "monthly-reference:${old.month}" } },
-                        onReuse = { old -> legacyMonth = old.month; editItem = null; editKey = null; template = null; editor = true },
+                        onReuse = { old -> editors.legacyMonth = old.month; editors.editItem = null; editors.editKey = null; editors.template = null; editors.editor = true },
                         represented = represented)
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
-                        item {
-                            val reviewLabel = if (oldState.pending.isEmpty()) "Revisar notificações"
-                                else "Revisar notificações (${oldState.pending.size})"
-                            FilledTonalButton({ tab = 5 }, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("dashboard-notification-review")) {
-                                AppIcon(R.drawable.ic_pending)
-                                Spacer(Modifier.width(8.dp))
-                                Text(reviewLabel)
-                            }
-                        }
-                        item { MonthPicker(month) { monthText = it.toString() } }
-                        item { MonthlyResultCard(salarySummary, hidden) { salaryEditor = true } }
-                        item { PaydayBudgetCard(paydayBudget, knownBalances.isNotEmpty(), hidden) { newItem(ForecastKind.INCOME, "Salário") } }
-                        item { TextButton({ expenseDimension = null; recordCategory = null; tab = 4 }) { Text("Ver extrato do mês") } }
-                        item { ExpenseChart(realized, month, hidden) {
-                            expenseDimension = it.dimension; expenseKey = it.key; expenseLabel = it.label; recordCategory = null; tab = 4
-                        } }
-                        item { MonthComparisonCard(monthComparison, hidden) {
-                            expenseDimension = null; recordCategory = it; tab = 4
-                        } }
+                        monthlyDashboardCards(navigation, editors, month, salarySummary, paydayBudget,
+                            monthComparison, realized, oldState.pending.size, knownBalances.isNotEmpty(), hidden,
+                            onNewSalary = { newItem(ForecastKind.INCOME, "Salário") })
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
-                        item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { followingCurrent = true; browsing = today.toString() }, { cycleEditor = true }) }
+                        item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { navigation.followingCurrent = true; navigation.browsing = today.toString() }, { editors.cycleEditor = true }) }
                         item { Text(if (closed) "Ciclo encerrado · valores estimados" else "Planejamento do ciclo · valores estimados", style = MaterialTheme.typography.labelMedium) }
                         item { RendlyCategories(report, hidden) }
-                        item { TextButton({ dueDates = true },
+                        item { TextButton({ editors.dueDates = true },
                             enabled = report.lines.any { it.included && !it.ignored && it.date >= today }, modifier = Modifier.fillMaxWidth()) {
                             AppIcon(R.drawable.ic_chevron_right); Spacer(Modifier.width(8.dp)); Text("Próximos vencimentos · consultar previsão")
                         } }
@@ -323,132 +274,120 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             }
                             Row {
                                 TextButton({ newItem(ForecastKind.INCOME) }, Modifier.testTag("forecast-add-income")) { Text("Prever receita") }
-                                TextButton({ templates = true }) { Text("Modelos") }
+                                TextButton({ editors.templates = true }) { Text("Modelos") }
                             }
                             Text("O vencimento organiza as datas; seu orçamento não depende de confirmar pagamentos.", style = MaterialTheme.typography.bodySmall)
                         }
                         forecastLineItems(report.lines, hidden, busy, ::edit, model::ignore, model::stop)
                         item { FinanceDisclosure("Histórico e dados anteriores", "forecast-legacy-data") {
                             Text("As fontes antigas foram preservadas. Recorrências, parcelas e registros vinculados foram aproveitados uma única vez. Rendas de referência antigas precisam de revisão antes de virar previsão.", style = MaterialTheme.typography.bodySmall)
-                            TextButton({ tab = 1 }) { Text("Revisar rendas de referência antigas") }
-                            TextButton({ tab = 4 }) { Text("Consultar lançamentos anteriores") }
+                            TextButton({ navigation.tab = 1 }) { Text("Revisar rendas de referência antigas") }
+                            TextButton({ navigation.tab = 4 }) { Text("Consultar lançamentos anteriores") }
                         } }
                     }
                 }
             }
         }
     }
-    if (salaryEditor) key(monthText) {
-        SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { salaryEditor = false }) { cents ->
+    if (editors.salaryEditor) key(navigation.monthText) {
+        SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { editors.salaryEditor = false }) { cents ->
             finance.saveMonthlyIncome(MonthlyIncomePlan(month, cents, salaryReference?.healthyLimitBasisPoints ?: 3000)) {
-                salaryEditor = false; model.refresh()
+                editors.salaryEditor = false; model.refresh()
             }
         }
     }
-    val draft = oldState.pending.firstOrNull { it.id == editingDraftId }
+    val draft = oldState.pending.firstOrNull { it.id == review.editingDraftId }
     val merchant = remember(draft?.id) { draft?.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } }
-    val record = oldState.records.firstOrNull { it.id == editingRecordId }
-    if (recordEditor && (editingDraftId == null || draft != null) && (editingRecordId == null || record != null)) key(editingDraftId, editingRecordId, actualKind) {
-        RecordEditor(draft, record, busy, onDismiss = { recordEditor = false },
-            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = draftRevision) {
-                recordEditor = false
-                if (draft != null) { reviewAfter = draft.id; rememberMerchantCategory(draft, value.category) }
+    val record = oldState.records.firstOrNull { it.id == review.editingRecordId }
+    if (review.recordEditor && (review.editingDraftId == null || draft != null) && (review.editingRecordId == null || record != null)) key(review.editingDraftId, review.editingRecordId, review.actualKind) {
+        RecordEditor(draft, record, busy, onDismiss = { review.recordEditor = false },
+            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = review.draftRevision) {
+                review.recordEditor = false
+                if (draft != null) { review.reviewAfter = draft.id; rememberMerchantCategory(draft, value.category) }
             } },
-            onIgnore = draft?.let { { finance.dismiss(it.id) { recordEditor = false; reviewAfter = it.id } } },
+            onIgnore = draft?.let { { finance.dismiss(it.id) { review.recordEditor = false; review.reviewAfter = it.id } } },
             onDelete = record?.let { { finance.delete(it.id) } },
             accounts = oldState.accounts, lastOrigin = settings.lastOrigin, onAddAccount = finance::addAccount,
-            initialMovement = actualKind, hideAmounts = hidden, duplicateIndex = duplicateIndex,
+            initialMovement = review.actualKind, hideAmounts = hidden, duplicateIndex = duplicateIndex,
             balances = oldState.accountBalances, history = oldState.records,
             rememberedCategory = merchant?.let { merchantStore.get(it.key) }, merchantLabel = merchant?.label,
-            notificationChanged = draft != null && draft.revision != draftRevision,
-            onAcceptUpdate = { draftRevision = draft?.revision },
+            notificationChanged = draft != null && draft.revision != review.draftRevision,
+            onAcceptUpdate = { review.draftRevision = draft?.revision },
             realizedOnly = true, onOpenExpenseForecast = if (draft == null && record == null && snapshot != null) {
-                { recordEditor = false; newItem(ForecastKind.EXPENSE) }
+                { review.recordEditor = false; newItem(ForecastKind.EXPENSE) }
             } else null)
     }
-    reviewAfter?.takeIf { !recordEditor && tab == 5 }?.let { done ->
+    review.reviewAfter?.takeIf { !review.recordEditor && navigation.tab == 5 }?.let { done ->
         val pendingIds = oldState.pending.map { it.id }.toSet()
-        val next = ReviewQueue.next(reviewIds, done, pendingIds)?.let { id -> oldState.pending.firstOrNull { it.id == id } }
+        val next = ReviewQueue.next(review.reviewIds, done, pendingIds)?.let { id -> oldState.pending.firstOrNull { it.id == id } }
             ?: oldState.pending.firstOrNull { it.id != done }
-        AlertDialog(onDismissRequest = { reviewAfter = null }, title = { DialogSystemBars(); Text("Sugestão tratada") },
+        AlertDialog(onDismissRequest = { review.reviewAfter = null }, title = { DialogSystemBars(); Text("Sugestão tratada") },
             text = { Text(if (next != null) "Há mais notificações para revisar. Cada lançamento continua exigindo a sua confirmação."
                 else "Não há mais notificações pendentes para revisar.") },
             confirmButton = { if (next != null) TextButton({ openReview(next, continuing = true) }, Modifier.testTag("review-next")) { Text("Revisar próxima") }
-                else TextButton({ reviewAfter = null }, Modifier.testTag("review-empty-done")) { Text("Concluir") } },
-            dismissButton = { if (next != null) TextButton({ reviewAfter = null }) { Text("Agora não") } })
+                else TextButton({ review.reviewAfter = null }, Modifier.testTag("review-empty-done")) { Text("Concluir") } },
+            dismissButton = { if (next != null) TextButton({ review.reviewAfter = null }) { Text("Agora não") } })
     }
-    LaunchedEffect(oldState.loaded, draft, record, editingDraftId, editingRecordId) {
-        if (oldState.loaded && ((editingDraftId != null && draft == null) || (editingRecordId != null && record == null))) recordEditor = false
+    LaunchedEffect(oldState.loaded, draft, record, review.editingDraftId, review.editingRecordId) {
+        if (oldState.loaded && ((review.editingDraftId != null && draft == null) || (review.editingRecordId != null && record == null))) review.recordEditor = false
     }
-    if (disclosure) DisclosureDialog({ disclosure = false }) {
-        finance.preferences.acceptDisclosure(); disclosure = false; appPicker = true; finance.loadApps()
+    if (editors.disclosure) DisclosureDialog({ editors.disclosure = false }) {
+        finance.preferences.acceptDisclosure(); editors.disclosure = false; editors.appPicker = true; finance.loadApps()
     }
-    if (appPicker) AppPickerDialog(apps, loadingApps, settings.packages, { appPicker = false }) {
-        finance.preferences.selectPackages(it); appPicker = false
+    if (editors.appPicker) AppPickerDialog(apps, loadingApps, settings.packages, { editors.appPicker = false }) {
+        finance.preferences.selectPackages(it); editors.appPicker = false
     }
-    val selectedLine = report?.lines?.firstOrNull { it.itemId == editItem && it.occurrenceKey == editKey }
-    if (dueDates && report != null) AlertDialog(onDismissRequest = { dueDates = false },
+    val selectedLine = report?.lines?.firstOrNull { it.itemId == editors.editItem && it.occurrenceKey == editors.editKey }
+    if (editors.dueDates && report != null) AlertDialog(onDismissRequest = { editors.dueDates = false },
         title = { Text("Próximos vencimentos") }, text = {
             LazyColumn(Modifier.heightIn(max = 400.dp)) {
                 val upcoming = report.lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && !it.rule.cycleAnchored && it.date >= today }.sortedBy { it.date }
                 if (upcoming.isEmpty()) item { Text("Sem vencimentos previstos restantes neste ciclo.") }
                 upcoming.forEach { line -> item {
-                    TextButton({ dueDates = false; edit(line) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    TextButton({ editors.dueDates = false; edit(line) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Column(Modifier.weight(1f)) { Text(privateDisplayText(line.title, hidden)); Text(line.date.toString()) }
                         Amount(line.amountCents, hidden, size = 16)
                     }
                 } }
             }
-        }, confirmButton = { TextButton({ dueDates = false }) { Text("Fechar") } })
-    val selectedRule = snapshot?.rules?.filter { it.itemId == editItem }?.maxByOrNull { it.effectiveFrom }
-    val oldIncome = legacyIncome.firstOrNull { it.month == legacyMonth }
+        }, confirmButton = { TextButton({ editors.dueDates = false }) { Text("Fechar") } })
+    val selectedRule = snapshot?.rules?.filter { it.itemId == editors.editItem }?.maxByOrNull { it.effectiveFrom }
+    val oldIncome = legacyIncome.firstOrNull { it.month == editors.legacyMonth }
     val referenceRule = oldIncome?.let { ForecastRule("monthly-reference:${it.month}", period.start, "Renda anterior · revisar", ForecastKind.INCOME,
         it.incomeCents, Category.OTHER_INCOME, ForecastFrequency.ONCE, period.start, legacySource = "monthly-reference:${it.month}") }
-    if (editor && snapshot != null) key(editItem, editKey, template, legacyMonth, initialKind) {
+    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.template, editors.legacyMonth, editors.initialKind) {
         ForecastEditor(rule = selectedLine?.rule ?: selectedRule ?: referenceRule, line = selectedLine, period = period, busy = busy, hidden = hidden,
-            onDismiss = { editor = false }, onSaveRule = { model.saveRule(it) { editor = false } }, onSaveOverride = { model.saveOverride(it) { editor = false } },
-            initialKind = initialKind, initialFrequency = if (initialKind == ForecastKind.EXPENSE && template == null) ForecastFrequency.ONCE else ForecastFrequency.MONTHLY, initialTitle = template.orEmpty(), initialCategory = fixedExpenseTemplates.firstOrNull { it.title == template }?.category,
+            onDismiss = { editors.editor = false }, onSaveRule = { model.saveRule(it) { editors.editor = false } }, onSaveOverride = { model.saveOverride(it) { editors.editor = false } },
+            initialKind = editors.initialKind, initialFrequency = if (editors.initialKind == ForecastKind.EXPENSE && editors.template == null) ForecastFrequency.ONCE else ForecastFrequency.MONTHLY, initialTitle = editors.template.orEmpty(), initialCategory = fixedExpenseTemplates.firstOrNull { it.title == editors.template }?.category,
             knownStatements = snapshot.rules.map { it.statementKey }.filter { it.isNotBlank() }.distinct(),
             existingOverride = snapshot.overrides.firstOrNull { it.itemId == selectedLine?.itemId && it.occurrenceKey == selectedLine?.occurrenceKey })
     }
-    if (templates) AlertDialog(onDismissRequest = { templates = false }, title = { DialogSystemBars(); Text("Modelos opcionais") },
-        text = { Column { fixedExpenseTemplates.forEach { item -> TextButton({ templates = false; newItem(ForecastKind.EXPENSE, item.title) }, Modifier.fillMaxWidth()) { Text(item.title) } }
-            Text("Você informará o valor antes de salvar.", style = MaterialTheme.typography.bodySmall) } }, confirmButton = { TextButton({ templates = false }) { Text("Fechar") } })
-    if (cycleEditor && snapshot != null) CycleDayEditor(snapshot.cycleRules.lastOrNull { it.effectiveStart <= today }?.day ?: 1, busy,
+    if (editors.templates) AlertDialog(onDismissRequest = { editors.templates = false }, title = { DialogSystemBars(); Text("Modelos opcionais") },
+        text = { Column { fixedExpenseTemplates.forEach { item -> TextButton({ editors.templates = false; newItem(ForecastKind.EXPENSE, item.title) }, Modifier.fillMaxWidth()) { Text(item.title) } }
+            Text("Você informará o valor antes de salvar.", style = MaterialTheme.typography.bodySmall) } }, confirmButton = { TextButton({ editors.templates = false }) { Text("Fechar") } })
+    if (editors.cycleEditor && snapshot != null) CycleDayEditor(snapshot.cycleRules.lastOrNull { it.effectiveStart <= today }?.day ?: 1, busy,
         preview = { day ->
             val rules = CycleConfiguration.rulesAfterChange(day, today, snapshot)
             CycleCalendar.periodContaining(maxOf(today, rules.last().effectiveStart), rules)
         },
-        onDismiss = { cycleEditor = false }, onSave = { model.setCycleDay(it) { cycleEditor = false; followingCurrent = true; browsing = today.toString() } },
+        onDismiss = { editors.cycleEditor = false }, onSave = { model.setCycleDay(it) { editors.cycleEditor = false; navigation.followingCurrent = true; navigation.browsing = today.toString() } },
         firstConfiguration = snapshot.cycleRules.isEmpty() && snapshot.reserveEvents.none { it.cycleStart != null })
-    reserveKind?.let { kind -> key(kind, allocating) {
-        ReserveEditor(kind, balance, busy, hidden, { reserveKind = null }, { cents, reason, cycle -> model.saveReserve(kind, cents, reason, cycle) { reserveKind = null } },
-            allocationLimitCents = if (allocating) report?.unallocatedCents else null, cycle = if (allocating) period else null, allocateInitially = allocating)
+    editors.reserveKind?.let { kind -> key(kind, editors.allocating) {
+        ReserveEditor(kind, balance, busy, hidden, { editors.reserveKind = null }, { cents, reason, cycle -> model.saveReserve(kind, cents, reason, cycle) { editors.reserveKind = null } },
+            allocationLimitCents = if (editors.allocating) report?.unallocatedCents else null, cycle = if (editors.allocating) period else null, allocateInitially = editors.allocating)
     } }
-    if (goalEditor) ReserveGoalEditor(snapshot?.reserveGoalCents, busy, hidden, { goalEditor = false }) { value -> model.saveReserveGoal(value) { goalEditor = false } }
-    if (simulationEditor) ForecastEditor(simulation, null, period, busy, hidden, { simulationEditor = false },
-        { simulation = it; simulationEditor = false }, {}, initialFrequency = ForecastFrequency.INSTALLMENTS,
+    if (editors.goalEditor) ReserveGoalEditor(snapshot?.reserveGoalCents, busy, hidden, { editors.goalEditor = false }) { value -> model.saveReserveGoal(value) { editors.goalEditor = false } }
+    if (editors.simulationEditor) ForecastEditor(editors.simulation, null, period, busy, hidden, { editors.simulationEditor = false },
+        { editors.simulation = it; editors.simulationEditor = false }, {}, initialFrequency = ForecastFrequency.INSTALLMENTS,
         initialTitle = "Nova parcela · simulação")
-    if (backupDialog != 0) BackupPasswordDialog(backupDialog == 1, busy, { backupDialog = 0; restoreUri = null }) { secret ->
-        val creating = backupDialog == 1; backupDialog = 0
+    if (editors.backupDialog != 0) BackupPasswordDialog(editors.backupDialog == 1, busy, { editors.backupDialog = 0; editors.restoreUri = null }) { secret ->
+        val creating = editors.backupDialog == 1; editors.backupDialog = 0
         if (creating) finance.createBackup(secret) { backupExport.launch("planejamento-${today}.cfbackup") }
-        else { val uri = restoreUri; restoreUri = null; if (uri != null) finance.stageBackup(uri.toUri(), secret) else secret.fill('\u0000') }
+        else { val uri = editors.restoreUri; editors.restoreUri = null; if (uri != null) finance.stageBackup(uri.toUri(), secret) else secret.fill('\u0000') }
     }
     staged?.let { BackupPreviewDialog(it, busy, finance::cancelRestore, finance::restoreBackup) }
-    if (clearing) AlertDialog(onDismissRequest = { clearing = false }, title = { DialogSystemBars(); Text("Apagar os dados?") },
+    if (editors.clearing) AlertDialog(onDismissRequest = { editors.clearing = false }, title = { DialogSystemBars(); Text("Apagar os dados?") },
         text = { Text("Previsões, reserva, histórico e preferências serão apagados deste aparelho. Backups exportados permanecem no destino escolhido.") },
-        confirmButton = { TextButton({ clearing = false; finance.clear() }, enabled = !busy) { Text("Apagar") } },
-        dismissButton = { TextButton({ clearing = false }) { Text("Cancelar") } })
-}
-
-private fun forecastCsv(report: ForecastReport): String {
-    fun cell(value: String): String {
-        val safe = if (value.trimStart().firstOrNull() in listOf('=', '+', '-', '@', '\t', '\r')) "'$value" else value
-        return "\"${safe.replace("\"", "\"\"")}\""
-    }
-    val rows = listOf(listOf("Início do ciclo", "Fim do ciclo", "Descrição", "Data prevista", "Tipo", "Valor previsto BRL", "Incluído no orçamento")) + report.lines.map {
-        listOf(report.period.start.toString(), report.period.endExclusive.minusDays(1).toString(), it.title, it.date.toString(),
-            if (it.kind == ForecastKind.INCOME) "Receita prevista" else "Gasto previsto", Money.editable(it.amountCents), if (it.included) "Sim" else "Não")
-    }
-    return "\uFEFF" + rows.joinToString("\r\n") { it.joinToString(";", transform = ::cell) } + "\r\n"
+        confirmButton = { TextButton({ editors.clearing = false; finance.clear() }, enabled = !busy) { Text("Apagar") } },
+        dismissButton = { TextButton({ editors.clearing = false }) { Text("Cancelar") } })
 }

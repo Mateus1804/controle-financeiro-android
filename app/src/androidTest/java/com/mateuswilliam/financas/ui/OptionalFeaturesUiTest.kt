@@ -136,6 +136,10 @@ class OptionalFeaturesUiTest {
         rule.waitForIdle()
         rule.onNodeWithText("Descrição").assertTextContains("Edição preservada")
         assertAmountInput("amount-input", 9999)
+        rule.activityRule.scenario.recreate()
+        rule.waitForIdle()
+        rule.onNodeWithText("Descrição").assertTextContains("Edição preservada")
+        assertAmountInput("amount-input", 9999)
         confirmDescription("Edição preservada")
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
         assertEquals(9999L, app.repository.exportRecords().single().amountCents)
