@@ -78,7 +78,7 @@ Os resultados locais e os limites da entrega estão em [Validação do planejado
 
 A preparação de atualizações passou a prever assinatura externa ao repositório, conferência de certificado e versionamento crescente. O esquema Room 4 acrescenta índices e conserva os dados existentes. O histórico e os candidatos manuais compartilham a mesma emissão, enquanto o catálogo utiliza uma consulta reduzida de nomes e datas.
 
-A validação inclui um backup congelado no formato 1, migração dos esquemas anteriores, histórico fictício de cinco mil registros e um cenário de atualização do APK anterior sobre a instalação existente. A revisão funcional anterior cobriu as APIs 26, 33, 35 e 36; o CI atual concentra os cenários na API 35. Os resultados efetivamente executados ficam em [Qualidade](docs/qualidade.md).
+A validação inclui um backup congelado no formato 1, migração dos esquemas anteriores, histórico fictício de cinco mil registros e um cenário de atualização do APK anterior sobre a instalação existente. A revisão funcional anterior cobriu as APIs 26, 33, 35 e 36; o CI atual concentra os cenários na API 35. Os resultados efetivamente executados ficam em [Qualidade](docs/qualidade.md). A cobertura automática e o roteiro manual pendente estão em [Acessibilidade](docs/acessibilidade.md).
 
 A [documentação de atualizações](docs/atualizacoes.md) descreve assinatura e limitações. As amostras bancárias reais continuam pendentes; uma tarefa privada foi preparada para conferi-las sem publicar mensagens ou dados pessoais. A preparação não publica APKs nem altera a assinatura de instalações pessoais.
 
