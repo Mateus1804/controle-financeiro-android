@@ -1,0 +1,73 @@
+package com.mateuswilliam.financas.ui
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import com.mateuswilliam.financas.core.*
+import java.time.LocalDate
+import java.time.YearMonth
+import kotlin.properties.ReadWriteProperty
+import kotlin.reflect.KProperty
+
+/** Estado de interface: não grava lançamentos, valores digitados, senhas ou dados no Room. */
+class ForecastUiStateViewModel(handle: SavedStateHandle) : ViewModel() {
+    internal val navigation = ForecastNavigationState(handle)
+    internal val editors = ForecastEditorsState(handle)
+    internal val review = ForecastReviewState(handle)
+}
+
+private class SavedUiProperty<T>(private val handle: SavedStateHandle, private val key: String, initial: T) : ReadWriteProperty<Any?, T> {
+    private var value by mutableStateOf(if (handle.contains(key)) handle.get<T>(key) as T else initial)
+    override fun getValue(thisRef: Any?, property: KProperty<*>): T = value
+    override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+        this.value = value
+        handle[key] = value
+    }
+}
+
+internal class ForecastNavigationState(handle: SavedStateHandle) {
+    var tab: Int by SavedUiProperty(handle, "navigation.tab", 0)
+    var browsing: String by SavedUiProperty(handle, "navigation.browsing", LocalDate.now().toString())
+    var followingCurrent: Boolean by SavedUiProperty(handle, "navigation.followingCurrent", true)
+    var monthText: String by SavedUiProperty(handle, "navigation.monthText", YearMonth.now().toString())
+    var expenseDimension: ExpenseDimension? by SavedUiProperty(handle, "navigation.expenseDimension", null)
+    var expenseKey: String by SavedUiProperty(handle, "navigation.expenseKey", "")
+    var expenseLabel: String by SavedUiProperty(handle, "navigation.expenseLabel", "")
+    var recordCategory: Category? by SavedUiProperty(handle, "navigation.recordCategory", null)
+}
+
+internal class ForecastEditorsState(handle: SavedStateHandle) {
+    var editor: Boolean by SavedUiProperty(handle, "editors.editor", false)
+    var editItem: String? by SavedUiProperty(handle, "editors.editItem", null)
+    var editKey: String? by SavedUiProperty(handle, "editors.editKey", null)
+    var initialKind: ForecastKind by SavedUiProperty(handle, "editors.initialKind", ForecastKind.EXPENSE)
+    var template: String? by SavedUiProperty(handle, "editors.template", null)
+    var legacyMonth: String? by SavedUiProperty(handle, "editors.legacyMonth", null)
+    var dueDates: Boolean by SavedUiProperty(handle, "editors.dueDates", false)
+    var templates: Boolean by SavedUiProperty(handle, "editors.templates", false)
+    var cycleEditor: Boolean by SavedUiProperty(handle, "editors.cycleEditor", false)
+    var reserveKind: ReserveEventKind? by SavedUiProperty(handle, "editors.reserveKind", null)
+    var allocating: Boolean by SavedUiProperty(handle, "editors.allocating", false)
+    var goalEditor: Boolean by SavedUiProperty(handle, "editors.goalEditor", false)
+    var simulationEditor: Boolean by SavedUiProperty(handle, "editors.simulationEditor", false)
+    var backupDialog: Int by SavedUiProperty(handle, "editors.backupDialog", 0)
+    var restoreUri: String? by SavedUiProperty(handle, "editors.restoreUri", null)
+    var clearing: Boolean by SavedUiProperty(handle, "editors.clearing", false)
+    var salaryEditor: Boolean by SavedUiProperty(handle, "editors.salaryEditor", false)
+    var disclosure: Boolean by SavedUiProperty(handle, "editors.disclosure", false)
+    var appPicker: Boolean by SavedUiProperty(handle, "editors.appPicker", false)
+    // Simulações não adotadas sobrevivem à rotação, mas não são persistidas em disco.
+    var simulation by mutableStateOf<ForecastRule?>(null)
+}
+
+internal class ForecastReviewState(handle: SavedStateHandle) {
+    var recordEditor: Boolean by SavedUiProperty(handle, "review.recordEditor", false)
+    var editingRecordId: String? by SavedUiProperty(handle, "review.editingRecordId", null)
+    var editingDraftId: String? by SavedUiProperty(handle, "review.editingDraftId", null)
+    var draftRevision: Int? by SavedUiProperty(handle, "review.draftRevision", null)
+    var actualKind: Movement by SavedUiProperty(handle, "review.actualKind", Movement.EXPENSE)
+    var reviewIds: List<String> by SavedUiProperty(handle, "review.reviewIds", emptyList())
+    var reviewAfter: String? by SavedUiProperty(handle, "review.reviewAfter", null)
+}

@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                     authenticate(AuthenticationAction.UNLOCK)
                 } else savedUi.SaveableStateProvider("finance") {
                     ForecastApp(financeModel, ViewModelProvider(this@MainActivity)[ForecastViewModel::class.java], resumeCount,
+                        ui = ViewModelProvider(this@MainActivity)[com.mateuswilliam.financas.ui.ForecastUiStateViewModel::class.java],
                         incomingDraft = draftFromNotification,
                         consumeDraft = { draftFromNotification = null; intent.removeExtra(ReviewNotifications.EXTRA_DRAFT_ID) },
                         onLockChange = { authenticate(if (it) AuthenticationAction.ENABLE else AuthenticationAction.DISABLE) },
