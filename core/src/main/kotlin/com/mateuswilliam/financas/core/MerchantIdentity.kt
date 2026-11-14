@@ -11,6 +11,8 @@ object MerchantIdentity {
         Regex("(?:compra|pagamento|debito|credito)\\b[^.\\n]{0,40}?\\b(?:em|no|na|para)\\s+([^.\\n,;]{3,60})", RegexOption.IGNORE_CASE),
         Regex("voce pagou\\s+(?:r\\$\\s*[\\d.,]+\\s+)?(?:para|a|em)\\s+([^.\\n,;]{3,60})", RegexOption.IGNORE_CASE),
     )
+    private val explicitLabel = Regex("\\b(?:estabelecimento|local)\\s*:\\s*([^.\\n,;]{3,60})", RegexOption.IGNORE_CASE)
+    private val approvedContext = Regex("\\bcompra\\b[^.!?\\n]{0,80}\\baprovada\\b|\\b(?:pagamento (?:realizado|efetuado|aprovado)|voce pagou)\\b", RegexOption.IGNORE_CASE)
     private val tail = Regex("\\s+(?:no valor|valor|r\\$|em \\d{1,2}/|as \\d|via |com final|cartao|aprovad|realizad|efetuad).*$", RegexOption.IGNORE_CASE)
     private val generic = setOf("conta", "cartao", "credito", "debito", "pix", "sua conta", "seu cartao", "loja", "estabelecimento")
 
@@ -18,8 +20,10 @@ object MerchantIdentity {
 
     fun identify(title: String, body: String): Merchant? {
         val text = "$title. $body".replace(Regex("\\s+"), " ")
-        for (pattern in patterns) {
-            val raw = pattern.find(normalizeAccents(text))?.groupValues?.get(1) ?: continue
+        val normalized = normalizeAccents(text)
+        val candidates = if (approvedContext.containsMatchIn(normalized)) listOf(explicitLabel) + patterns else patterns
+        for (pattern in candidates) {
+            val raw = pattern.find(normalized)?.groupValues?.get(1) ?: continue
             val label = raw.replace(tail, "").trim(' ', '-', ':', '*')
             val key = label.lowercase(java.util.Locale.ROOT).replace(Regex("[^a-z0-9 ]"), "").replace(Regex("\\s+"), " ").trim()
             if (key.length >= 3 && key !in generic && key.substringBefore(' ') !in genericStart && key.any { it.isLetter() }) return Merchant(key, label.take(60))

@@ -236,7 +236,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onBackup = { editors.backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { navigation.tab = 1 },
                         onLockChange = onLockChange, onSecureScreen = finance.preferences::setSecureScreen,
                         onReminders = { finance.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
-                        plannerMode = true, showCapture = true, onDisplayName = finance.preferences::setDisplayName)
+                        plannerMode = true, showCapture = true, onDisplayName = finance.preferences::setDisplayName,
+                        onMerchantCategories = { editors.merchantCategoriesOpen = true })
                     loadError != null -> { Text(loadError!!, Modifier.padding(FinanceSpacing.page)); Button({ model.refresh() }) { Text("Tentar novamente") } }
                     snapshot == null -> Text("Abrindo seu planejamento…", Modifier.padding(FinanceSpacing.page))
                     report == null -> Text("Não foi possível calcular este ciclo. Confira as previsões em seus dados e tente novamente.", Modifier.padding(FinanceSpacing.page))
@@ -288,6 +289,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             }
         }
     }
+    if (editors.merchantCategoriesOpen) MerchantCategoriesDialog(merchantStore, hidden) { editors.merchantCategoriesOpen = false }
     if (editors.accountsOpen) AccountsManager(oldState.accountBalances, oldState.balanceReferences, hidden, busy,
         onDismiss = { editors.accountsOpen = false },
         onStatement = { account ->

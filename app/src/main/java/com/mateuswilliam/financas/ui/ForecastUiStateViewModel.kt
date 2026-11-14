@@ -59,6 +59,7 @@ internal class ForecastEditorsState(handle: SavedStateHandle) {
     var clearing: Boolean by SavedUiProperty(handle, "editors.clearing", false)
     var salaryEditor: Boolean by SavedUiProperty(handle, "editors.salaryEditor", false)
     var disclosure: Boolean by SavedUiProperty(handle, "editors.disclosure", false)
+    var merchantCategoriesOpen: Boolean by SavedUiProperty(handle, "editors.merchantCategoriesOpen", false)
     var appPicker: Boolean by SavedUiProperty(handle, "editors.appPicker", false)
     // Simulações não adotadas sobrevivem à rotação, mas não são persistidas em disco.
     var simulation by mutableStateOf<ForecastRule?>(null)

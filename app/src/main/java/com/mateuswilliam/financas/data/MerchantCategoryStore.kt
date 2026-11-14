@@ -15,8 +15,15 @@ class MerchantCategoryStore(context: Context) {
         preferences.edit { putString(key, category.name) }
     }
 
+    fun entries(): List<MerchantCategoryEntry> = preferences.all.mapNotNull { (key, value) ->
+        val category = Category.entries.firstOrNull { it.name == value } ?: return@mapNotNull null
+        MerchantCategoryEntry(key, category)
+    }.sortedBy { it.key }
+
     fun forget(key: String) = preferences.edit { remove(key) }
     fun clear() = preferences.edit { clear() }
 
     private companion object { const val MAX_ENTRIES = 500 }
 }
+
+data class MerchantCategoryEntry(val key: String, val category: Category)
