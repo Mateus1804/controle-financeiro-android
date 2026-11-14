@@ -24,6 +24,9 @@ class PlanningImprovementsUiTest {
         rule.setContent { FinanceTheme { PaydayBudgetCard(budget, true, false) {} } }
         rule.onNodeWithTag("payday-total").assertTextContains(Money.format(150000))
         rule.onNodeWithTag("payday-weekly").assertExists()
+        rule.onNodeWithText("Este cálculo desconta os compromissos previstos. Gastos variáveis previstos ficam de fora.").assertExists()
+        rule.onNodeWithText("Meta total da reserva").assertExists()
+        rule.onNodeWithText("A meta total da reserva é descontada nesta estimativa; não representa um aporte mensal.").assertExists()
         budget = short; rule.waitForIdle()
         rule.onNodeWithText("Déficit até o pagamento").assertExists()
         rule.onNodeWithTag("payday-weekly").assertDoesNotExist()

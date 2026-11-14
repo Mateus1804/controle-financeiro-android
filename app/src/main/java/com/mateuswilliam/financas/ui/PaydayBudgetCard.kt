@@ -36,9 +36,13 @@ internal fun PaydayBudgetCard(budget: PaydayBudget?, hasBalance: Boolean, hidden
                         Amount(if (deficit) budget.deficitCents else budget.totalCents, hidden, Modifier.testTag("payday-total"), size = 32)
                     }
                     if (!deficit) budget.weeklyCents?.let { PaydayLine("Média por semana", it, hidden, Modifier.testTag("payday-weekly")) }
-                    PaydayLine("Disponível hoje", budget.availableCents, hidden)
-                    PaydayLine("Compromissos pendentes", budget.pendingCommitmentsCents, hidden)
-                    PaydayLine("Valor a guardar", budget.savingsCents, hidden)
+                    PaydayLine("Disponível hoje · contas ativas", budget.availableCents, hidden)
+                    PaydayLine("Compromissos previstos", budget.pendingCommitmentsCents, hidden)
+                    PaydayLine("Meta total da reserva", budget.savingsCents, hidden)
+                    Text("Este cálculo desconta os compromissos previstos. Gastos variáveis previstos ficam de fora.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (budget.savingsCents > 0) Text("A meta total da reserva é descontada nesta estimativa; não representa um aporte mensal.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Estimativa de planejamento; não altera saldos nem lançamentos.", style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
