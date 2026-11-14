@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -37,6 +38,8 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
     fun groupColor(key: String) = palette[Math.floorMod(key.hashCode(), palette.size)]
     val legend = remember(report) { ExpenseLegend.of(report) }
     val visible = legend.visible
+    val angles = remember(visible) { expenseSliceAngles(visible.map { it.cents }) }
+    val enlarged = report.total > 0 && visible.any { it.cents.toDouble() / report.total * 360 < MIN_EXPENSE_SLICE_DEGREES }
     val chartTrack = MaterialTheme.colorScheme.surfaceContainerHigh
     val chartAlpha by androidx.compose.animation.core.animateFloatAsState(if (report.total > 0L) 1f else 0f, label = "Entrada do gráfico")
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest), shape = MaterialTheme.shapes.extraLarge) {
@@ -56,8 +59,8 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
                         val stroke = 18.dp.toPx()
                         var start = -90f
                         if (hidden) drawCircle(chartTrack, radius = (size.minDimension - stroke) / 2, style = Stroke(stroke))
-                        else visible.forEach { group ->
-                            val sweep = (group.cents.toDouble() / report.total * 360).toFloat()
+                        else visible.forEachIndexed { index, group ->
+                            val sweep = angles[index]
                             drawArc(groupColor(dimension.name + group.key), start + if (visible.size > 1) 0.8f else 0f,
                                 (sweep - if (visible.size > 1) minOf(sweep, 1.6f) else 0f).coerceAtLeast(0f), false,
                                 topLeft = androidx.compose.ui.geometry.Offset(stroke / 2, stroke / 2),
@@ -75,6 +78,8 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
                         else onGroup(ExpenseFilter(dimension, group.key, group.label))
                     }
                 }
+                if (!hidden && enlarged) Text("Fatias muito pequenas foram ampliadas para leitura. Os percentuais da legenda continuam reais.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Percentuais calculados sobre o total gasto no período.", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (legend.hasOthers) TextButton(onClick = { allGroups = true }, Modifier.heightIn(min = FinanceSpacing.touch)) { Text("Ver todos os ${report.groups.size} grupos") }
@@ -106,8 +111,7 @@ private fun ExpenseLegendRow(group: ExpenseGroup, hidden: Boolean, color: Color,
         Text(privateDisplayText(group.label, hidden), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Column(horizontalAlignment = Alignment.End) {
             Amount(group.cents, hidden, Modifier.widthIn(max = 144.dp), size = 16)
-            Text(if (hidden) "Percentual oculto" else "${ExpenseLegendText.percentage(group.basisPoints)} do total", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ExpensePercentageBadge(group.basisPoints, hidden, color)
         }
     }
 }
@@ -117,5 +121,16 @@ private fun ExpenseTotal(total: Long, hidden: Boolean, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Despesas brutas", style = MaterialTheme.typography.labelMedium)
         Amount(total, hidden, size = 20)
+    }
+}
+
+internal fun expensePercentageTextColor(background: Color): Color = if (background.luminance() > 0.179f) Color.Black else Color.White
+
+@Composable
+private fun ExpensePercentageBadge(basisPoints: Int, hidden: Boolean, color: Color) {
+    val background = if (hidden) MaterialTheme.colorScheme.surfaceContainerHigh else color
+    Surface(color = background, contentColor = expensePercentageTextColor(background), shape = MaterialTheme.shapes.small) {
+        Text(if (hidden) "Percentual oculto" else "${ExpenseLegendText.percentage(basisPoints)} do total",
+            Modifier.padding(horizontal = 6.dp, vertical = 2.dp), style = MaterialTheme.typography.labelMedium)
     }
 }
