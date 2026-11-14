@@ -301,8 +301,18 @@ class FinanceUiTest {
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
             rule.waitForIdle()
             openExpense()
-            rule.onNodeWithTag("amount-input").performTextInput("1234")
-            rule.onNodeWithTag("amount-input").performImeAction()
+            // O usuário precisa alcançar o campo antes de focá-lo. Em paisagem, o foco
+            // sem rolagem dispara duas solicitações de reposicionamento durante o IME.
+            val amount = rule.onNodeWithTag("amount-input")
+            amount.performScrollTo().assertIsDisplayed().performClick()
+            rule.waitUntil(5000) {
+                android.view.inspector.WindowInspector.getGlobalWindowViews().any {
+                    androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+                }
+            }
+            rule.waitForIdle()
+            amount.performTextInput("1234")
+            amount.performImeAction()
             rule.waitUntil(5000) {
                 val windows = if (android.os.Build.VERSION.SDK_INT >= 29) android.view.inspector.WindowInspector.getGlobalWindowViews() else listOf(rule.activity.window.decorView)
                 windows.none { androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
