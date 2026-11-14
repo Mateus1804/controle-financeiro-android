@@ -98,11 +98,7 @@ class RedesignInteractionTest {
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.9f && rule.activity.resources.configuration.screenWidthDp <= 320 }
             checkpoint("Conferindo navegação com fonte ampliada")
             for (label in listOf("Orçamento", "Projeções", "Reserva", "Orçamento")) {
-                rule.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                    assertTrue(action(layouts))
-                    assertTrue("Rótulo da navegação cortado em fonte 200%", layouts.none { it.hasVisualOverflow })
-                }
+                rule.onNodeWithText(label, useUnmergedTree = true).assertStartAlignedTextFits(label)
                 waitForEnabled(hasText(label) and hasClickAction())
                     .assertIsDisplayed().assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
             }
@@ -116,12 +112,7 @@ class RedesignInteractionTest {
                 waitForEnabled(hasTestTag(tag)).assertIsDisplayed().assertHeightIsAtLeast(48.dp)
             }
             for (label in listOf("Receita", "Despesa")) {
-                rule.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                    assertTrue(action(layouts)); assertEquals(1, layouts.size)
-                    assertEquals("Atalho não deve quebrar a palavra em fonte 200%", 1, layouts.single().lineCount)
-                    assertFalse(layouts.single().hasVisualOverflow)
-                }
+                rule.onNodeWithText(label, useUnmergedTree = true).assertStartAlignedTextFits(label, singleLine = true)
             }
             rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
             checkpoint("Capturando orçamento escuro com fonte ampliada")

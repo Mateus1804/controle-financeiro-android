@@ -131,12 +131,12 @@ fun movementIcon(movement: Movement): Int = when (movement) {
 
 // A formatação é apenas visual. Cálculos e persistência continuam em centavos inteiros.
 @Composable
-fun Amount(cents: Long, hidden: Boolean, modifier: Modifier = Modifier, size: Int = 18, maxLines: Int = 2) {
+fun Amount(cents: Long, hidden: Boolean, modifier: Modifier = Modifier, size: Int = 18) {
     androidx.compose.foundation.text.BasicText(
         text = if (hidden) "••••" else Money.format(cents), modifier = modifier.semantics { if (hidden) contentDescription = "Valor oculto" },
         style = LocalTextStyle.current.copy(color = LocalContentColor.current, fontSize = size.sp,
             lineHeight = (size * 1.25f).sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
-        maxLines = maxLines,
+        maxLines = 2,
         autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = minOf(size, 14).sp,
             maxFontSize = size.sp, stepSize = 1.sp),
     )

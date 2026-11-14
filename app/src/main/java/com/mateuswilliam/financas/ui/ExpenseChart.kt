@@ -113,7 +113,7 @@ private fun ExpenseLegendRow(group: ExpenseGroup, hidden: Boolean, color: Color,
                 Box(Modifier.size(12.dp).background(color, CircleShape))
                 Text(privateDisplayText(group.label, hidden), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             }
-            Amount(group.cents, hidden, Modifier.fillMaxWidth(), size = 16, maxLines = Int.MAX_VALUE)
+            Amount(group.cents, hidden, Modifier.fillMaxWidth(), size = 16)
             ExpensePercentageBadge(group.basisPoints, hidden, color)
         }
     } else {
@@ -132,7 +132,7 @@ private fun ExpenseLegendRow(group: ExpenseGroup, hidden: Boolean, color: Color,
 private fun ExpenseTotal(total: Long, hidden: Boolean, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Despesas brutas", style = MaterialTheme.typography.labelMedium)
-        Amount(total, hidden, size = 20, maxLines = Int.MAX_VALUE)
+        Amount(total, hidden, size = 20)
     }
 }
 

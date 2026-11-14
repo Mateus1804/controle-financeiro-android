@@ -2,10 +2,12 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
@@ -32,7 +34,7 @@ class LargeFontChartUiTest {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
                 FinanceTheme {
-                    Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
+                    Column(Modifier.width(320.dp).safeDrawingPadding().testTag("large-font-chart-scroll").verticalScroll(rememberScrollState())) {
                         ExpenseChart(listOf(record), month, hidden) {}
                     }
                 }
@@ -47,13 +49,12 @@ class LargeFontChartUiTest {
         val amount = rule.onNode(hasText(Money.format(Money.MAX_CENTS)) and inGroup, useUnmergedTree = true)
         val percentage = rule.onNode(hasText("100,00% do total") and inGroup, useUnmergedTree = true)
         listOf("nome" to label, "valor" to amount, "percentual" to percentage).forEach { (field, node) ->
-            node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                assertTrue(action(layouts))
-                assertTrue(layouts.isNotEmpty())
-                assertTrue("$field cortado em 320dp/200%: ${layouts.map { it.size to it.lineCount }}", layouts.none { it.hasVisualOverflow })
-            }
+            node.assertStartAlignedTextFits(field).assertIsDisplayed()
         }
+        val viewport = rule.onNodeWithTag("large-font-chart-scroll").getUnclippedBoundsInRoot()
+        val groupBounds = group.getUnclippedBoundsInRoot()
+        assertTrue("Legenda deve ficar acima da barra do Android", groupBounds.bottom <= viewport.bottom)
+        assertTrue("Legenda deve ficar dentro da área de leitura", groupBounds.top >= viewport.top)
         assertTrue(label.fetchSemanticsNode().boundsInRoot.bottom <= amount.fetchSemanticsNode().boundsInRoot.top)
         assertTrue(amount.fetchSemanticsNode().boundsInRoot.bottom <= percentage.fetchSemanticsNode().boundsInRoot.top)
         group.assertHeightIsAtLeast(48.dp)
