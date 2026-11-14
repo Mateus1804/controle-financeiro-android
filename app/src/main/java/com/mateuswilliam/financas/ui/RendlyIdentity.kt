@@ -32,7 +32,7 @@ internal fun DisplayNameDialog(initial: String, dismiss: () -> Unit, save: (Stri
 
 @Composable
 internal fun RendlyCategories(report: ForecastReport, hidden: Boolean) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.testTag("forecast-categories"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Gastos por categoria", style = MaterialTheme.typography.titleMedium)
         val grouped = report.lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE }
             .groupBy { it.category }.mapValues { (_, lines) -> lines.sumOf { it.amountCents } }

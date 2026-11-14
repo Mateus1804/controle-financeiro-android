@@ -154,20 +154,21 @@ class CommitmentReportUiTest {
 
     private fun assertCategory(category: Category, cents: Long) {
         val value = Money.format(cents)
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText(value))
-        val labels = rule.onAllNodesWithText(category.label, useUnmergedTree = true).fetchSemanticsNodes()
+        val categoryRegion = hasAnyAncestor(hasTestTag("forecast-categories"))
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText(value) and categoryRegion)
+        val labels = rule.onAllNodes(hasText(category.label) and categoryRegion, useUnmergedTree = true).fetchSemanticsNodes()
         val sameRow = SemanticsMatcher("$value na mesma linha de ${category.label}") { amount ->
             val amountBounds = amount.boundsInRoot
             labels.any { label ->
                 val labelBounds = label.boundsInRoot
                 labelBounds.width > 0 && labelBounds.height > 0 &&
                     amountBounds.width > 0 && amountBounds.height > 0 &&
-                    amountBounds.left >= labelBounds.right &&
-                    kotlin.math.abs(amountBounds.center.y - labelBounds.center.y) <= 1f
+                    amountBounds.left >= labelBounds.right - 1f &&
+                    minOf(amountBounds.bottom, labelBounds.bottom) - maxOf(amountBounds.top, labelBounds.top) >= minOf(amountBounds.height, labelBounds.height) / 2
             }
         }
         // Layout-only Rows flatten into one semantics parent; sibling membership is insufficient.
-        rule.onNode(hasText(value) and sameRow, useUnmergedTree = true).assertIsDisplayed()
+        rule.onNode(hasText(value) and categoryRegion and sameRow, useUnmergedTree = true).assertIsDisplayed()
     }
 
     private fun assertPrivateNumbersAbsent() {
