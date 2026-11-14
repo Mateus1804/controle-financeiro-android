@@ -91,7 +91,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             val recurringDates = oldState.recurring.filter { it.active && it.movement == Movement.INCOME && it.category == Category.SALARY }
                 .mapNotNull { runCatching { LocalDate.parse(it.nextDate) }.getOrNull() }
             PaydayBudgets.nextPayday(lines, recurringDates, todayDate)?.let { payday ->
-                PaydayBudgets.compute(knownBalances.sumOf { it.balanceCents ?: 0L }, lines, data?.reserveGoalCents ?: 0L, todayDate, payday)
+                PaydayBudgets.compute(knownBalances.sumOf { it.balanceCents ?: 0L }, lines, todayDate, payday)
             }
         }.getOrNull()
     }

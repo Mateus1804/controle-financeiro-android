@@ -1,15 +1,13 @@
-# Alcance do cálculo até o salário
+# Cálculo até o próximo salário
 
-O cartão informa que desconta compromissos previstos e deixa de fora gastos variáveis previstos. A opção escolhida foi esclarecer a regra existente. Não foi acrescentado um novo desconto nem uma preferência que altere o cálculo.
+O valor disponível é o saldo conhecido das contas ativas menos os compromissos previstos desde hoje até antes da data do próximo salário. A reserva e sua meta não são descontadas. Não há confirmação de pagamento para usar esse planejamento.
 
-A regra permanece: saldo conhecido de contas ativas menos compromissos incluídos, não ignorados, do grupo Compromisso e com data entre hoje e o próximo salário (sem incluir o dia desse salário), menos o valor de reserva já fornecido ao cálculo. Lançamentos representados são excluídos pelo mecanismo existente.
+Uma linha separada, “Se os gastos variáveis previstos acontecerem”, mostra a disponibilidade depois desses gastos. Ela não altera o valor principal, os saldos das contas ou os lançamentos. Ocorrências repetidas são contadas uma vez; previsões ignoradas e fora do intervalo ficam de fora.
 
-## Problema financeiro encontrado na revisão
-
-A ForecastApp passa reserveGoalCents como savingsCents para PaydayBudgets.compute. Esse campo é a meta total da reserva de emergência, não um aporte planejado para o período. Assim, uma meta de R$ 10.000 pode descontar R$ 10.000 do cartão, mesmo que a intenção seja guardar apenas uma pequena parte neste mês.
-
-O rótulo passa de “Valor a guardar” para “Meta total da reserva” e uma observação explica o desconto real. A regra não foi corrigida silenciosamente: depende de confirmação do proprietário, conforme a restrição desta tarefa. A correção proposta para uma etapa posterior é separar meta total de aporte planejado e definir qual deles deve reduzir a disponibilidade. Este PR não aprova nenhuma dessas regras.
+Quando existe conta ativa sem saldo informado, o cartão avisa “Saldo parcial”. Uma conta com zero informado é conhecida; uma conta arquivada não torna esse aviso parcial. O cabeçalho informa “Cálculo até dd/mm (próximo salário previsto)”.
 
 ## Verificação
 
-Compilação do app/testes e lint locais; resultado no PR. O teste visual existente mantém os valores esperados em centavos e confere as novas explicações. Instrumentação somente Android 15/API 35. Não foram alterados core financeiro, Room ou backup.
+O caso de aceitação usa saldo de R$ 1.000, compromisso de R$ 300 e dez dias: total de R$ 700 e média semanal de R$ 490. O cenário com R$ 200 de gastos variáveis retorna R$ 500 sem mudar o principal. Casos adicionais cobrem déficit, pagamento hoje, previsões ignoradas e deduplicação. Os novos testes reproduziram o desconto indevido antes da correção. A suíte instrumental confere data, saldo parcial, valores e ocultação; somente Android 15 (API 35).
+
+O PR #32 havia apenas explicado a regra anterior, que descontava a meta total da reserva. O Prompt 2 autorizou sua correção. Este cálculo não altera banco ou backup. Uma previsão futura sem vínculo com um lançamento realizado continua sendo uma projeção a revisar; não há reconhecimento bancário universal nem confirmação automática de pagamentos.

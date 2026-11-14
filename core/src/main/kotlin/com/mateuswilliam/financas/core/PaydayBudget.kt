@@ -11,9 +11,10 @@ import java.time.temporal.ChronoUnit
  */
 data class PaydayBudget(
     val payday: LocalDate, val daysRemaining: Int, val availableCents: Long,
-    val pendingCommitmentsCents: Long, val savingsCents: Long,
+    val pendingCommitmentsCents: Long, val variableForecastCents: Long = 0,
 ) {
-    val spendableCents: Long get() = availableCents - pendingCommitmentsCents - savingsCents
+    val spendableCents: Long get() = availableCents - pendingCommitmentsCents
+    val withVariablesCents: Long get() = spendableCents - variableForecastCents
     val deficitCents: Long get() = maxOf(0L, -spendableCents)
     val totalCents: Long get() = maxOf(0L, spendableCents)
 
@@ -43,12 +44,15 @@ object PaydayBudgets {
 
     /** Compromissos de despesa ainda pendentes em [today, payday). */
     fun pendingCommitments(lines: List<ForecastLine>, today: LocalDate, payday: LocalDate): Long =
-        lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && it.group == ForecastGroup.COMMITMENT && it.date >= today && it.date < payday }
+        pending(lines, today, payday, ForecastGroup.COMMITMENT)
+
+    private fun pending(lines: List<ForecastLine>, today: LocalDate, payday: LocalDate, group: ForecastGroup): Long =
+        lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && it.group == group && it.date >= today && it.date < payday }
             .distinctBy { it.itemId to it.occurrenceKey }.sumOf { it.amountCents }
 
-    fun compute(availableCents: Long, lines: List<ForecastLine>, savingsCents: Long, today: LocalDate, payday: LocalDate): PaydayBudget {
+    fun compute(availableCents: Long, lines: List<ForecastLine>, today: LocalDate, payday: LocalDate): PaydayBudget {
         require(payday >= today) { "O pagamento precisa ser hoje ou depois." }
         return PaydayBudget(payday, ChronoUnit.DAYS.between(today, payday).toInt(), availableCents,
-            pendingCommitments(lines, today, payday), savingsCents)
+            pendingCommitments(lines, today, payday), pending(lines, today, payday, ForecastGroup.VARIABLE))
     }
 }
