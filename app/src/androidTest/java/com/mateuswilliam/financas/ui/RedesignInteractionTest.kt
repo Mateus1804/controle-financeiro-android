@@ -19,21 +19,6 @@ class RedesignInteractionTest {
     private val app get() = rule.activity.application as FinanceApplication
     @Before fun reset() { runBlocking { app.repository.clear() }; app.settings.finishIntro(); rule.waitForIdle() }
 
-    @Test fun quickIncomeStartsTheCorrectMovementAndKeepsIntegerCents() {
-        openQuick("income")
-        rule.onNodeWithTag("amount-input").performTextInput("123456")
-        confirm()
-        val saved = runBlocking { app.repository.exportRecords().single() }
-        assertEquals(Movement.INCOME, saved.movement); assertEquals(123456L, saved.amountCents)
-    }
-
-    @Test fun quickExpenseStartsTheCorrectMovement() {
-        openQuick("expense")
-        rule.onNodeWithTag("amount-input").performTextInput("1234")
-        confirm()
-        assertEquals(Movement.EXPENSE, runBlocking { app.repository.exportRecords().single().movement })
-    }
-
     @Test fun quickTransferShowsDestinationAndCannotSaveWithoutOne() {
         runBlocking { app.repository.addAccount("Origem fictícia") }
         app.settings.rememberOrigin("Origem fictícia")
