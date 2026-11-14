@@ -28,7 +28,7 @@ internal fun LazyListScope.monthlyDashboardCards(
     item { MonthPicker(month) { navigation.monthText = it.toString() } }
     item { MonthlyResultCard(salarySummary, hidden) { editors.salaryEditor = true } }
     item { AccountsOverview(accountBalances, hidden) { editors.accountsOpen = true } }
-    item { PaydayBudgetCard(paydayBudget, hasBalance, hidden, onAccounts = { editors.accountsOpen = true }) { onNewSalary() } }
+    item { PaydayBudgetCard(paydayBudget, hasBalance, hidden, partialBalance = accountBalances.any { !it.archived && it.balanceCents == null }, onAccounts = { editors.accountsOpen = true }) { onNewSalary() } }
     item { TextButton({ navigation.accountFilterKey = null; navigation.expenseDimension = null; navigation.recordCategory = null; navigation.tab = 4 }) { Text("Ver extrato do mês") } }
     item { ExpenseChart(realized, month, hidden) {
         navigation.accountFilterKey = null; navigation.expenseDimension = it.dimension; navigation.expenseKey = it.key; navigation.expenseLabel = it.label; navigation.recordCategory = null; navigation.tab = 4

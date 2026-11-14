@@ -22,14 +22,24 @@ class PlanningImprovementsUiTest {
         val short = PaydayBudget(today.plusDays(7), 7, 50000, 60000, 10000)
         var budget by mutableStateOf<PaydayBudget?>(ok)
         rule.setContent { FinanceTheme { PaydayBudgetCard(budget, true, false) {} } }
-        rule.onNodeWithTag("payday-total").assertTextContains(Money.format(150000))
+        rule.onNodeWithTag("payday-total").assertTextContains(Money.format(200000))
         rule.onNodeWithTag("payday-weekly").assertExists()
-        rule.onNodeWithText("Este cálculo desconta os compromissos previstos. Gastos variáveis previstos ficam de fora.").assertExists()
-        rule.onNodeWithText("Meta total da reserva").assertExists()
-        rule.onNodeWithText("A meta total da reserva é descontada nesta estimativa; não representa um aporte mensal.").assertExists()
+        rule.onNodeWithText("A reserva não é descontada. Gastos variáveis previstos aparecem apenas no cenário separado.").assertExists()
+        rule.onNodeWithTag("payday-with-variables").assertTextContains(Money.format(150000))
+        rule.onNodeWithText("Meta total da reserva").assertDoesNotExist()
         budget = short; rule.waitForIdle()
         rule.onNodeWithText("Déficit até o pagamento").assertExists()
         rule.onNodeWithTag("payday-weekly").assertDoesNotExist()
+    }
+
+    @Test fun paydayCardMarksPartialBalanceAndShowsNextSalaryDate() {
+        rule.setContent { FinanceTheme { PaydayBudgetCard(PaydayBudget(today.plusDays(10), 10, 100000, 30000, 20000),
+            true, false, partialBalance = true) {} } }
+        rule.onNodeWithTag("payday-total").assertTextContains(Money.format(70000))
+        rule.onNodeWithTag("payday-weekly").assertTextContains(Money.format(49000))
+        rule.onNodeWithTag("payday-with-variables").assertTextContains(Money.format(50000))
+        rule.onNodeWithTag("payday-partial").assertTextContains("Saldo parcial")
+        rule.onNodeWithText("Cálculo até 22/11 (próximo salário previsto)").assertExists()
     }
 
     @Test fun paydayCardAsksForMissingPaydayAndHidesValues() {
