@@ -37,6 +37,7 @@ fun SettingsScreen(
     plannerMode: Boolean = false,
     showCapture: Boolean = !plannerMode,
     onDisplayName: (String) -> Unit = {},
+    onMerchantCategories: () -> Unit = {},
 ) {
     var nameEditor by remember { mutableStateOf(false) }
     if (nameEditor) DisplayNameDialog(settings.displayName, { nameEditor = false }, onDisplayName)
@@ -104,6 +105,10 @@ fun SettingsScreen(
                 }
             }
         }
+        if (showCapture) item { OutlinedButton(onMerchantCategories,
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("merchant-categories-settings")) {
+            Text("Categorias lembradas por estabelecimento")
+        } }
         item {
             SettingsCard {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
