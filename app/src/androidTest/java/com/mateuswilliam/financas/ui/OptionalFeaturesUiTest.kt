@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -139,13 +140,13 @@ class OptionalFeaturesUiTest {
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().isNotEmpty() } }
         assertEquals(9999L, app.repository.exportRecords().single().amountCents)
         rule.onNodeWithTag("review-next").performClick()
-        rule.onNodeWithText("EXEMPLO FICTÍCIO · fila-b").assertExists()
+        assertReviewTitle("EXEMPLO FICTÍCIO · fila-b")
         assertEquals(setOf("fila-b", "fila-nova"), app.repository.pending.first().map { it.id }.toSet())
         screenshot("revisao-em-sequencia")
         confirmDescription("Segunda revisão explícita")
         rule.waitUntil(5000) { runBlocking { app.repository.exportRecords().size == 2 } }
         rule.onNodeWithTag("review-next").performClick()
-        rule.onNodeWithText("EXEMPLO FICTÍCIO · fila-nova").assertExists()
+        assertReviewTitle("EXEMPLO FICTÍCIO · fila-nova")
         assertEquals("fila-nova", app.repository.pending.first().single().id)
         assertEquals(2, app.repository.exportRecords().size)
     }
@@ -176,7 +177,7 @@ class OptionalFeaturesUiTest {
         try {
             rule.runOnIdle { app.settings.setLockEnabled(true) }
             rule.waitUntil(5000) { rule.onAllNodesWithText("Acesso protegido").fetchSemanticsNodes().isNotEmpty() }
-            rule.onAllNodesWithText("Rendly").assertCountEquals(0)
+            rule.onAllNodesWithTag("rendly-greeting").assertCountEquals(0)
             rule.onAllNodesWithTag("forecast-dashboard").assertCountEquals(0)
             rule.onAllNodesWithTag("add-realized-expense").assertCountEquals(0)
             rule.runOnIdle { assertTrue(rule.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
@@ -302,6 +303,13 @@ class OptionalFeaturesUiTest {
         InstrumentationRegistry.getInstrumentation().sendStatus(2, android.os.Bundle().apply {
             putString("stream", "\n[interface] $message\n")
         })
+    }
+
+    private fun assertReviewTitle(title: String) {
+        val originalTitle = SemanticsMatcher("Título original da revisão: $title") { node ->
+            node.config.getOrNull(SemanticsProperties.Text)?.map { it.text } == listOf(title)
+        }
+        rule.onNode(originalTitle).assertExists()
     }
 
     private fun confirmDescription(description: String) {

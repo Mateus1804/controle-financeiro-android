@@ -299,8 +299,15 @@ class FinanceUiTest {
         try {
             rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
+            rule.waitForIdle()
             openExpense()
             rule.onNodeWithTag("amount-input").performTextInput("1234")
+            rule.onNodeWithTag("amount-input").performImeAction()
+            rule.waitUntil(5000) {
+                val windows = if (android.os.Build.VERSION.SDK_INT >= 29) android.view.inspector.WindowInspector.getGlobalWindowViews() else listOf(rule.activity.window.decorView)
+                windows.none { androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
+            }
+            rule.waitForIdle()
             rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Paisagem")
             screenshot("formulario-paisagem")
             confirmEntry()
