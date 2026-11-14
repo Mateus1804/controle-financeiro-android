@@ -97,6 +97,14 @@ class MainAccountsUiTest {
         assertEquals(0L, balance.balanceCents)
         assertEquals(0L, balance.reference!!.balanceCents)
         assertEquals("Saldo inicial", balance.reference!!.reason)
+        runBlocking { app.repository.setAccountArchived(balance.account.key, true) }
+        rule.onNode(hasText("Orçamento") and hasClickAction()).performClick()
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("open-accounts"))
+        rule.onNodeWithTag("open-accounts").performClick()
+        rule.waitUntil(10000) { rule.onAllNodesWithText("Carteira pessoal · Arquivada").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText("Carteira pessoal · Arquivada").performClick()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Conta: Carteira pessoal · Limpar filtro"))
+        rule.onNodeWithText("Conta: Carteira pessoal · Limpar filtro").assertExists()
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
     }
 }

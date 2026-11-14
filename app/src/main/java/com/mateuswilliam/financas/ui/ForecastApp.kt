@@ -222,7 +222,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         { navigation.recordCategory = it }, { openActual(recordId = it.id) },
                         expenseFilter = navigation.expenseDimension?.let { ExpenseFilter(it, navigation.expenseKey, navigation.expenseLabel) },
                         onClearExpenseFilter = { navigation.expenseDimension = null },
-                        accountFilter = oldState.accounts.firstOrNull { it.key == navigation.accountFilterKey },
+                        accountFilter = oldState.accountBalances.firstOrNull { it.account.key == navigation.accountFilterKey }?.account
+                            ?: oldState.accounts.firstOrNull { it.key == navigation.accountFilterKey },
                         onClearAccount = { navigation.accountFilterKey = null }, realizedOnly = true)
                     navigation.tab == 3 -> SettingsScreen(settings, connected, hasAccess, canAlert, captureError,
                         onToggle = { enabled -> if (enabled && !settings.consented) editors.disclosure = true else finance.preferences.setEnabled(enabled) },
