@@ -56,7 +56,7 @@ class CommitmentJourneyTest {
         assertEquals(79999L, ui.report().marginCents)
 
         ui.edit(firstPart)
-        rule.onNodeWithText("Só neste ciclo").assertExists()
+        rule.onNodeWithText("Alterar só este mês").assertExists()
         ui.type("forecast-amount", "22500")
         ui.saveForecast()
         ui.waitData { it.overrides.singleOrNull()?.amountCents == 22500L }
@@ -74,7 +74,7 @@ class CommitmentJourneyTest {
             hasContentDescription(Money.format(77500), substring = true)).assertCountEquals(0)
         rule.runOnIdle { app.settings.hideAmounts(false) }
 
-        ui.clickText("Orçamento")
+        rule.openRendlyPlanner()
         ui.clickTag("forecast-cycle-next", dashboard = true)
         val nextPart = ui.report(next).lines.single { it.kind == ForecastKind.EXPENSE }
         ui.openActions(nextPart)

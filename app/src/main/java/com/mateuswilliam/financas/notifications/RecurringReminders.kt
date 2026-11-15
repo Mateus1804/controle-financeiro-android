@@ -19,7 +19,6 @@ import androidx.core.content.ContextCompat
 import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.R
-import com.mateuswilliam.financas.core.RecurringPlan
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -43,10 +42,6 @@ object RecurringReminders {
         scheduler.schedule(JobInfo.Builder(JOB_ID, ComponentName(context, RecurringReminderService::class.java))
             .setPeriodic(6 * 60 * 60 * 1000L).setPersisted(true).build())
     }
-
-    fun show(context: Context, plan: RecurringPlan): Boolean = showInformative(
-        context, "plan:${plan.id}:${plan.nextDate}", "Há uma movimentação prevista para hoje"
-    )
 
     internal fun showInformative(context: Context, tag: String, title: String): Boolean {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled() ||

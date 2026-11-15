@@ -1,5 +1,8 @@
 # Atualizações assinadas e compatibilidade
 
+> Estado vigente: esta versão usa banco Rendly novo e descarta o armazenamento financeiro anterior, conforme autorizado. Backups antigos são incompatíveis. Veja [Armazenamento](armazenamento-rendly.md) e [Estado atual](estado-atual.md). O CI instrumental usa somente API 35, com suíte e reset intencional. As notas abaixo registram a política de preservação de versões anteriores e não se aplicam ao reset atual.
+
+
 ## Identidade e versões
 
 O identificador permanece `com.mateuswilliam.financas`. A próxima versão preparada utiliza `versionCode=2` e `versionName=0.2.0`, com substituição por `-PappVersionCode` e `-PappVersionName`. O código inteiro precisa aumentar a cada distribuição. A assinatura de uma atualização deve ser compatível com a instalação anterior; uma chave debug aleatória de outro computador não atende a esse requisito.

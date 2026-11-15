@@ -1,6 +1,8 @@
 package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
@@ -18,14 +20,14 @@ internal fun ForecastNavigationBar(tab: Int, onSelect: (Int) -> Unit) {
     val destinations = listOf("Mês" to R.drawable.ic_records, "Gráficos" to R.drawable.ic_overview,
         "Fixas e parcelas" to R.drawable.ic_calendar, "Mais" to R.drawable.ic_more)
     if (LocalDensity.current.fontScale > 1.25f) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().selectableGroup()) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).navigationBarsPadding().selectableGroup()) {
             destinations.forEachIndexed { index, (label, icon) ->
                 Surface(color = if (tab == index) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest) {
-                    Row(Modifier.fillMaxWidth().selectable(selected = tab == index, role = Role.Tab, onClick = { onSelect(index) })
+                    Row(Modifier.selectable(selected = tab == index, role = Role.Tab, onClick = { onSelect(index) })
                         .heightIn(min = 48.dp).padding(horizontal = 24.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         AppIcon(selectedIcon(icon, tab == index))
-                        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                        Text(label, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }

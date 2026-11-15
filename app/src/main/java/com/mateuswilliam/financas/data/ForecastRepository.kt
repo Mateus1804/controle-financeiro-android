@@ -21,10 +21,14 @@ class ForecastRepository(private val database:FinanceDatabase) {
 
     private suspend fun readDataset() = ForecastDataset(dao.allForecastRules().map { it.model() },
         dao.allForecastOverrides().map { it.model() },dao.allCycleRules().map { it.model() },
-        dao.allReserveEvents().map { it.model() },dao.allForecastMeta().firstOrNull { it.key=="reserveGoal" }?.value?.toLong(), dao.allRecords().filter { it.forecastItemId != null && it.forecastOccurrenceKey != null }.groupBy { it.forecastItemId!! to it.forecastOccurrenceKey!! }.mapValues { (_, rows) -> rows.map { it.id }.toSet() })
+        dao.allReserveEvents().map { it.model() },dao.allForecastMeta().firstOrNull { it.key=="reserveGoal" }?.value?.toLong())
 
     suspend fun saveRule(rule:ForecastRule,replaceFuture:Boolean=true) = database.withTransaction {
         require(ForecastValidation.error(rule)==null) { ForecastValidation.error(rule) ?: "Previsão inválida." }
+        val linked = dao.allRecords().filter { it.forecastItemId == rule.itemId }
+        require(linked.all { (if (it.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE) == rule.kind }) {
+            "Há lançamentos vinculados. Crie outra previsão para mudar entre receita e despesa."
+        }
         if(replaceFuture) dao.deleteFutureForecastRules(rule.itemId,rule.effectiveFrom.toString())
         dao.upsertForecastRule(ForecastRuleEntity.from(rule))
     }

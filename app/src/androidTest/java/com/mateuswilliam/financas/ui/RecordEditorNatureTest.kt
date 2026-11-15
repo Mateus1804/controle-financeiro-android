@@ -34,8 +34,7 @@ class RecordEditorNatureTest {
     @Test fun templateStartsWithEmptyEditableAmount() {
         rule.setContent { FinanceTheme {
             RecordEditor(null, null, false, {}, {}, null, null, emptyList(), "Carteira", { it },
-                initialDescription = "Aluguel", initialCategory = Category.HOME,
-                initialRecurring = true, onSaveRecurring = { _, _ -> })
+                initialDescription = "Aluguel", initialCategory = Category.HOME)
         } }
         rule.onNodeWithTag("amount-input").assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
         rule.onNodeWithTag("record-description").performScrollTo().assertTextContains("Aluguel")
@@ -69,6 +68,7 @@ class RecordEditorNatureTest {
         rule.setContent { FinanceTheme {
             RecordEditor(null, null, false, {}, {}, null, null, emptyList(), "Carteira", { it }, balances = listOf(wallet))
         } }
+        rule.openRecordDetails()
         rule.onNodeWithText("Escolher conta").performScrollTo().assertExists()
         rule.onNodeWithText("Carteira").assertDoesNotExist()
     }

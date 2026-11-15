@@ -19,15 +19,14 @@ class RealizedEntryUiTest {
     @Before fun reset() {
         runBlocking { app.repository.clear() }
         app.settings.finishIntro(); app.settings.dismissNamePrompt()
-        rule.waitUntil(10000) { rule.onAllNodes(hasTestTag("add-realized-income") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10000) { rule.onAllNodes(hasTestTag("add-movement") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         rule.waitForIdle()
     }
     @Test fun quickIncomeStartsTheCorrectMovementAndKeepsIntegerCents() = enter(Movement.INCOME, "123456", 123456)
     @Test fun quickExpenseStartsTheCorrectMovementAndKeepsIntegerCents() = enter(Movement.EXPENSE, "1234", 1234)
 
     private fun enter(movement: Movement, input: String, expected: Long) {
-        rule.onNodeWithTag(if (movement == Movement.INCOME) "add-realized-income" else "add-realized-expense")
-            .assertIsEnabled().performClick()
+        rule.newRendlyRecord(movement)
         rule.onNodeWithTag("amount-input").performTextInput(input)
         rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Lançamento fictício")
         rule.onNodeWithText("Descrição").performImeAction()

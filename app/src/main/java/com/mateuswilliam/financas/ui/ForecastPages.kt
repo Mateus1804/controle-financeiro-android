@@ -49,7 +49,7 @@ internal fun ForecastReserveScreen(data: ForecastDataset, report: ForecastReport
                 supportingContent = { Column {
                     Text(privateDisplayText(event.reason, hidden), style = MaterialTheme.typography.bodySmall)
                     Text(shortDate(event.createdAt), style = MaterialTheme.typography.labelSmall)
-                    event.cycleStart?.let { Text("Destinação do ciclo iniciado em ${it.format(commitmentDateFormat)}", style = MaterialTheme.typography.labelSmall) }
+                    event.cycleStart?.let { Text("Destinação do ciclo iniciado em ${it.format(financeDateFormat)}", style = MaterialTheme.typography.labelSmall) }
                 } }, trailingContent = { Amount(event.amountCents, hidden, size = 16) })
         } }
     }
@@ -97,7 +97,7 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
         projected.forEach { (base, simulated) -> item(key = base.period.start.toString()) {
             Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${base.period.start.format(commitmentDateFormat)} a ${base.period.endExclusive.minusDays(1).format(commitmentDateFormat)}", style = MaterialTheme.typography.titleMedium)
+                    Text("${base.period.start.format(financeDateFormat)} a ${base.period.endExclusive.minusDays(1).format(financeDateFormat)}", style = MaterialTheme.typography.titleMedium)
                     Text(if (hidden) "Percentual oculto" else "Gastos totais: ${base.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}")
                     Text("Margem estimada", style = MaterialTheme.typography.bodySmall)
                     Amount(base.marginCents, hidden, Modifier.testTag("projection-margin-${base.period.start}"))

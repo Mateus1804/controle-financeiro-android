@@ -73,27 +73,3 @@ private fun SalaryLine(label: String, cents: Long, hidden: Boolean, amountModifi
         Amount(cents, hidden, amountModifier.widthIn(max = 160.dp), size = 16)
     }
 }
-
-@Composable
-internal fun SalaryMonthEditor(month: YearMonth, current: Long?, hidden: Boolean, busy: Boolean,
-    onDismiss: () -> Unit, onSave: (Long) -> Unit) {
-    val amount = rememberTextFieldState(current?.let(MoneyInput::fromCents).orEmpty())
-    var attempted by remember { mutableStateOf(false) }
-    var invalid by remember { mutableStateOf(false) }
-    val cents = if (invalid) null else MoneyInput.cents(amount.text.toString())
-    AlertDialog(onDismissRequest = { if (!busy) onDismiss() },
-        title = { DialogSystemBars(); Text("Salário líquido do mês") },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Valor líquido usado no resultado de $month.")
-            PrivateValueGate(hidden, "Mostrar salário para edição") {
-                MoneyAmountField(amount, attempted, !busy, label = "Salário líquido (R$)", tag = "salary-month-amount",
-                    onInvalidInput = { invalid = it })
-            }
-            if (attempted && (cents == null || cents <= 0)) Text("Informe um valor maior que zero.", color = MaterialTheme.colorScheme.error)
-        } },
-        confirmButton = { TextButton({
-            attempted = true
-            cents?.takeIf { it > 0 }?.let(onSave)
-        }, enabled = !busy) { Text("Salvar") } },
-        dismissButton = { TextButton(onDismiss, enabled = !busy) { Text("Cancelar") } })
-}

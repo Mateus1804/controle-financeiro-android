@@ -24,7 +24,7 @@ class PurchaseManagementUiTest {
     @Test fun theWholeInstallmentForecastCanBeCorrectedFromTheDashboard() {
         ui.seed(purchase(20000, 2))
         ui.open(ui.report().lines.single())
-        ui.clickText("Só neste ciclo"); ui.clickText("Deste ciclo em diante")
+        ui.clickText("Alterar só este mês"); ui.clickText("Aplicar deste mês em diante")
         rule.onNodeWithTag("forecast-title").performScrollTo().performTextReplacement("Compra corrigida")
         rule.onNodeWithTag("forecast-installment-count").performScrollTo().performTextReplacement("3")
         rule.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("21000")

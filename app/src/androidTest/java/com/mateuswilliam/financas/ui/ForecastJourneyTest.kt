@@ -36,6 +36,7 @@ class ForecastJourneyTest {
         runBlocking { app.repository.clear(); app.forecasts.setCycleDay(5, today) }
         app.settings.finishIntro(); app.settings.dismissNamePrompt(); model.refresh()
         rule.waitUntil(10000) { model.dataset.value?.let { it.rules.isEmpty() && it.cycleRules.lastOrNull()?.day == 5 } == true }
+        rule.openRendlyPlanner()
         rule.waitForIdle()
     }
     private suspend fun seed(includeSalary: Boolean = true) {
@@ -60,14 +61,15 @@ class ForecastJourneyTest {
         assertEquals(ForecastFrequency.MONTHLY, salary.frequency)
         assertEquals("", salary.account)
         runBlocking { seed(includeSalary = false) }; waitRules(4)
-        scroll("salary-month-summary")
-        rule.onNodeWithText("Resultado do mês").assertExists()
+        rule.openRendlySalary()
+        rule.onNodeWithTag("salary-screen").assertExists()
+        rule.openRendlyPlanner()
         val base = ForecastCalculator.report(current(), period())
         assertEquals(220000L, base.totalExpensesCents); assertEquals(80000L, base.marginCents)
         val line = base.lines.single { it.kind == ForecastKind.INCOME }
         val actions = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
-        scroll(actions); clickTag(actions); clickText("Editar")
-        rule.onNodeWithText("Só neste ciclo").assertExists()
+        scroll(actions); clickTag(actions); clickText("Alterar só este mês")
+        rule.onNodeWithText("Alterar só este mês").assertExists()
         rule.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("285000")
         androidx.test.espresso.Espresso.closeSoftKeyboard(); clickTag("forecast-save")
         rule.waitUntil(10000) { model.dataset.value?.overrides?.any { it.amountCents == 285000L } == true }
@@ -96,7 +98,7 @@ class ForecastJourneyTest {
         assertEquals(220000L, report.totalExpensesCents); assertEquals("73.33", report.expensePercentage?.toPlainString())
         rule.activityRule.scenario.recreate(); rule.waitForIdle()
         assertEquals(report, ForecastCalculator.report(current(), old))
-        clickText("Reserva")
+        rule.openRendlyReserve()
         rule.onNodeWithTag("reserve-balance").assertTextContains("2.500,00", substring = true)
         assertTrue(app.repository.exportRecords().isEmpty())
     }
@@ -104,7 +106,7 @@ class ForecastJourneyTest {
     @Test fun simulationHasNoWritesUntilAdoptedAndInstallmentsEnd() = runBlocking<Unit> {
         seed(); waitRules(4)
         val before = current()
-        clickText("Projeções"); clickTag("forecast-simulate")
+        rule.openRendlyProjections(); clickTag("forecast-simulate")
         rule.onNodeWithTag("forecast-amount").performScrollTo().performTextInput("60000")
         rule.onNodeWithTag("forecast-installment-count").performScrollTo().performTextInput("3")
         androidx.test.espresso.Espresso.closeSoftKeyboard(); clickTag("forecast-save")

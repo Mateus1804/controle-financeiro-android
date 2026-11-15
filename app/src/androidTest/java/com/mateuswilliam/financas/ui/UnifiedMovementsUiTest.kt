@@ -30,9 +30,7 @@ class UnifiedMovementsUiTest {
         ui.seed(ForecastRule("previsao-separada", month.atDay(1), "Previsão separada", kind, 5000,
             if (movement == Movement.INCOME) Category.OTHER_INCOME else Category.HOME,
             ForecastFrequency.MONTHLY, month.atDay(1)))
-        val tag = if (movement == Movement.INCOME) "add-realized-income" else "add-realized-expense"
-        rule.onNodeWithTag(tag).assertIsEnabled()
-        ui.clickTag(tag)
+        rule.newRendlyRecord(movement)
         rule.onNodeWithText("Recorrente").assertDoesNotExist()
         rule.onNodeWithText("Parcelada").assertDoesNotExist()
         rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("5000")
@@ -62,7 +60,7 @@ class UnifiedMovementsUiTest {
         ui.waitData { it.overrides.singleOrNull()?.amountCents == 7500L }
         assertEquals(7500L, ui.report().totalExpensesCents)
         assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
-        ui.action(ui.report().lines.single(), "Ignorar somente ocorrência")
+        ui.action(ui.report().lines.single(), "Pular este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == true }
         assertEquals(0L, ui.report().totalExpensesCents)
         assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
@@ -85,8 +83,8 @@ class UnifiedMovementsUiTest {
         rule.onNodeWithContentDescription("Mês anterior").performClick()
         rule.onNodeWithText(payment.description).assertDoesNotExist()
         rule.onNodeWithText("Previsão do mês anterior").assertDoesNotExist()
-        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Somente lançamentos já ocorridos"))
-        rule.onNodeWithText("Somente lançamentos já ocorridos").assertExists()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText("Receitas menos despesas registradas. Transferências próprias não mudam o resultado."))
+        rule.onNodeWithText("Receitas menos despesas registradas. Transferências próprias não mudam o resultado.").assertExists()
         assertEquals(0L, Ledger.month(listOf(payment), previous, ZoneId.systemDefault()).expenses)
         assertEquals(5000L, Ledger.month(listOf(payment), month, ZoneId.systemDefault()).expenses)
         assertEquals(5000L, ui.report(previous).totalExpensesCents)
@@ -126,7 +124,7 @@ class UnifiedMovementsUiTest {
         val actual = Record("realized", 2500, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
             "Carteira", "Despesa realizada", System.currentTimeMillis())
         seedActual(actual)
-        ui.clickText("Projeções")
+        rule.openRendlyProjections()
         rule.onNodeWithTag("forecast-projections").assertExists()
         rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag("projection-margin-${month.atDay(1)}"))
         rule.onNodeWithTag("projection-margin-${month.atDay(1)}").assertTextContains(Money.format(-5000))
@@ -143,8 +141,7 @@ class UnifiedMovementsUiTest {
     }
 
     private fun openStatement() {
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Ver extrato do mês"))
-        ui.clickText("Ver extrato do mês")
+        rule.openRendlyMonth()
         rule.onNodeWithTag("records-list").assertExists()
     }
 }

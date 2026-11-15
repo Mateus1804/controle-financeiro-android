@@ -42,6 +42,11 @@ class RendlyIdentityTest {
             com.mateuswilliam.financas.core.Category.SALARY, com.mateuswilliam.financas.core.ForecastFrequency.MONTHLY, date))
         app.forecasts.saveRule(com.mateuswilliam.financas.core.ForecastRule("rendly-expense-example", date, "Despesa fictícia", com.mateuswilliam.financas.core.ForecastKind.EXPENSE, 220000,
             com.mateuswilliam.financas.core.Category.HOME, com.mateuswilliam.financas.core.ForecastFrequency.MONTHLY, date))
+        val at = System.currentTimeMillis()
+        app.repository.save(com.mateuswilliam.financas.core.Record("rendly-real-income",300000,com.mateuswilliam.financas.core.Movement.INCOME,
+            com.mateuswilliam.financas.core.PaymentMethod.PIX,com.mateuswilliam.financas.core.Category.SALARY,"Carteira fictícia","Renda fictícia",at),null)
+        app.repository.save(com.mateuswilliam.financas.core.Record("rendly-real-expense",220000,com.mateuswilliam.financas.core.Movement.EXPENSE,
+            com.mateuswilliam.financas.core.PaymentMethod.PIX,com.mateuswilliam.financas.core.Category.HOME,"Carteira fictícia","Despesa fictícia",at),null)
         androidx.lifecycle.ViewModelProvider(rule.activity)[com.mateuswilliam.financas.ForecastViewModel::class.java].refresh()
         rule.waitUntil(10000) { rule.onAllNodesWithText(com.mateuswilliam.financas.core.Money.format(80000)).fetchSemanticsNodes().isNotEmpty() }
         val directory = java.io.File(app.getExternalFilesDir(null), "screenshots").apply { mkdirs() }

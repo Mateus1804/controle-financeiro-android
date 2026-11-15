@@ -52,7 +52,7 @@ class CommitmentReportUiTest {
         ui.assertProjection(cycle, "33,00", 67000)
         ui.assertProjection(next, "10,00", 180000)
 
-        ui.clickText("Orçamento")
+        rule.openRendlyPlanner()
         ui.edit(ui.report(cycle).lines.single { it.itemId == "curso" })
         ui.type("forecast-amount", "13000"); ui.saveForecast()
         ui.waitData { it.rules.singleOrNull { value -> value.itemId == "curso" }?.amountCents == 13000L }
@@ -92,7 +92,7 @@ class CommitmentReportUiTest {
             .assertTextEquals("••••").assertContentDescriptionEquals("Valor oculto")
         rule.onAllNodesWithText("Percentual oculto").onFirst().assertIsDisplayed()
         assertPrivateNumbersAbsent()
-        ui.clickText("Orçamento")
+        rule.openRendlyPlanner()
         scrollCategories()
         rule.onAllNodes(geometry, useUnmergedTree = true).assertCountEquals(0)
         assertPrivateNumbersAbsent()
@@ -109,7 +109,7 @@ class CommitmentReportUiTest {
         ui.assertProjection(cycle, null, -9500)
         assertEquals(9500L, ui.report(cycle).totalExpensesCents)
         assertNull(ui.report(cycle).expensePercentage)
-        ui.clickText("Orçamento")
+        rule.openRendlyPlanner()
         ui.clickTag("forecast-add-income", dashboard = true)
         rule.onNode(hasText("Nova previsão") and hasAnyAncestor(isDialog())).assertIsDisplayed()
         rule.onNodeWithContentDescription("Tipo").assertTextContains("Receita")
@@ -149,13 +149,15 @@ class CommitmentReportUiTest {
         }
     }
 
-    private fun scrollCategories() = rule.onNodeWithTag("forecast-dashboard")
-        .performScrollToNode(hasText("Gastos por categoria"))
+    private fun scrollCategories() {
+        rule.openRendlyCommitment()
+        rule.onNodeWithTag("commitment-screen").performScrollToNode(hasText("Gastos por categoria"))
+    }
 
     private fun assertCategory(category: Category, cents: Long) {
         val value = Money.format(cents)
         val categoryRegion = hasAnyAncestor(hasTestTag("forecast-categories"))
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText(value) and categoryRegion)
+        rule.onNodeWithTag("commitment-screen").performScrollToNode(hasText(value) and categoryRegion)
         val labels = rule.onAllNodes(hasText(category.label) and categoryRegion, useUnmergedTree = true).fetchSemanticsNodes()
         val sameRow = SemanticsMatcher("$value na mesma linha de ${category.label}") { amount ->
             val amountBounds = amount.boundsInRoot

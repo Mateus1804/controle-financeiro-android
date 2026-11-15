@@ -23,8 +23,9 @@ internal fun AndroidComposeTestRule<ActivityScenarioRule<MainActivity>, MainActi
     model.refresh()
     waitUntil(10000) { model.dataset.value?.rules?.isEmpty() == true }
     waitUntil(10000) {
-        onAllNodes(hasTestTag("add-realized-income") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
-            onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty()
+        onAllNodes(hasTestTag("add-movement") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+            onAllNodesWithTag("records-list").fetchSemanticsNodes().isNotEmpty()
     }
+    openRendlyMonth()
     waitForIdle()
 }

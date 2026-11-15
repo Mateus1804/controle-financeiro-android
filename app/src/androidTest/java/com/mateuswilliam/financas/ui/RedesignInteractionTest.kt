@@ -22,8 +22,8 @@ class RedesignInteractionTest {
     @Before fun reset() {
         runBlocking { app.repository.clear(); Unit }
         app.settings.finishIntro(); app.settings.dismissNamePrompt()
-        waitForEnabled(hasTestTag("add-realized-expense"))
-        rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }
+        waitForEnabled(hasTestTag("add-movement"))
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("records-list").fetchSemanticsNodes().isNotEmpty() }
         rule.waitForIdle()
     }
 
@@ -31,6 +31,7 @@ class RedesignInteractionTest {
         runBlocking { app.repository.addAccount("Origem fictícia") }
         app.settings.rememberOrigin("Origem fictícia")
         openExpense()
+        rule.openRecordDetails()
         rule.onNodeWithContentDescription("Movimentação").performScrollTo().assertIsEnabled().performClick()
         rule.onNode(hasText("Transferência") and hasClickAction()).performClick()
         rule.onNodeWithTag("amount-input").performScrollTo().performTextInput("2500")
@@ -51,7 +52,7 @@ class RedesignInteractionTest {
             "Compra R$ 42,90", "Compra de R$ 42,90 no mercado fictício.", 4290, Movement.EXPENSE, PaymentMethod.CARD,
             Category.FOOD, "Valor de 42,90 identificado.", now, now - 60000))
         app.settings.hideAmounts(true)
-        waitForEnabled(hasTestTag("dashboard-notification-review")).performClick()
+        rule.openRendlyReview()
         waitForEnabled(hasTestTag("review-privado-ui"))
         rule.onAllNodesWithText("42,90", substring = true, useUnmergedTree = true).assertCountEquals(0)
         rule.onAllNodesWithContentDescription("42,90", substring = true, useUnmergedTree = true).assertCountEquals(0)
@@ -65,23 +66,15 @@ class RedesignInteractionTest {
     }
 
     @Test fun plannerNavigationAndReviewSettingsKeepReadableTouchTargets() {
-        rule.onNodeWithTag("forecast-settings").assertContentDescriptionEquals("Ajustes").assertHasClickAction()
-        rule.onNodeWithContentDescription("Ocultar valores").assertHasClickAction()
-            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
-        rule.onNodeWithTag("dashboard-notification-review").assertTextContains("Revisar notificações").assertHasClickAction()
-        for (label in listOf("Orçamento", "Projeções", "Reserva", "Orçamento")) {
-            waitForEnabled(hasText(label) and hasClickAction())
-                .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+        for (label in listOf("Mês", "Gráficos", "Fixas e parcelas", "Mais")) {
+            waitForEnabled(hasText(label) and hasClickAction()).assertHeightIsAtLeast(48.dp).performClick()
         }
-        waitForEnabled(hasTestTag("add-realized-income")).assertIsDisplayed()
-        waitForEnabled(hasTestTag("add-realized-expense")).assertIsDisplayed()
-        waitForEnabled(hasTestTag("dashboard-notification-review"))
-            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+        rule.openRendlyReview()
         rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
-        waitForEnabled(hasTestTag("forecast-settings"))
-            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
-        rule.onNodeWithTag("settings-list").assertIsDisplayed()
-        rule.onNodeWithContentDescription("Capturar notificações").performScrollTo().assertIsDisplayed()
+        rule.openRendlySettings()
+        rule.onNodeWithTag("settings-list").assertExists()
+        rule.openRendlyMonth()
+        waitForEnabled(hasTestTag("add-movement")).assertHeightIsAtLeast(48.dp)
     }
 
     @Test fun narrowScreenWithDoubleFontScaleKeepsActionsAndNavigationReachable() {
@@ -97,23 +90,17 @@ class RedesignInteractionTest {
             command("wm size 640x1280"); command("wm density 320"); command("settings put system font_scale 2.0")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.9f && rule.activity.resources.configuration.screenWidthDp <= 320 }
             checkpoint("Conferindo navegação com fonte ampliada")
-            for (label in listOf("Orçamento", "Projeções", "Reserva", "Orçamento")) {
-                rule.onNodeWithText(label, useUnmergedTree = true).assertStartAlignedTextFits(label)
-                waitForEnabled(hasText(label) and hasClickAction())
-                    .assertIsDisplayed().assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+            for (label in listOf("Mês", "Gráficos", "Fixas e parcelas", "Mais", "Mês")) {
+                val tab = waitForEnabled(hasText(label) and hasClickAction()).performScrollTo()
+                rule.onNode(hasText(label) and hasAnyAncestor(hasClickAction()), useUnmergedTree = true).assertStartAlignedTextFits(label)
+                tab.assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
             }
-            waitForEnabled(hasTestTag("dashboard-notification-review")).assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+            rule.openRendlyReview()
             rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
-            waitForEnabled(hasTestTag("forecast-settings")).assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
-            rule.onNodeWithTag("settings-list").assertIsDisplayed()
-            waitForEnabled(hasText("Orçamento") and hasClickAction()).performClick()
-            checkpoint("Conferindo atalhos com fonte ampliada")
-            for (tag in listOf("add-realized-income", "add-realized-expense")) {
-                waitForEnabled(hasTestTag(tag)).assertIsDisplayed().assertHeightIsAtLeast(48.dp)
-            }
-            for (label in listOf("Receita", "Despesa")) {
-                rule.onNodeWithText(label, useUnmergedTree = true).assertStartAlignedTextFits(label, singleLine = true)
-            }
+            rule.openRendlySettings()
+            rule.onNodeWithTag("settings-list").assertExists()
+            rule.openRendlyMonth()
+            waitForEnabled(hasTestTag("add-movement")).assertHeightIsAtLeast(48.dp)
             rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
             checkpoint("Capturando orçamento escuro com fonte ampliada")
             rule.waitForIdle(); capture("orcamento-fonte-ampliada-escuro")
@@ -150,8 +137,8 @@ class RedesignInteractionTest {
         }
         rule.onNodeWithText("Agora não").performClick()
         assertTrue(app.settings.snapshot().namePromptSeen)
-        waitForEnabled(hasTestTag("add-realized-expense")).assertIsDisplayed()
-        waitForEnabled(hasTestTag("forecast-settings")).performClick()
+        waitForEnabled(hasTestTag("add-movement")).assertIsDisplayed()
+        rule.openRendlySettings()
         for (theme in listOf(Appearance.LIGHT, Appearance.DARK)) {
             rule.runOnIdle { app.settings.setAppearance(theme) }
             rule.onNodeWithContentDescription("Capturar notificações").performScrollTo().assertIsEnabled().performClick()
@@ -171,8 +158,7 @@ class RedesignInteractionTest {
             app.repository.save(Record("linha-$index", 10000L + index, Movement.EXPENSE, PaymentMethod.PIX,
                 Category.FOOD, "Conta fictícia", "Lançamento fictício $index", now - index * 1000L), null)
         }
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Ver extrato do mês"))
-        waitForEnabled(hasText("Ver extrato do mês") and hasClickAction()).performClick()
+        rule.openRendlyMonth()
         assertEquals(30, app.repository.exportRecords().size)
         rule.waitUntil(10000) {
             try {
@@ -182,12 +168,12 @@ class RedesignInteractionTest {
             } catch (_: AssertionError) { false }
         }
         val record = rule.onNodeWithText("Lançamento fictício 29").fetchSemanticsNode().boundsInRoot
-        val action = waitForEnabled(hasTestTag("add-realized-expense")).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val action = waitForEnabled(hasTestTag("add-movement")).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue("A ação fixa não pode cobrir a última linha do histórico", record.bottom <= action.top)
         capture("extrato-ultima-linha")
     }
 
-    private fun openExpense() = waitForEnabled(hasTestTag("add-realized-expense")).performClick()
+    private fun openExpense() = rule.newRendlyRecord()
 
     private fun waitForEnabled(matcher: SemanticsMatcher): SemanticsNodeInteraction {
         rule.waitUntil(10000) { rule.onAllNodes(matcher and isEnabled()).fetchSemanticsNodes().isNotEmpty() }

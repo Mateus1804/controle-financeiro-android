@@ -53,7 +53,6 @@ object ForecastCalculator {
                 }
             }
             candidates.forEach { (key, pair) ->
-                if ((itemId to key) in excluded) return@forEach
                 val (rule, occurrence) = pair
                 val override = overrides[itemId to key]
                 val date = override?.date ?: occurrence.date
@@ -71,7 +70,7 @@ object ForecastCalculator {
         val finalLines = lines.map { line ->
             if (!line.statementTotal && line.statementKey.isNotBlank() && (line.statementKey to line.kind) in statements)
                 line.copy(included = false) else line
-        }.sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title }.thenBy { it.itemId })
+        }.filterNot { (it.itemId to it.occurrenceKey) in excluded }.sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title }.thenBy { it.itemId })
         val included = finalLines.filter { it.included }
         val income = included.filter { it.kind == ForecastKind.INCOME }.sumOf { it.amountCents }
         val expenses = included.filter { it.kind == ForecastKind.EXPENSE }

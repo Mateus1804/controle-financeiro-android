@@ -23,8 +23,6 @@ class RefundNatureTest {
         assertEquals(5000L, records.sumOf { it.cashContribution() })
         assertEquals(mapOf(Category.FOOD to 3000L), summary.categories)
         assertEquals(0L, ExpenseReports.month(records, month, zone, ExpenseDimension.CATEGORY).refunds)
-        val usage = Budgets.usage(records, listOf(MonthlyBudget(month.toString(), Category.SALARY, 9000)), month, zone)
-        assertEquals(0L, usage.single().spentCents)
         assertEquals(Category.SALARY, refund.category)
         assertEquals("salario", refund.originalRecordId)
         // The snapshot still works after the original is removed.
@@ -36,7 +34,6 @@ class RefundNatureTest {
             record("estorno", Movement.REFUND, 1000, Category.FOOD))
         assertEquals(2000L, Ledger.month(records, month, zone).expenses)
         assertEquals(1000L, ExpenseReports.month(records, month, zone, ExpenseDimension.CATEGORY).refunds)
-        assertEquals(2000L, Budgets.usage(records, listOf(MonthlyBudget(month.toString(), Category.FOOD, 5000)), month, zone).single().spentCents)
     }
 
     @Test fun `categorias oferecidas respeitam natureza mas legado continua valido`() {

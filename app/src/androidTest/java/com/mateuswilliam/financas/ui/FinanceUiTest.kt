@@ -140,8 +140,7 @@ class FinanceUiTest {
             "Banco de exemplo", "EXEMPLO — compra aprovada", "Compra aprovada de R$ 42,90 no supermercado de exemplo.",
             4290, Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Confira os dados sugeridos antes de confirmar.", now, now - 60_000))
         rule.waitUntil(10000) {
-            rule.onAllNodes(hasTestTag("salary-remaining") and hasText("2.811,60", substring = true),
-                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            rule.onAllNodes(hasTestTag("month-net") and hasText("2.811,60", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
         screenshot("resumo")
         for (theme in listOf(Appearance.DARK, Appearance.LIGHT)) {
@@ -155,7 +154,7 @@ class FinanceUiTest {
             rule.onNodeWithText("Combustível de exemplo").assertIsDisplayed()
             screenshot("extrato-${if (theme == Appearance.DARK) "escuro" else "claro"}")
         }
-        clickEnabled(hasTestTag("open-notification-review"))
+        rule.openRendlyReview()
         rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
         screenshot("pendencias")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
@@ -217,6 +216,7 @@ class FinanceUiTest {
         rule.onNodeWithTag("amount-input").performTextInput("1234")
         // O teclado mede a janela fora do relógio Compose; o toque só ocorre após estabilizar a geometria.
         waitForStableBounds(rule.onNodeWithTag("amount-input"))
+        rule.openRecordDetails()
         val addAccount = rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo()
         waitForStableBounds(addAccount)
         addAccount.performClick()
@@ -407,9 +407,9 @@ class FinanceUiTest {
             rule.waitUntil(10000) { rule.onAllNodesWithText("Falta autorizar o acesso às notificações no Android.").fetchSemanticsNodes().isNotEmpty() }
             rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Autorizar no Android"))
             rule.onNodeWithText("Autorizar no Android").assertIsDisplayed().assertIsEnabled()
-            clickEnabled(hasTestTag("forecast-settings"))
+            rule.openRendlyMonth()
             waitForDashboard()
-            clickEnabled(hasTestTag("dashboard-notification-review"))
+            rule.openRendlyReview()
             rule.onNodeWithText("Caixa de revisão").assertIsDisplayed()
             clickEnabled(hasText("Configurar captura") and hasClickAction())
             rule.onNodeWithText("Falta autorizar o acesso às notificações no Android.").assertExists()
@@ -437,7 +437,7 @@ class FinanceUiTest {
         rule.onNodeWithContentDescription("Capturar notificações").assertIsOff()
         assertTrue(app.settings.snapshot().consented)
         assertFalse(app.settings.snapshot().enabled)
-        clickEnabled(hasTestTag("forecast-settings"))
+        rule.openRendlySettings()
         openExpense()
         rule.onNodeWithTag("amount-input").assertIsDisplayed()
     }
@@ -458,8 +458,8 @@ class FinanceUiTest {
 
     private fun waitForDashboard() {
         rule.waitUntil(10000) {
-            rule.onAllNodes(hasTestTag("add-realized-expense") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
-                rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty()
+            rule.onAllNodes(hasTestTag("add-movement") and isEnabled()).fetchSemanticsNodes().isNotEmpty() &&
+                rule.onAllNodesWithTag("records-list").fetchSemanticsNodes().isNotEmpty()
         }
         rule.waitForIdle()
     }
@@ -470,20 +470,21 @@ class FinanceUiTest {
     }
 
     private fun openExpense() {
-        clickEnabled(hasTestTag("add-realized-expense"))
+        rule.newRendlyRecord()
         rule.waitUntil(10000) { rule.onAllNodesWithTag("amount-input").fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun openSettings() {
         if (rule.onAllNodesWithTag("settings-list").fetchSemanticsNodes().isEmpty())
-            clickEnabled(hasTestTag("forecast-settings"))
+            rule.openRendlySettings()
         rule.waitUntil(10000) { rule.onAllNodesWithTag("settings-list").fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun scrollDashboardTo(matcher: SemanticsMatcher) {
+        rule.openRendlyGraphs()
         rule.waitUntil(10000) {
             try {
-                rule.onNodeWithTag("forecast-dashboard").performScrollToNode(matcher)
+                rule.onNodeWithTag("graphs-screen").performScrollToNode(matcher)
                 true
             } catch (_: AssertionError) { false }
         }
@@ -499,12 +500,7 @@ class FinanceUiTest {
         }
     }
 
-    private fun openStatement() {
-        waitForDashboard()
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Ver extrato do mês"))
-        clickEnabled(hasText("Ver extrato do mês") and hasClickAction())
-        rule.onNodeWithTag("records-list").assertExists()
-    }
+    private fun openStatement() { rule.openRendlyMonth() }
 
     private fun confirmEntry(description: String = "Lançamento fictício de teste", saveLabel: String = "Registrar despesa") {
         rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement(description)

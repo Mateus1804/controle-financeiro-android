@@ -32,6 +32,7 @@ internal class CurrentForecastUi(
         waitData { it.rules.isEmpty() && it.overrides.isEmpty() && it.cycleRules.isEmpty() }
         val finance = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
         rule.waitUntil(10000) { finance.state.value.let { it.loaded && it.records.isEmpty() && it.pending.isEmpty() } }
+        rule.openRendlyPlanner()
         rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }
         rule.waitForIdle()
     }
@@ -51,6 +52,12 @@ internal class CurrentForecastUi(
         rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
     }
     fun clickTag(tag: String) {
+        if (tag == "add-realized-income" || tag == "add-realized-expense") {
+            rule.newRendlyRecord(if (tag.endsWith("income")) Movement.INCOME else Movement.EXPENSE); return
+        }
+        if (tag == "open-accounts") { rule.openRendlySettings(); rule.onNodeWithTag("settings-accounts").performClick(); return }
+        if (tag == "forecast-settings") { rule.openRendlySettings(); return }
+        if (tag == "dashboard-notification-review") { rule.openRendlyReview(); return }
         val target = hasTestTag(tag)
         rule.waitUntil(10000) { rule.onAllNodes(target and isEnabled()).fetchSemanticsNodes().size == 1 }
         rule.onNode(target).assertIsEnabled()
@@ -68,7 +75,7 @@ internal class CurrentForecastUi(
         clickTag(tag)
         clickText(label)
     }
-    fun open(line: ForecastLine) = action(line, "Editar")
+    fun open(line: ForecastLine) = action(line, if (line.frequency == ForecastFrequency.ONCE) "Editar" else "Alterar só este mês")
     fun showMonth(target: YearMonth) {
         while (selectedMonth != target) {
             val next = selectedMonth < target
