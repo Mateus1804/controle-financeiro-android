@@ -126,7 +126,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         model.refresh()
     }
     LaunchedEffect(incomingPlanning) { if (incomingPlanning) {
-        navigation.tab = 0; navigation.followingCurrent = true; navigation.browsing = LocalDate.now().toString(); consumePlanning()
+        navigation.tab = 7; navigation.followingCurrent = true; navigation.browsing = LocalDate.now().toString(); consumePlanning()
     } }
     LaunchedEffect(forecastMessage) { forecastMessage?.let { snackbar.showSnackbar(it); if (model.message.value == it) model.message.value = null } }
     LaunchedEffect(financeMessage) { financeMessage?.let {
@@ -176,61 +176,45 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     fun edit(line: ForecastLine) { editors.editItem = line.itemId; editors.editKey = line.occurrenceKey; editors.legacyMonth = null; editors.template = null; editors.editor = true }
     fun showReserve(kind: ReserveEventKind, allocation: Boolean = false) { editors.allocating = allocation; editors.reserveKind = kind }
     fun select(date: LocalDate) { navigation.followingCurrent = false; navigation.browsing = date.toString() }
-    BackHandler(navigation.tab >= 3 && !editors.editor) { navigation.tab = 0 }
+    fun parentTab() = when (navigation.tab) { 5 -> 6; 6, 7, 8, 9, 10 -> 3; 11 -> 7; else -> 0 }
+    var adding by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    BackHandler(navigation.tab != 0 && !editors.editor && !review.recordEditor) { navigation.tab = parentTab() }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = { Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-            Column {
-                val largeActions = LocalDensity.current.fontScale > 1.25f
-                val actionPadding = if (largeActions) PaddingValues(horizontal = 8.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding
-                if (navigation.tab == 0 || navigation.tab == 4) Row(Modifier.padding(horizontal = FinanceSpacing.page), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton({ openActual(Movement.INCOME) }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-income"), contentPadding = actionPadding) {
-                        if (!largeActions) { AppIcon(R.drawable.ic_income); Spacer(Modifier.width(6.dp)) }
-                        Text("Receita", maxLines = 1)
-                    }
-                    Button({ openActual() }, enabled = !busy && oldState.loaded, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("add-realized-expense"), contentPadding = actionPadding) {
-                        if (!largeActions) { AppIcon(R.drawable.ic_add); Spacer(Modifier.width(6.dp)) }
-                        Text("Despesa", maxLines = 1)
-                    }
-                }
-                ForecastNavigationBar(navigation.tab) { navigation.tab = it }
-            }
-        } },
+        floatingActionButton = { if (navigation.tab == 0) FloatingActionButton({ adding = true }, Modifier.testTag("add-movement")) { AppIcon(R.drawable.ic_add, description = "Novo lançamento") } },
+        bottomBar = { ForecastNavigationBar(if (navigation.tab <= 3) navigation.tab else 3) { navigation.tab = it } },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 840.dp).fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = FinanceSpacing.page, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (navigation.tab > 3) IconButton({ navigation.tab = parentTab() }) { AppIcon(R.drawable.ic_chevron_left, description = "Voltar") }
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(32.dp))
                             Text("Rendly", style = MaterialTheme.typography.titleLarge)
                         }
-                        Text(if (navigation.tab >= 3) "Ajustes e histórico" else if (settings.displayName.isBlank()) "Olá! 👋🏼" else "Olá, ${settings.displayName}! 👋🏼",
+                        Text(if (settings.displayName.isBlank()) "Olá! 👋🏼" else "Olá, ${settings.displayName}! 👋🏼",
                             style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("rendly-greeting"), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                     IconButton({ finance.preferences.hideAmounts(!hidden) }, Modifier.size(48.dp)) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
-                    if (navigation.tab != 0) IconButton({ navigation.tab = if (navigation.tab == 5) 0 else 5 }, Modifier.size(48.dp).testTag("open-notification-review")) {
-                        BadgedBox(badge = { if (oldState.pending.isNotEmpty()) Badge { Text(oldState.pending.size.toString()) } }) {
-                            AppIcon(R.drawable.ic_pending, description = "Revisão de notificações")
-                        }
-                    }
-                    IconButton({ navigation.tab = if (navigation.tab == 3) 0 else 3 }, Modifier.size(48.dp).testTag("forecast-settings")) { AppIcon(R.drawable.ic_settings, description = "Ajustes") }
                 }
                 when {
                     navigation.tab == 5 -> Column {
-                        TextButton({ navigation.tab = 3 }, Modifier.padding(horizontal = FinanceSpacing.page)) { Text("Configurar captura") }
+                        TextButton({ navigation.tab = 6 }, Modifier.padding(horizontal = FinanceSpacing.page)) { Text("Configurar captura") }
                         Box(Modifier.weight(1f)) {
                             PendingScreen(oldState.pending, hidden, { openReview(it) }, { id -> finance.dismiss(id) { review.reviewIds = ReviewQueue.snapshot(oldState.pending.map { it.id }, id); review.reviewAfter = id } }, busy, captureActive)
                         }
                     }
-                    navigation.tab == 4 -> RecordsScreen(realized, month, { navigation.monthText = it.toString() }, hidden, navigation.recordCategory,
-                        { navigation.recordCategory = it }, { openActual(recordId = it.id) },
-                        expenseFilter = navigation.expenseDimension?.let { ExpenseFilter(it, navigation.expenseKey, navigation.expenseLabel) },
-                        onClearExpenseFilter = { navigation.expenseDimension = null },
-                        accountFilter = oldState.accountBalances.firstOrNull { it.account.key == navigation.accountFilterKey }?.account
-                            ?: oldState.accounts.firstOrNull { it.key == navigation.accountFilterKey },
-                        onClearAccount = { navigation.accountFilterKey = null }, realizedOnly = true)
-                    navigation.tab == 3 -> SettingsScreen(settings, connected, hasAccess, canAlert, captureError,
+                    navigation.tab == 0 -> MonthLedgerScreen(realized, month, { navigation.monthText = it.toString() }, hidden,
+                        navigation.recordCategory, { navigation.recordCategory = it; navigation.expenseDimension = null },
+                        oldState.accountBalances.map { it.account }, navigation.accountFilterKey, { navigation.accountFilterKey = it },
+                        { openActual(recordId = it.id) }, navigation.expenseDimension?.let { ExpenseFilter(it, navigation.expenseKey, navigation.expenseLabel) },
+                        { navigation.expenseDimension = null })
+                    navigation.tab == 1 -> GraphsScreen(realized, month, { navigation.monthText = it.toString() }, monthComparison, hidden,
+                        onFilter = { navigation.accountFilterKey = null; navigation.recordCategory = null; navigation.expenseDimension = it.dimension; navigation.expenseKey = it.key; navigation.expenseLabel = it.label; navigation.tab = 0 },
+                        onCategory = { navigation.accountFilterKey = null; navigation.expenseDimension = null; navigation.recordCategory = it; navigation.tab = 0 })
+                    navigation.tab == 3 -> MoreScreen { navigation.tab = it }
+                    navigation.tab == 6 -> SettingsScreen(settings, connected, hasAccess, canAlert, captureError,
                         onToggle = { enabled -> if (enabled && !settings.consented) editors.disclosure = true else finance.preferences.setEnabled(enabled) },
                         onApps = { if (!settings.consented) editors.disclosure = true else { editors.appPicker = true; finance.loadApps() } },
                         onAccess = ::requestCaptureAccess,
@@ -238,31 +222,34 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onAlerts = ::requestAlerts,
                         onExport = { export.launch("previsoes-${period.start}.csv") }, onClear = { editors.clearing = true }, onSimulate = finance::simulate,
                         onAppearance = finance.preferences::setAppearance, busy = busy,
-                        onBackup = { editors.backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { navigation.tab = 1 },
+                        onBackup = { editors.backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { navigation.tab = 11 },
                         onLockChange = onLockChange, onSecureScreen = finance.preferences::setSecureScreen,
                         onReminders = { finance.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
                         plannerMode = true, showCapture = true, onDisplayName = finance.preferences::setDisplayName,
-                        onMerchantCategories = { editors.merchantCategoriesOpen = true })
+                        onMerchantCategories = { editors.merchantCategoriesOpen = true },
+                        onAccounts = { editors.accountsOpen = true }, onReview = { navigation.tab = 5 })
                     loadError != null -> { Text(loadError!!, Modifier.padding(FinanceSpacing.page)); Button({ model.refresh() }) { Text("Tentar novamente") } }
                     snapshot == null -> Text("Abrindo seu planejamento…", Modifier.padding(FinanceSpacing.page))
                     report == null -> Text("Não foi possível calcular este ciclo. Confira as previsões em seus dados e tente novamente.", Modifier.padding(FinanceSpacing.page))
-                    navigation.tab == 2 -> ForecastReserveScreen(snapshot, report, hidden, busy,
+                    navigation.tab == 8 -> ForecastReserveScreen(snapshot, report, hidden, busy,
                         onSet = { showReserve(ReserveEventKind.SET) }, onAdd = { showReserve(ReserveEventKind.ADD) },
                         onWithdraw = { showReserve(ReserveEventKind.WITHDRAW) }, onGoal = { editors.goalEditor = true })
-                    navigation.tab == 1 -> ForecastProjectionScreen(snapshot, period, editors.simulation, hidden, busy,
+                    navigation.tab == 11 -> ForecastProjectionScreen(snapshot, period, editors.simulation, hidden, busy,
                         onSimulate = { editors.simulationEditor = true }, onDiscard = { editors.simulation = null },
-                        onAdopt = { editors.simulation?.let { value -> model.saveRule(value) { editors.simulation = null } } }, onOpen = { select(it.start); navigation.tab = 0 },
+                        onAdopt = { editors.simulation?.let { value -> model.saveRule(value) { editors.simulation = null } } }, onOpen = { select(it.start); navigation.tab = 7 },
                         legacyIncome = legacyIncome.filterNot { old -> snapshot.rules.any { it.legacySource == "monthly-reference:${old.month}" } },
                         onReuse = { old -> editors.legacyMonth = old.month; editors.editItem = null; editors.editKey = null; editors.template = null; editors.editor = true },
                         represented = represented)
+                    navigation.tab == 9 -> SalaryScreen(month, { navigation.monthText = it.toString() }, salarySummary, paydayBudget,
+                        oldState.accountBalances, hidden, { editors.salaryEditor = true }, { editors.accountsOpen = true }, { newItem(ForecastKind.INCOME, "Salário") })
+                    navigation.tab == 10 -> CommitmentScreen(report, hidden)
+                    navigation.tab == 2 -> FixedForecastScreen(snapshot, month, { navigation.monthText = it.toString() }, hidden, busy, ::edit, model::ignore, model::stop,
+                        { newItem(ForecastKind.EXPENSE) }, { editors.templates = true })
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
-                        monthlyDashboardCards(navigation, editors, month, salarySummary, paydayBudget,
-                            monthComparison, realized, oldState.pending.size, oldState.accountBalances, knownBalances.isNotEmpty(), hidden,
-                            onNewSalary = { newItem(ForecastKind.INCOME, "Salário") })
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
                         item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { navigation.followingCurrent = true; navigation.browsing = today.toString() }, { editors.cycleEditor = true }) }
                         item { Text(if (closed) "Ciclo encerrado · valores estimados" else "Planejamento do ciclo · valores estimados", style = MaterialTheme.typography.labelMedium) }
-                        item { RendlyCategories(report, hidden) }
+                        item { TextButton({ navigation.tab = 11 }, Modifier.fillMaxWidth()) { Text("Projetar próximos ciclos") } }
                         item { TextButton({ editors.dueDates = true },
                             enabled = report.lines.any { it.included && !it.ignored && it.date >= today }, modifier = Modifier.fillMaxWidth()) {
                             AppIcon(R.drawable.ic_chevron_right); Spacer(Modifier.width(8.dp)); Text("Próximos vencimentos · consultar previsão")
@@ -286,20 +273,28 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         forecastLineItems(report.lines, hidden, busy, ::edit, model::ignore, model::stop)
                         item { FinanceDisclosure("Histórico e dados anteriores", "forecast-legacy-data") {
                             Text("As fontes antigas foram preservadas. Recorrências, parcelas e registros vinculados foram aproveitados uma única vez. Rendas de referência antigas precisam de revisão antes de virar previsão.", style = MaterialTheme.typography.bodySmall)
-                            TextButton({ navigation.tab = 1 }) { Text("Revisar rendas de referência antigas") }
-                            TextButton({ navigation.tab = 4 }) { Text("Consultar lançamentos anteriores") }
+                            TextButton({ navigation.tab = 11 }) { Text("Revisar rendas de referência antigas") }
+                            TextButton({ navigation.tab = 0 }) { Text("Consultar lançamentos anteriores") }
                         } }
                     }
                 }
             }
         }
     }
+    if (adding) AlertDialog(onDismissRequest = { adding = false }, title = { Text("Novo lançamento") }, text = {
+        Column { listOf(Movement.EXPENSE, Movement.INCOME, Movement.TRANSFER, Movement.REFUND).forEach { kind ->
+            TextButton({ adding = false; openActual(kind) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                .testTag(if (kind == Movement.INCOME) "add-realized-income" else if (kind == Movement.EXPENSE) "add-realized-expense" else "add-${kind.name}")) {
+                Text(if (kind == Movement.TRANSFER) "Transferência entre minhas contas" else kind.label)
+            }
+        } }
+    }, confirmButton = { TextButton({ adding = false }) { Text("Cancelar") } })
     if (editors.merchantCategoriesOpen) MerchantCategoriesDialog(merchantStore, hidden) { editors.merchantCategoriesOpen = false }
     if (editors.accountsOpen) AccountsManager(oldState.accountBalances, oldState.balanceReferences, hidden, busy,
         onDismiss = { editors.accountsOpen = false },
         onStatement = { account ->
             navigation.accountFilterKey = account.key; navigation.recordCategory = null; navigation.expenseDimension = null
-            editors.accountsOpen = false; navigation.tab = 4
+            editors.accountsOpen = false; navigation.tab = 0
         }, onSave = finance::configureAccountBalance, onArchive = finance::setAccountArchived)
     if (editors.salaryEditor) key(navigation.monthText) {
         SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { editors.salaryEditor = false }) { cents ->

@@ -38,6 +38,7 @@ fun SettingsScreen(
     showCapture: Boolean = !plannerMode,
     onDisplayName: (String) -> Unit = {},
     onMerchantCategories: () -> Unit = {},
+    onAccounts: () -> Unit = {}, onReview: () -> Unit = {},
 ) {
     var nameEditor by remember { mutableStateOf(false) }
     if (nameEditor) DisplayNameDialog(settings.displayName, { nameEditor = false }, onDisplayName)
@@ -47,6 +48,8 @@ fun SettingsScreen(
             Text("Como você quer ser chamado?")
         } }
         item { SectionTitle("Ajustes", "Preferências, captura e proteção dos dados") }
+        item { OutlinedButton(onAccounts, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("settings-accounts")) { Text("Contas e saldos") } }
+        if (showCapture) item { OutlinedButton(onReview, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-notification-review")) { Text("Revisar notificações") } }
         item {
             SettingsCard {
                 SettingsHeading("Aparência", R.drawable.ic_visibility)

@@ -29,7 +29,7 @@ private class SavedUiProperty<T>(private val handle: SavedStateHandle, private v
 
 internal class ForecastNavigationState(handle: SavedStateHandle) {
     var accountFilterKey: String? by SavedUiProperty(handle, "navigation.accountFilterKey", null)
-    var tab: Int by SavedUiProperty(handle, "navigation.tab", 0)
+    var tab: Int by SavedUiProperty(handle, "navigation.tab.v2", 0)
     var browsing: String by SavedUiProperty(handle, "navigation.browsing", LocalDate.now().toString())
     var followingCurrent: Boolean by SavedUiProperty(handle, "navigation.followingCurrent", true)
     var monthText: String by SavedUiProperty(handle, "navigation.monthText", YearMonth.now().toString())
