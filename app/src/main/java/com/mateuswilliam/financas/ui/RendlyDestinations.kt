@@ -33,16 +33,6 @@ internal fun SalaryScreen(month: YearMonth, onMonth: (YearMonth) -> Unit, summar
 }
 
 @Composable
-internal fun GraphsScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) -> Unit, comparison: MonthComparison,
-    hidden: Boolean, onFilter: (ExpenseFilter) -> Unit, onCategory: (Category) -> Unit) {
-    LazyColumn(Modifier.testTag("graphs-screen"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { MonthPicker(month, onMonth) }
-        item { ExpenseChart(records, month, hidden, onFilter) }
-        item { MonthComparisonCard(comparison, hidden, onCategory) }
-    }
-}
-
-@Composable
 internal fun FixedForecastScreen(data: ForecastDataset, month: YearMonth, onMonth: (YearMonth) -> Unit, hidden: Boolean, busy: Boolean,
     onEdit: (ForecastLine) -> Unit, onIgnore: (ForecastLine) -> Unit, onStop: (ForecastLine) -> Unit, onNew: () -> Unit, onTemplates: () -> Unit) {
     val lines = remember(data, month) { ForecastCalculator.report(data, BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1))).lines
