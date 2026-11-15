@@ -34,6 +34,7 @@ class SalaryAndReviewUiTest {
         }
         rule.openRendlyMonth()
         rule.waitUntil(10000) { rule.onAllNodesWithTag("month-expenses", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10000) { rule.onAllNodes(hasTestTag("month-expenses") and hasText("1.200,00", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("month-expenses", useUnmergedTree = true).assertTextContains("1.200,00", substring = true)
         rule.onNodeWithTag("month-income", useUnmergedTree = true).assertTextContains("0,00", substring = true)
         assertEquals(1, runBlocking { app.repository.exportRecords().size })

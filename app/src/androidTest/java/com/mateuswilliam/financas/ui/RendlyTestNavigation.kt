@@ -36,6 +36,7 @@ internal fun ComposeContentTestRule.openRendlyProjections() {
     openRendlyPlanner()
     onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Projetar próximos ciclos"))
     onNodeWithText("Projetar próximos ciclos").performClick()
+    waitUntil(10000) { onAllNodesWithTag("forecast-projections").fetchSemanticsNodes().isNotEmpty() }
 }
 internal fun ComposeContentTestRule.newRendlyRecord(kind: Movement = Movement.EXPENSE) {
     openRendlyMonth()
