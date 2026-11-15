@@ -49,7 +49,7 @@ class MonthlyRecurringUiTest {
         val line = ui.report().lines.single()
         val tag = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
         ui.scroll(tag); ui.clickTag(tag)
-        rule.onNodeWithText("Editar").assertExists()
+        rule.onNodeWithText("Alterar só este mês").assertExists()
         rule.onNodeWithText("Pular este mês").assertExists()
         rule.onNodeWithText("Registrar pagamento").assertDoesNotExist()
         rule.onNodeWithText("Confirmar pagamento").assertDoesNotExist()

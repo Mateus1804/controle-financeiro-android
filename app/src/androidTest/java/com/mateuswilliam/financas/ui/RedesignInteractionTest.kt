@@ -92,7 +92,7 @@ class RedesignInteractionTest {
             checkpoint("Conferindo navegação com fonte ampliada")
             for (label in listOf("Mês", "Gráficos", "Fixas e parcelas", "Mais", "Mês")) {
                 val tab = waitForEnabled(hasText(label) and hasClickAction()).performScrollTo()
-                rule.onNodeWithText(label, useUnmergedTree = true).assertStartAlignedTextFits(label)
+                rule.onNode(hasText(label) and hasAnyAncestor(hasClickAction()), useUnmergedTree = true).assertStartAlignedTextFits(label)
                 tab.assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
             }
             rule.openRendlyReview()

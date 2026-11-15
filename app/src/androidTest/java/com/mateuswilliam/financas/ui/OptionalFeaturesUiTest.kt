@@ -68,14 +68,14 @@ class OptionalFeaturesUiTest {
         assertTrue(app.repository.exportRecords().isEmpty())
         rule.dismissFeedback("Previsão salva")
         rule.activityRule.scenario.recreate()
-        rule.waitUntil(10000) { rule.onAllNodesWithTag("records-list").fetchSemanticsNodes().isNotEmpty() }
+        rule.openRendlyPlanner()
         val data = app.forecasts.dataset.first()
         val period = CycleCalendar.periodContaining(LocalDate.now(), data.cycleRules)
         val line = ForecastCalculator.report(data, period).lines.single { it.itemId == saved.itemId }
         val actions = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
         scrollForecast(hasTestTag(actions))
         rule.onNodeWithTag(actions).performClick()
-        rule.onNodeWithText("Editar").performClick()
+        rule.onNodeWithText("Alterar só este mês").performClick()
         rule.onNodeWithTag("forecast-title").assertTextContains("Limite de consumo fictício")
         assertAmountInput("forecast-amount", 10000)
         rule.onNodeWithText("Cancelar").performClick()

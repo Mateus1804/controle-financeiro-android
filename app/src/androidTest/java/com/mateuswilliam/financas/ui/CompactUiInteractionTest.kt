@@ -52,7 +52,7 @@ class CompactUiInteractionTest {
         clickTag(trigger)
         rule.onNodeWithText("Pular este mês").assertIsDisplayed()
         rule.onNodeWithText("Interromper futuras").assertIsDisplayed()
-        clickText("Editar")
+        clickText("Alterar só este mês")
         rule.onNodeWithText("Editar previsão").assertIsDisplayed()
         rule.onNodeWithText("Alterar só este mês").assertExists()
         clickText("Cancelar")
