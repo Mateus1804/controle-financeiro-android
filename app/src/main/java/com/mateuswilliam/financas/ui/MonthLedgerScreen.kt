@@ -33,7 +33,8 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
     }
     val groups = remember(selected.records, zone) { selected.records.groupBy { Instant.ofEpochMilli(it.occurredAt).atZone(zone).toLocalDate() } }
     val accountOptions = (listOf<String?>(null) + accounts.map { it.key } + listOfNotNull(accountKey)).distinct()
-    LazyColumn(Modifier.fillMaxSize().testTag("records-list"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, 104.dp),
+    // Reservar a área do botão na viewport evita que scrollTo pare com uma linha atrás do +.
+    LazyColumn(Modifier.fillMaxSize().padding(bottom = 80.dp).testTag("records-list"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { MonthPicker(month, onMonth) }
         item {
