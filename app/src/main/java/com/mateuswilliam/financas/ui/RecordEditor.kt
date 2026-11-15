@@ -216,6 +216,40 @@ fun RecordEditor(
                 } else PrivateValueGate(hideAmounts, "Mostrar valor para edição") {
                     MoneyAmountField(amount, attempted, enabled = !busy, onInvalidInput = { invalidMoneyInput = it })
                 }
+                if (movement != Movement.TRANSFER) {
+                    val categoryOptions = (categoriesFor(movement, reversalMovement) + category).distinct()
+                    if (movement == Movement.REFUND && originalRecordId != null) {
+                        Text("Categoria do lançamento original: ${category.label}", style = MaterialTheme.typography.bodyMedium)
+                        Text("Remova o vínculo para editar a categoria.", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category,
+                            categoryOptions, { it.label }) { category = it; categoryEdited = true }
+                        if (draft != null && rememberedCategory != null && merchantLabel != null && !categoryEdited) Text(
+                            "Categoria lembrada para ${privateDisplayText(merchantLabel, hideAmounts)}. Você pode alterá-la antes de confirmar.",
+                            Modifier.testTag("remembered-category"), style = MaterialTheme.typography.bodySmall)
+                    }
+                } else Text("Transferência entre minhas contas", style = MaterialTheme.typography.titleSmall)
+                PrivateValueGate(hideAmounts && privateDisplayText(description, true) != description, "Mostrar descrição para edição") {
+                OutlinedTextField(description, { value ->
+                    description = value.take(200)
+                    if (existing == null && preset == null && draft == null && movement != Movement.TRANSFER && originalRecordId == null) {
+                        history.filter { it.movement == movement && it.description.trim().equals(description.trim(), ignoreCase = true) }
+                            .maxByOrNull { it.occurredAt }?.let { match ->
+                                if (!categoryEdited && match.category in categoriesFor(movement, reversalMovement)) category = match.category
+                                if (!accountEdited && activeAccounts.any { AccountNames.key(it.label) == AccountNames.key(match.bank) }) bank = match.bank
+                            }
+                    }
+                }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth().testTag(if (recurring != null) "recurring-title" else "record-description"), minLines = 2,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
+                }
+                if (!purchaseMode) OutlinedButton(onClick = {
+                    val selected = LocalDate.parse(date)
+                    showFinanceDatePicker(context, dateDialogTheme, selected) {
+                        date = it.toString()
+                        if (!recurrenceOnlyMonth) recurringDay = if (recurring != null && it.dayOfMonth == LocalDate.parse(recurring.nextDate).dayOfMonth) recurring.dayOfMonth else it.dayOfMonth
+                    }
+                }, modifier = Modifier.fillMaxWidth().testTag(if (recurringMode) "recurring-due-date" else "record-date")) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("${if (recurringMode) if (recurrenceOnlyMonth) "Vencimento deste mês" else "Início / primeiro vencimento" else "Data"}: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
+                FinanceDisclosure("Mais detalhes", "record-payment-details") {
                 if (recurring == null && preset == null && !installmentConfirmation) ChoiceField("Movimentação", movement,
                     Movement.entries.toList(), { it.label }) {
                     if (movement != it) {
@@ -249,47 +283,15 @@ fun RecordEditor(
                         category = if (it == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER
                     }
                 }
-                if (movement != Movement.TRANSFER) {
-                    val categoryOptions = (categoriesFor(movement, reversalMovement) + category).distinct()
-                    if (movement == Movement.REFUND && originalRecordId != null) {
-                        Text("Categoria do lançamento original: ${category.label}", style = MaterialTheme.typography.bodyMedium)
-                        Text("Remova o vínculo para editar a categoria.", style = MaterialTheme.typography.bodySmall)
-                    } else {
-                        ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category,
-                            categoryOptions, { it.label }) { category = it; categoryEdited = true }
-                        if (draft != null && rememberedCategory != null && merchantLabel != null && !categoryEdited) Text(
-                            "Categoria lembrada para ${privateDisplayText(merchantLabel, hideAmounts)}. Você pode alterá-la antes de confirmar.",
-                            Modifier.testTag("remembered-category"), style = MaterialTheme.typography.bodySmall)
-                    }
-                } else Text("Transferência entre minhas contas", style = MaterialTheme.typography.titleSmall)
                 AccountPickerField("Conta ou banco de origem", bank, activeAccounts, { bank = it; accountEdited = true }, onAddAccount, hidden = hideAmounts)
                 if (movement == Movement.TRANSFER) {
                     AccountPickerField("Conta de destino", destination, activeAccounts.filter { AccountNames.key(it.label) != AccountNames.key(bank) }, { destination = it }, onAddAccount, hidden = hideAmounts)
                     TransferPreview(record, existing, balances, hideAmounts)
                 }
-                if (!purchaseMode) FinanceDisclosure("Mais detalhes · meio de pagamento", "record-payment-details") {
+                if (!purchaseMode) {
                     ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }
                 }
-                PrivateValueGate(hideAmounts && privateDisplayText(description, true) != description, "Mostrar descrição para edição") {
-                OutlinedTextField(description, { value ->
-                    description = value.take(200)
-                    if (existing == null && preset == null && draft == null && movement != Movement.TRANSFER && originalRecordId == null) {
-                        history.filter { it.movement == movement && it.description.trim().equals(description.trim(), ignoreCase = true) }
-                            .maxByOrNull { it.occurredAt }?.let { match ->
-                                if (!categoryEdited && match.category in categoriesFor(movement, reversalMovement)) category = match.category
-                                if (!accountEdited && activeAccounts.any { AccountNames.key(it.label) == AccountNames.key(match.bank) }) bank = match.bank
-                            }
-                    }
-                }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth().testTag(if (recurring != null) "recurring-title" else "record-description"), minLines = 2,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done))
                 }
-                if (!purchaseMode) OutlinedButton(onClick = {
-                    val selected = LocalDate.parse(date)
-                    showFinanceDatePicker(context, dateDialogTheme, selected) {
-                        date = it.toString()
-                        if (!recurrenceOnlyMonth) recurringDay = if (recurring != null && it.dayOfMonth == LocalDate.parse(recurring.nextDate).dayOfMonth) recurring.dayOfMonth else it.dayOfMonth
-                    }
-                }, modifier = Modifier.fillMaxWidth().testTag(if (recurringMode) "recurring-due-date" else "record-date")) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("${if (recurringMode) if (recurrenceOnlyMonth) "Vencimento deste mês" else "Início / primeiro vencimento" else "Data"}: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 if (onOpenExpenseForecast != null && movement == Movement.EXPENSE) TextButton(
                     onClick = onOpenExpenseForecast, enabled = !busy,

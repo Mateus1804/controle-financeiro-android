@@ -15,8 +15,8 @@ import com.mateuswilliam.financas.R
 /** Textos ampliados usam a largura da tela, sem reduzir a fonte escolhida no Android. */
 @Composable
 internal fun ForecastNavigationBar(tab: Int, onSelect: (Int) -> Unit) {
-    val destinations = listOf("Orçamento" to R.drawable.ic_overview,
-        "Projeções" to R.drawable.ic_chevron_right, "Reserva" to R.drawable.ic_wallet)
+    val destinations = listOf("Mês" to R.drawable.ic_records, "Gráficos" to R.drawable.ic_overview,
+        "Fixas e parcelas" to R.drawable.ic_calendar, "Mais" to R.drawable.ic_more)
     if (LocalDensity.current.fontScale > 1.25f) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().selectableGroup()) {
             destinations.forEachIndexed { index, (label, icon) ->
