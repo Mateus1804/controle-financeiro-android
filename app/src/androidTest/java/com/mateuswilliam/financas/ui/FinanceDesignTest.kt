@@ -36,9 +36,9 @@ class FinanceDesignTest {
             SideEffect { primary = actual }
         } }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        rule.runOnIdle { assertEquals(Color(0xFF0F6B63), primary) }
+        rule.runOnIdle { assertEquals(Color(0xFF765C88), primary) }
         rule.runOnIdle { dark = true }
-        rule.runOnIdle { assertEquals(Color(0xFF8FD6C9), primary) }
+        rule.runOnIdle { assertEquals(Color(0xFFD6C7E6), primary) }
     }
 
     @Test fun fallbackAndDynamicTextPairsHaveReadableContrastInBothModes() {
