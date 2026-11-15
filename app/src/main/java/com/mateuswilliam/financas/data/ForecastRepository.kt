@@ -11,7 +11,7 @@ import java.time.LocalDate
 class ForecastRepository(private val database:FinanceDatabase) {
     private val dao = database.financeDao()
     val dataset:Flow<ForecastDataset> = callbackFlow {
-        val observer = object:InvalidationTracker.Observer("forecast_rules","forecast_overrides","cycle_rules","reserve_events","forecast_meta","recurring_months","occurrences","commitments") {
+        val observer = object:InvalidationTracker.Observer("forecast_rules","forecast_overrides","cycle_rules","reserve_events","forecast_meta","records") {
             override fun onInvalidated(tables:Set<String>) { trySend(Unit) }
         }
         database.invalidationTracker.addObserver(observer)
@@ -21,49 +21,8 @@ class ForecastRepository(private val database:FinanceDatabase) {
 
     private suspend fun readDataset() = ForecastDataset(dao.allForecastRules().map { it.model() },
         dao.allForecastOverrides().map { it.model() },dao.allCycleRules().map { it.model() },
-        dao.allReserveEvents().map { it.model() },dao.allForecastMeta().firstOrNull { it.key=="reserveGoal" }?.value?.toLong(), readRecordLinks())
+        dao.allReserveEvents().map { it.model() },dao.allForecastMeta().firstOrNull { it.key=="reserveGoal" }?.value?.toLong(), dao.allRecords().filter { it.forecastItemId != null && it.forecastOccurrenceKey != null }.groupBy { it.forecastItemId!! to it.forecastOccurrenceKey!! }.mapValues { (_, rows) -> rows.map { it.id }.toSet() })
 
-    // These keys match the importer. Links can span months; a payment is counted on its own date.
-    private suspend fun readRecordLinks(): Map<Pair<String, String>, Set<String>> {
-        val links = mutableMapOf<Pair<String, String>, MutableSet<String>>()
-        fun link(item: String, occurrence: String, record: String?) {
-            if (record != null) links.getOrPut(item to occurrence) { mutableSetOf() }.add(record)
-        }
-        val months = dao.allRecurringMonths()
-        val occurrences = dao.allOccurrences()
-        val recurringIds = dao.allRecurring().mapTo(hashSetOf()) { it.id }
-        val occupied = months.mapTo(hashSetOf()) { it.recurringId to it.month }
-        val dates = months.mapTo(hashSetOf()) { it.recurringId to it.dueDate }
-        for (row in months) link("legacy:recurring:${row.recurringId}", "month:${row.month}", row.recordId)
-        val separateOccurrences = hashSetOf<Pair<String, String>>()
-        for (row in occurrences) {
-            val month = row.dueDate.take(7)
-            if ((row.recurringId to row.dueDate) in dates || occupied.add(row.recurringId to month))
-                link("legacy:recurring:${row.recurringId}", "month:$month", row.recordId)
-            else {
-                separateOccurrences.add(row.recurringId to row.dueDate)
-                link("legacy:occurrence:${row.recurringId}:${row.dueDate}", "once", row.recordId)
-            }
-        }
-        val occurrenceDates = occurrences.mapTo(hashSetOf()) { it.recurringId to it.dueDate }
-        for (row in dao.allCommitments()) {
-            val id = row.recurringId
-            if (id != null && (id in recurringIds || (id to row.dueDate) in dates || (id to row.dueDate) in occurrenceDates)) {
-                val month = row.dueDate.take(7)
-                if ((id to row.dueDate) in separateOccurrences)
-                    link("legacy:occurrence:$id:${row.dueDate}", "once", row.recordId)
-                else link("legacy:recurring:$id", "month:$month", row.recordId)
-            } else link("legacy:commitment:${row.id}", "once", row.recordId)
-        }
-        return links
-    }
-
-    suspend fun initialize() = database.withTransaction {
-        if (dao.allForecastMeta().none { it.key=="legacyImported" }) {
-            LegacyForecastImporter.import(dao)
-            dao.upsertForecastMeta(ForecastMetaEntity("legacyImported","1"))
-        }
-    }
     suspend fun saveRule(rule:ForecastRule,replaceFuture:Boolean=true) = database.withTransaction {
         require(ForecastValidation.error(rule)==null) { ForecastValidation.error(rule) ?: "Previsão inválida." }
         if(replaceFuture) dao.deleteFutureForecastRules(rule.itemId,rule.effectiveFrom.toString())
@@ -73,8 +32,7 @@ class ForecastRepository(private val database:FinanceDatabase) {
         require(dao.allForecastRules().any { it.itemId==value.itemId }) { "Previsão não encontrada." }
         val amount=value.amountCents
         val title=value.title
-        require(amount==null || amount!=0L && amount in -Money.MAX_CENTS..Money.MAX_CENTS)
-        require(amount==null || amount>=0 || dao.allForecastRules().any { it.itemId==value.itemId && it.legacySource!=null })
+        require(amount==null || amount in 1..Money.MAX_CENTS)
         require(ForecastSnapshots.validOccurrenceKey(value.occurrenceKey))
         require(title==null || title.isNotBlank() && title.length<=256 && '\u0000' !in title)
         require(value.occurrenceKey.matches(Regex("once|month:\\d{4}-\\d{2}|installment:[1-9]\\d*|cycle:\\d{4}-\\d{2}-\\d{2}")))

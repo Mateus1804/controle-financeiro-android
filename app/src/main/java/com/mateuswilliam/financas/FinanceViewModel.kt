@@ -11,19 +11,11 @@ import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.core.AccountBalance
 import com.mateuswilliam.financas.core.AccountBalanceReference
-import com.mateuswilliam.financas.core.MonthlyBudget
-import com.mateuswilliam.financas.core.MonthlyIncomePlan
-import com.mateuswilliam.financas.core.InstallmentPurchase
-import com.mateuswilliam.financas.core.InstallmentAdjustment
-import com.mateuswilliam.financas.core.RecurringPlan
-import com.mateuswilliam.financas.core.RecurringMonth
 import com.mateuswilliam.financas.core.Category
-import com.mateuswilliam.financas.core.CommitmentReport
 import com.mateuswilliam.financas.data.StagedRestore
 import com.mateuswilliam.financas.data.CaptureSettings
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.data.DraftChangedException
-import com.mateuswilliam.financas.data.PurchaseManagement
 import com.mateuswilliam.financas.notifications.ReviewNotifications
 import com.mateuswilliam.financas.notifications.RecurringReminders
 import java.time.ZoneId
@@ -48,8 +40,6 @@ data class FinanceState(
     val loaded: Boolean = false,
     val accounts: List<AccountOption> = emptyList(),
     val manualRecords: List<Record> = emptyList(),
-    val budgets: List<MonthlyBudget> = emptyList(),
-    val recurring: List<RecurringPlan> = emptyList(),
     val accountBalances: List<AccountBalance> = emptyList(),
     val balanceReferences: List<AccountBalanceReference> = emptyList(),
 )
@@ -73,8 +63,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     private val baseState = combine(repository.ledger, repository.pending, preferences.state, repository.accounts) { ledger, drafts, settings, accounts ->
         FinanceState(ledger.records, drafts, settings, loaded = true, accounts = accounts, manualRecords = ledger.manualRecords)
     }
-    val state = combine(baseState, repository.budgets, repository.recurring, balances, repository.accountBalanceEvents) { base, budgets, recurring, balances, references ->
-        base.copy(budgets = budgets, recurring = recurring, accountBalances = balances, balanceReferences = references)
+    val state = combine(baseState, balances, repository.accountBalanceEvents) { base, balances, references ->
+        base.copy(accountBalances = balances, balanceReferences = references)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
     val stagedRestore = MutableStateFlow<StagedRestore?>(null)
     private var encryptedBackup: ByteArray? = null
@@ -112,122 +102,6 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         app.merchantCategories.clear()
         if (preferencesCleared) "Dados apagados e captura desativada."
         else "Os dados financeiros foram apagados, mas as preferências não puderam ser limpas. Captura e lembretes permanecem pausados. Confira o armazenamento e tente novamente."
-    }
-
-    fun saveBudget(budget: MonthlyBudget, onSaved: () -> Unit) = action { repository.saveBudget(budget); onSaved(); "Limite mensal salvo." }
-    fun deleteBudget(month: String, category: Category) = action { repository.deleteBudget(month, category); "Limite mensal removido." }
-    fun commitmentSetup(month: YearMonth) = repository.commitmentSetup(month)
-    fun commitmentReport(month: YearMonth): Flow<Result<CommitmentReport>> =
-        repository.observeCommitmentReport(month).map { Result.success(it) }.catch { emit(Result.failure(it)) }
-    fun saveMonthlyIncome(plan: MonthlyIncomePlan, onSaved: () -> Unit) = action {
-        repository.saveMonthlyPlan(plan)
-        onSaved()
-        "Renda prevista e limite salvos para o mês."
-    }
-    fun savePurchase(purchase: InstallmentPurchase, draftId: String?, expectedRevision: Int?, onSaved: () -> Unit) = action {
-        val saved = try { repository.createPurchase(purchase, draftId, expectedRevision) }
-        catch (exception: DraftChangedException) { return@action exception.message.orEmpty() }
-        if (saved) {
-            if (draftId != null) ReviewNotifications.cancel(app, draftId)
-            onSaved()
-            "Compra salva. As parcelas em aberto estão nas movimentações."
-        } else "A compra já foi salva ou a notificação não está mais pendente."
-    }
-    suspend fun purchaseManagement(installmentId: String) = repository.purchaseManagement(installmentId)
-    fun editPurchase(current: PurchaseManagement, purchase: InstallmentPurchase, onFinished: () -> Unit) = action {
-        val saved = repository.editPurchase(current.revision, purchase)
-        onFinished()
-        if (saved) "Compra corrigida nas movimentações." else "A compra mudou. Abra novamente para conferir as parcelas."
-    }
-    fun adjustInstallment(current: PurchaseManagement, adjustment: InstallmentAdjustment, onFinished: () -> Unit) = action {
-        val saved = repository.adjustInstallment(current.installmentId, current.revision, adjustment)
-        onFinished()
-        if (saved) "Parcela corrigida nas movimentações." else "A parcela mudou. Abra novamente para conferir."
-    }
-    fun cancelOpenInstallments(current: PurchaseManagement, onFinished: () -> Unit) = action {
-        val count = repository.cancelOpenInstallments(current.purchase.id, current.revision, current.openCount)
-        onFinished()
-        if (count > 0) "Parcelas em aberto canceladas nas movimentações." else "A compra mudou. Confira as parcelas em aberto antes de cancelar."
-    }
-    fun excludeInstallmentForecast(current: PurchaseManagement, onFinished: () -> Unit) = action {
-        val removed = repository.excludeInstallmentForecast(current.installmentId, current.revision)
-        onFinished()
-        if (removed) "Parcela excluída das movimentações." else "A parcela mudou. Abra novamente para conferir."
-    }
-    fun confirmInstallment(id: String, record: Record, expectedPurchaseRevision: Long, onSaved: () -> Unit) = action {
-        if (repository.confirmInstallment(id, record, expectedPurchaseRevision)) {
-            onSaved()
-            "Parcela registrada no extrato."
-        } else "A parcela mudou, foi registrada ou cancelada. Confira as movimentações."
-    }
-    fun setFixedRecurring(id: String, fromMonth: YearMonth?) = action {
-        repository.setFixedRecurring(id, fromMonth)
-        if (fromMonth != null) "Despesa fixa incluída no planejamento."
-        else "A recorrência saiu das previsões de despesas fixas. O histórico foi mantido."
-    }
-    fun setFixedRecurringFromMonth(id: String, effectiveMonth: YearMonth, enabled: Boolean) = action {
-        repository.setFixedRecurringFromMonth(id, effectiveMonth, enabled)
-        if (enabled) "Despesa fixa incluída a partir de $effectiveMonth." else "Projeções fixas interrompidas a partir de $effectiveMonth. O histórico foi mantido."
-    }
-    fun setRecurringActiveFromMonth(id: String, effectiveMonth: YearMonth, active: Boolean) = action {
-        repository.setRecurringActiveFromMonth(id, effectiveMonth, active)
-        RecurringReminders.cancelForRecurring(app, id, effectiveMonth)
-        if (active) "Recorrência retomada a partir de $effectiveMonth." else "Recorrência pausada a partir de $effectiveMonth. Os meses anteriores foram mantidos."
-    }
-    fun saveRecurring(plan: RecurringPlan, onSaved: () -> Unit) = action {
-        val old = state.value.recurring.find { it.id == plan.id }
-        repository.saveRecurring(plan)
-        if (old != null && (!plan.active || old.nextDate != plan.nextDate)) RecurringReminders.cancel(app, old.id, old.nextDate)
-        onSaved()
-        "Previsão mensal salva. Nenhum lançamento foi criado."
-    }
-    fun recurringMonths(month: YearMonth) = repository.observeRecurringMonths(month)
-    suspend fun recurringConfiguration(id: String, month: YearMonth) = repository.recurringConfiguration(id, month)
-    fun saveRecurringMonth(expected: RecurringMonth, edited: RecurringPlan, onSaved: () -> Unit) = action {
-        val saved = repository.saveRecurringMonth(expected, edited)
-        if (saved) {
-            RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate)
-            onSaved()
-        }
-        if (saved) "Previsão corrigida somente nesta competência." else "A competência mudou. Abra novamente para conferir."
-    }
-    fun saveRecurringMovement(plan: RecurringPlan, effectiveMonth: YearMonth, fixedExpense: Boolean, onSaved: () -> Unit) = action {
-        repository.saveRecurringMovement(plan, effectiveMonth, fixedExpense)
-        RecurringReminders.cancelForRecurring(app, plan.id, effectiveMonth)
-        onSaved()
-        "Recorrência mensal salva. Os pagamentos anteriores foram mantidos."
-    }
-    fun saveRecurringFromMonth(plan: RecurringPlan, effectiveMonth: YearMonth, onSaved: () -> Unit) = action {
-        repository.saveRecurringFromMonth(plan, effectiveMonth)
-        RecurringReminders.cancelForRecurring(app, plan.id, effectiveMonth)
-        onSaved()
-        "Configuração salva a partir de $effectiveMonth. Os meses anteriores foram mantidos."
-    }
-    fun confirmRecurringMonth(expected: RecurringMonth, record: Record, onSaved: () -> Unit) = action {
-        val saved = repository.confirmRecurringMonth(expected, record)
-        if (saved) { RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate); onSaved() }
-        if (saved) "Lançamento confirmado nesta competência." else "A competência mudou ou já foi tratada. Confira as movimentações."
-    }
-    fun skipRecurringMonth(expected: RecurringMonth) = action {
-        val skipped = repository.skipRecurringMonth(expected)
-        if (skipped) RecurringReminders.cancel(app, expected.recurringId, expected.plan.nextDate)
-        if (skipped) "Vencimento pulado somente nesta competência." else "A competência mudou ou já foi tratada. Confira as movimentações."
-    }
-    fun excludeRecurringForecast(plan: RecurringPlan, onFinished: () -> Unit) = action {
-        val removed = repository.archiveRecurringForecast(plan)
-        if (removed) RecurringReminders.cancelForRecurring(app, plan.id)
-        onFinished()
-        if (removed) "Previsão mensal excluída." else "A previsão mudou. Abra novamente para conferir."
-    }
-    fun skipRecurring(plan: RecurringPlan) = action {
-        if (repository.skipRecurring(plan.id, plan.nextDate)) {
-            RecurringReminders.cancel(app, plan.id, plan.nextDate)
-            "Vencimento pulado. Nenhum lançamento foi criado."
-        } else "A previsão mudou, foi pausada ou já foi tratada. Confira as movimentações."
-    }
-    fun confirmRecurring(id: String, due: String, record: Record, onSaved: () -> Unit) = action {
-        if (repository.confirmRecurring(id, due, record)) { RecurringReminders.cancel(app, id, due); onSaved(); "Lançamento confirmado e próxima previsão atualizada." }
-        else "A previsão mudou ou já foi tratada. Confira as movimentações."
     }
 
     fun createBackup(password: CharArray, onReady: () -> Unit) {

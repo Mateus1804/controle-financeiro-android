@@ -19,8 +19,16 @@ import com.mateuswilliam.financas.notifications.RecurringReminders
 class FinanceApplication : Application() {
     val settings by lazy { CapturePreferences(this) }
     val merchantCategories by lazy { com.mateuswilliam.financas.data.MerchantCategoryStore(this) }
-    val database by lazy { Room.databaseBuilder(this, FinanceDatabase::class.java, "financas.db")
-        .addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3, FinanceDatabase.MIGRATION_3_4, FinanceDatabase.MIGRATION_4_5, FinanceDatabase.MIGRATION_5_6, FinanceDatabase.MIGRATION_6_7, FinanceDatabase.MIGRATION_7_8, FinanceDatabase.MIGRATION_8_9, FinanceDatabase.MIGRATION_9_10).build() }
+    val database by lazy {
+        // Reset financeiro solicitado pelo proprietário: esta versão não migra dados anteriores.
+        if (getDatabasePath("financas.db").exists()) {
+            check(deleteDatabase("financas.db")) { "Não foi possível remover o banco anterior." }
+            settings.pauseForRestore()
+            settings.rememberOrigin("")
+            merchantCategories.clear()
+        }
+        Room.databaseBuilder(this, FinanceDatabase::class.java, "rendly-v1.db").build()
+    }
     val repository by lazy { FinanceRepository(database, settings) }
     val forecasts by lazy { com.mateuswilliam.financas.data.ForecastRepository(database) }
     val backups by lazy { BackupStore(this, repository) }

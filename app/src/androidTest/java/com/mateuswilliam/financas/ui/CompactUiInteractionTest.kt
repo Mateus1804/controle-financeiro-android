@@ -28,7 +28,7 @@ class CompactUiInteractionTest {
     private fun period() = CycleCalendar.periodContaining(today, current().cycleRules)
 
     @Before fun reset() {
-        runBlocking { app.maintenanceReady.await(); app.repository.clear(); app.forecasts.initialize(); app.forecasts.setCycleDay(5, today) }
+        runBlocking { app.maintenanceReady.await(); app.repository.clear(); app.forecasts.setCycleDay(5, today) }
         app.settings.finishIntro(); app.settings.dismissNamePrompt(); model.refresh()
         rule.waitUntil(10000) {
             model.dataset.value?.let { it.rules.isEmpty() && it.cycleRules.lastOrNull()?.day == 5 } == true

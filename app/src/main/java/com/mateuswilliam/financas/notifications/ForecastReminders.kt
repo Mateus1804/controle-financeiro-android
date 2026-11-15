@@ -17,7 +17,6 @@ object ForecastReminders {
     suspend fun notifyToday(app: FinanceApplication, today: LocalDate = LocalDate.now()) {
         deliveryMutex.withLock {
             if (!app.settings.snapshot().remindersEnabled) return
-            app.forecasts.initialize()
             val dataset = app.forecasts.dataset.first()
             val period = CycleCalendar.periodContaining(today, dataset.cycleRules)
             val lines = ForecastCalculator.report(dataset, period).lines.filter {

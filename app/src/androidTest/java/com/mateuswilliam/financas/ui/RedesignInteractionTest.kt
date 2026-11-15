@@ -20,7 +20,7 @@ class RedesignInteractionTest {
     private val app get() = rule.activity.application as FinanceApplication
 
     @Before fun reset() {
-        runBlocking { app.repository.clear(); app.forecasts.initialize() }
+        runBlocking { app.repository.clear(); Unit }
         app.settings.finishIntro(); app.settings.dismissNamePrompt()
         waitForEnabled(hasTestTag("add-realized-expense"))
         rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }

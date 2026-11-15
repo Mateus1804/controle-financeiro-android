@@ -13,12 +13,12 @@ class BackupAuthenticationException : IllegalArgumentException("Senha incorreta 
 
 /** Envelope portátil. O cabeçalho também é autenticado; parâmetros recebidos não controlam o custo da KDF. */
 object BackupCrypto {
-    const val VERSION = 1
+    const val VERSION = 2
     const val ITERATIONS = 600_000
     const val MAX_PAYLOAD_BYTES = 16 * 1024 * 1024
     const val HEADER_BYTES = 44
     const val MAX_FILE_BYTES = MAX_PAYLOAD_BYTES + HEADER_BYTES + 16
-    private val magic = byteArrayOf(67, 70, 65, 66, 75, 80, 13, 10)
+    private val magic = byteArrayOf(82, 78, 68, 76, 66, 75, 13, 10)
 
     fun passwordError(password: CharArray): String? = when {
         password.size < 12 -> "Use uma senha com pelo menos 12 caracteres."
@@ -41,7 +41,7 @@ object BackupCrypto {
         require(password.size in 1..256) { "Informe a senha do backup (até 256 caracteres)." }
         val header = file.copyOfRange(0, HEADER_BYTES)
         val input = ByteBuffer.wrap(header)
-        require(ByteArray(8).also(input::get).contentEquals(magic)) { "Este arquivo não é um backup do Controle Financeiro." }
+        require(ByteArray(8).also(input::get).contentEquals(magic)) { "Este arquivo não é um backup novo do Rendly." }
         require(input.int == VERSION) { "Versão de backup não suportada. Nenhum dado foi substituído." }
         require(input.int == ITERATIONS) { "Parâmetros de criptografia não suportados." }
         val salt = ByteArray(16).also(input::get)

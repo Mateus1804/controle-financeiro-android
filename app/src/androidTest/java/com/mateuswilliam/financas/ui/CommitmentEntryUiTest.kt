@@ -48,8 +48,6 @@ class CommitmentEntryUiTest {
         assertEquals(60001L, parts.sumOf { it.amountCents })
         assertEquals((0L..5L).map { ui.period().start.plusMonths(it) }, parts.map { it.date })
         assertTrue(ui.report(cycle).lines.isEmpty())
-        assertTrue(dao.allPurchases().isEmpty())
-        assertTrue(dao.allCommitments().isEmpty())
         assertTrue(app.repository.exportRecords().isEmpty())
         rule.activityRule.scenario.recreate()
         ui.waitRules(1)
@@ -84,7 +82,6 @@ class CommitmentEntryUiTest {
         assertEquals("SAVED", dao.draftById(draft.id)?.status)
         assertEquals("", dao.draftById(draft.id)?.sourceBody)
         assertTrue(ui.current().rules.isEmpty())
-        assertTrue(dao.allPurchases().isEmpty())
         assertFalse(app.settings.snapshot().consented)
     }
 
@@ -100,7 +97,6 @@ class CommitmentEntryUiTest {
         ui.waitData { it.overrides.singleOrNull()?.amountCents == 325019L }
         assertEquals(325019L, ui.report().incomeCents)
         assertEquals(300000L, ui.report(next).incomeCents)
-        assertTrue(dao.allMonthlyPlans().isEmpty())
         assertTrue(app.repository.exportRecords().isEmpty())
         rule.activityRule.scenario.recreate()
         ui.waitData { it.overrides.singleOrNull()?.amountCents == 325019L }

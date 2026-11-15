@@ -26,7 +26,7 @@ class SalaryAndReviewUiTest {
     @Test fun actualExpenseAndForecastDoNotShareTheLedger() {
         runBlocking {
             val now = LocalDate.now()
-            app.repository.saveMonthlyPlan(MonthlyIncomePlan(YearMonth.from(now), 300000))
+            app.forecasts.saveRule(ForecastRule("salary", now, "Salário", ForecastKind.INCOME, 300000, Category.SALARY, ForecastFrequency.MONTHLY, now))
             app.repository.save(Record("haircut", 120000, Movement.EXPENSE, PaymentMethod.PIX, Category.SERVICES,
                 "Carteira", "Despesa fictícia", System.currentTimeMillis()), null)
             app.forecasts.saveRule(ForecastRule("bill", now, "Internet", ForecastKind.EXPENSE, 60000,

@@ -20,18 +20,11 @@ data class SalarySummary(
 
 object SalarySummaries {
     fun represented(records: List<Record>, data: ForecastDataset, asOf: Long): Set<Pair<String, String>> {
-        val ids = records.filter { it.occurredAt <= asOf }.mapTo(hashSetOf()) { it.id }
-        return buildSet {
-            data.recordLinks.forEach { (key, linked) -> if (linked.any { it in ids }) add(key) }
-            data.rules.forEach { rule ->
-                val source = rule.legacySource
-                if (source != null && source.startsWith("record:") && source.removePrefix("record:") in ids)
-                    add(rule.itemId to "once")
-            }
-        }
+        return records.filter { it.occurredAt <= asOf && it.forecastItemId != null && it.forecastOccurrenceKey != null }
+            .mapTo(hashSetOf()) { it.forecastItemId!! to it.forecastOccurrenceKey!! }
     }
 
-    fun month(records: List<Record>, data: ForecastDataset?, month: YearMonth, zone: ZoneId, asOf: Long, manualSalary: Long? = null): SalarySummary {
+    fun month(records: List<Record>, data: ForecastDataset?, month: YearMonth, zone: ZoneId, asOf: Long): SalarySummary {
         val realized = Ledger.month(records.filter { it.occurredAt <= asOf }, month, zone)
         val salaryEntries = realized.records.filter { it.category == Category.SALARY && it.incomeContribution() != 0L }
         val actualSalary = salaryEntries.sumOf { it.incomeContribution() }
@@ -46,7 +39,7 @@ object SalarySummaries {
                 }
             }.distinctBy { line -> line.itemId to line.occurrenceKey }
         }
-        val salary = if (salaryEntries.isNotEmpty()) actualSalary else manualSalary ?: projected.orEmpty()
+        val salary = if (salaryEntries.isNotEmpty()) actualSalary else projected.orEmpty()
             .filter { it.included && it.kind == ForecastKind.INCOME && it.category == Category.SALARY }
             .sumOf { it.amountCents }
         return SalarySummary(salary.takeIf { it > 0 }, salaryEntries.isEmpty() && salary > 0, realized.expenses,

@@ -48,7 +48,6 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val forecastMessage by model.message.collectAsStateWithLifecycle()
     val financeMessage by finance.message.collectAsStateWithLifecycle()
     val loadError by model.loadError.collectAsStateWithLifecycle()
-    val legacyIncome by model.legacyIncome.collectAsStateWithLifecycle()
     val oldState by finance.state.collectAsStateWithLifecycle()
     val staged by finance.stagedRestore.collectAsStateWithLifecycle()
     val busy = busyForecast || busyFinance
@@ -73,24 +72,18 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val asOf = remember(resumeCount, oldState.records) { System.currentTimeMillis() }
     val realized = remember(oldState.records, asOf) { oldState.records.filter { it.occurredAt <= asOf } }
     val duplicateIndex = remember(oldState.manualRecords) { DuplicateCandidates(oldState.manualRecords) }
-    val salaryReference = key(navigation.monthText) {
-        val reference by remember(month) { model.monthlyPlan(month) }.collectAsStateWithLifecycle(initialValue = null)
-        reference
-    }
-    val salarySummary = remember(oldState.records, data, month, zone, asOf, salaryReference) {
-        runCatching { SalarySummaries.month(oldState.records, data, month, zone, asOf, salaryReference?.incomeCents) }.getOrElse {
-            SalarySummaries.month(oldState.records, null, month, zone, asOf, salaryReference?.incomeCents)
+    val salarySummary = remember(oldState.records, data, month, zone, asOf) {
+        runCatching { SalarySummaries.month(oldState.records, data, month, zone, asOf) }.getOrElse {
+            SalarySummaries.month(oldState.records, null, month, zone, asOf)
         }
     }
     val monthComparison = remember(realized, month, zone) { MonthComparisons.compare(realized, month, LocalDate.now(), zone) }
     val knownBalances = remember(oldState.accountBalances) { oldState.accountBalances.filter { !it.archived && it.balanceCents != null } }
-    val paydayBudget = remember(data, oldState.records, oldState.recurring, knownBalances, asOf) {
+    val paydayBudget = remember(data, oldState.records, knownBalances, asOf) {
         runCatching {
             val todayDate = LocalDate.now()
             val lines = data?.let { PaydayBudgets.upcomingLines(it, SalarySummaries.represented(oldState.records, it, asOf), todayDate) }.orEmpty()
-            val recurringDates = oldState.recurring.filter { it.active && it.movement == Movement.INCOME && it.category == Category.SALARY }
-                .mapNotNull { runCatching { LocalDate.parse(it.nextDate) }.getOrNull() }
-            PaydayBudgets.nextPayday(lines, recurringDates, todayDate)?.let { payday ->
+            PaydayBudgets.nextPayday(lines, emptyList(), todayDate)?.let { payday ->
                 PaydayBudgets.compute(knownBalances.sumOf { it.balanceCents ?: 0L }, lines, todayDate, payday)
             }
         }.getOrNull()
@@ -170,15 +163,15 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val backupImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { editors.restoreUri = uri.toString(); editors.backupDialog = 2 }
     }
-    fun editorScope() = if (navigation.tab == 2) BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1)) else period
+    fun editorScope() = if (navigation.tab in listOf(2, 9)) BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1)) else period
     fun rememberScope() { val chosen = editorScope(); editors.scopeStart = chosen.start.toString(); editors.scopeEnd = chosen.endExclusive.toString() }
     fun newItem(kind: ForecastKind, title: String? = null) {
         rememberScope(); editors.initialFrequency = if (navigation.tab == 2 || title != null) ForecastFrequency.MONTHLY else ForecastFrequency.ONCE
-        editors.editItem = null; editors.editKey = null; editors.legacyMonth = null; editors.template = title; editors.initialKind = kind; editors.editor = true
+        editors.editItem = null; editors.editKey = null; editors.template = title; editors.initialKind = kind; editors.editor = true
     }
     fun edit(line: ForecastLine, onlyOccurrence: Boolean = true) {
         rememberScope(); editors.onlyOccurrence = onlyOccurrence
-        editors.editItem = line.itemId; editors.editKey = line.occurrenceKey; editors.legacyMonth = null; editors.template = null; editors.editor = true
+        editors.editItem = line.itemId; editors.editKey = line.occurrenceKey; editors.template = null; editors.editor = true
     }
     fun showReserve(kind: ReserveEventKind, allocation: Boolean = false) { editors.allocating = allocation; editors.reserveKind = kind }
     fun select(date: LocalDate) { navigation.followingCurrent = false; navigation.browsing = date.toString() }
@@ -243,11 +236,12 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     navigation.tab == 11 -> ForecastProjectionScreen(snapshot, period, editors.simulation, hidden, busy,
                         onSimulate = { editors.simulationEditor = true }, onDiscard = { editors.simulation = null },
                         onAdopt = { editors.simulation?.let { value -> model.saveRule(value) { editors.simulation = null } } }, onOpen = { select(it.start); navigation.tab = 7 },
-                        legacyIncome = legacyIncome.filterNot { old -> snapshot.rules.any { it.legacySource == "monthly-reference:${old.month}" } },
-                        onReuse = { old -> editors.legacyMonth = old.month; editors.editItem = null; editors.editKey = null; editors.template = null; editors.editor = true },
                         represented = represented)
                     navigation.tab == 9 -> SalaryScreen(month, { navigation.monthText = it.toString() }, salarySummary, paydayBudget,
-                        oldState.accountBalances, hidden, { editors.salaryEditor = true }, { editors.accountsOpen = true }, { newItem(ForecastKind.INCOME, "Salário") })
+                        oldState.accountBalances, hidden, {
+                            val salary = snapshot.let { ForecastCalculator.report(it, BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1))).lines.firstOrNull { line -> line.kind == ForecastKind.INCOME && line.category == Category.SALARY } }
+                            if (salary != null) edit(salary) else newItem(ForecastKind.INCOME, "Salário")
+                        }, { editors.accountsOpen = true }, { newItem(ForecastKind.INCOME, "Salário") })
                     navigation.tab == 10 -> CommitmentScreen(report, hidden)
                     navigation.tab == 2 -> FixedForecastScreen(snapshot, month, { navigation.monthText = it.toString() }, hidden, busy, { edit(it) }, { edit(it, false) }, model::ignore, model::stop,
                         { newItem(ForecastKind.EXPENSE) }, { editors.templates = true })
@@ -277,11 +271,6 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             Text("O vencimento organiza as datas; seu orçamento não depende de confirmar pagamentos.", style = MaterialTheme.typography.bodySmall)
                         }
                         forecastLineItems(report.lines, hidden, busy, { edit(it) }, model::ignore, model::stop, { edit(it, false) })
-                        item { FinanceDisclosure("Histórico e dados anteriores", "forecast-legacy-data") {
-                            Text("As fontes antigas foram preservadas. Recorrências, parcelas e registros vinculados foram aproveitados uma única vez. Rendas de referência antigas precisam de revisão antes de virar previsão.", style = MaterialTheme.typography.bodySmall)
-                            TextButton({ navigation.tab = 11 }) { Text("Revisar rendas de referência antigas") }
-                            TextButton({ navigation.tab = 0 }) { Text("Consultar lançamentos anteriores") }
-                        } }
                     }
                 }
             }
@@ -302,13 +291,6 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             navigation.accountFilterKey = account.key; navigation.recordCategory = null; navigation.expenseDimension = null
             editors.accountsOpen = false; navigation.tab = 0
         }, onSave = finance::configureAccountBalance, onArchive = finance::setAccountArchived)
-    if (editors.salaryEditor) key(navigation.monthText) {
-        SalaryMonthEditor(month, salarySummary.salaryCents, hidden, busy, { editors.salaryEditor = false }) { cents ->
-            finance.saveMonthlyIncome(MonthlyIncomePlan(month, cents, salaryReference?.healthyLimitBasisPoints ?: 3000)) {
-                editors.salaryEditor = false; model.refresh()
-            }
-        }
-    }
     val draft = oldState.pending.firstOrNull { it.id == review.editingDraftId }
     val merchant = remember(draft?.id) { draft?.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } }
     val record = oldState.records.firstOrNull { it.id == review.editingRecordId }
@@ -322,7 +304,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             onDelete = record?.let { { finance.delete(it.id) } },
             accounts = oldState.accounts, lastOrigin = settings.lastOrigin, onAddAccount = finance::addAccount,
             initialMovement = review.actualKind, hideAmounts = hidden, duplicateIndex = duplicateIndex,
-            balances = oldState.accountBalances, history = oldState.records,
+            balances = oldState.accountBalances, history = oldState.records, forecastData = snapshot,
             rememberedCategory = merchant?.let { merchantStore.get(it.key) }, merchantLabel = merchant?.label,
             notificationChanged = draft != null && draft.revision != review.draftRevision,
             onAcceptUpdate = { review.draftRevision = draft?.revision },
@@ -367,11 +349,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             }
         }, confirmButton = { TextButton({ editors.dueDates = false }) { Text("Fechar") } })
     val selectedRule = snapshot?.rules?.filter { it.itemId == editors.editItem }?.maxByOrNull { it.effectiveFrom }
-    val oldIncome = legacyIncome.firstOrNull { it.month == editors.legacyMonth }
-    val referenceRule = oldIncome?.let { ForecastRule("monthly-reference:${it.month}", period.start, "Renda anterior · revisar", ForecastKind.INCOME,
-        it.incomeCents, Category.OTHER_INCOME, ForecastFrequency.ONCE, period.start, legacySource = "monthly-reference:${it.month}") }
-    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.template, editors.legacyMonth, editors.initialKind, editors.onlyOccurrence, editors.scopeStart) {
-        ForecastEditor(rule = selectedLine?.rule ?: selectedRule ?: referenceRule, line = selectedLine, period = editingPeriod, busy = busy, hidden = hidden,
+    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.template, editors.initialKind, editors.onlyOccurrence, editors.scopeStart) {
+        ForecastEditor(rule = selectedLine?.rule ?: selectedRule, line = selectedLine, period = editingPeriod, busy = busy, hidden = hidden,
             onDismiss = { editors.editor = false }, onSaveRule = { model.saveRule(it) { editors.editor = false } }, onSaveOverride = { model.saveOverride(it) { editors.editor = false } },
             initialKind = editors.initialKind, initialFrequency = editors.initialFrequency, initialOnlyOccurrence = editors.onlyOccurrence, initialTitle = editors.template.orEmpty(), initialCategory = fixedExpenseTemplates.firstOrNull { it.title == editors.template }?.category,
             knownStatements = snapshot.rules.map { it.statementKey }.filter { it.isNotBlank() }.distinct(),

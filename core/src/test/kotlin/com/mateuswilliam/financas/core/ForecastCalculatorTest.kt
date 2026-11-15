@@ -77,13 +77,11 @@ class ForecastCalculatorTest {
         assertEquals("Original",line.title)
     }
 
-    @Test fun refundsRetainNatureAndOverOneHundredPercentageIsUnclamped() {
-        val refund=rule("refund",-1000,frequency=ForecastFrequency.ONCE).copy(legacySource="record:1")
-        assertNull(ForecastValidation.error(refund))
-        assertNotNull(ForecastValidation.error(refund.copy(legacySource=null)))
-        val report=ForecastCalculator.report(ForecastDataset(rules=listOf(rule("salary",10000,ForecastKind.INCOME),rule("expenses",16000),refund)),november)
-        assertEquals(BigDecimal("150.00"),report.expensePercentage)
-        assertEquals(-5000L,report.marginCents)
+    @Test fun negativeForecastIsRejectedAndOverspendingPercentageIsNotCapped() {
+        assertNotNull(ForecastValidation.error(rule("refund",-1000,frequency=ForecastFrequency.ONCE)))
+        val report=ForecastCalculator.report(ForecastDataset(rules=listOf(rule("salary",10000,ForecastKind.INCOME),rule("expenses",16000))),november)
+        assertEquals(BigDecimal("160.00"),report.expensePercentage)
+        assertEquals(-6000L,report.marginCents)
     }
 
     @Test fun movedOccurrenceUsesItsOriginalStableKey() {
@@ -129,21 +127,11 @@ class ForecastCalculatorTest {
             BudgetPeriod(date("2027-02-01"),date("2027-03-01"))).lines.single().date)
     }
 
-    @Test fun legacyIdentifiersAndTitlesArePreservedWithinImportBounds() {
-        val legacy=rule("legacy:"+"x".repeat(256),100).copy(title="x".repeat(256),legacySource="commitment:original")
-        assertNull(ForecastValidation.error(legacy))
-        assertNotNull(ForecastValidation.error(legacy.copy(legacySource=null)))
-        assertNotNull(ForecastValidation.error(legacy.copy(title="x".repeat(257))))
-    }
-
-    @Test fun acceptedStatementAndLegacyLinksFitBackupTextBounds() {
-        val valid=rule("bill",100).copy(statementKey="s".repeat(200),statementTotal=true,
-            legacySource="l".repeat(512))
+    @Test fun statementTextBoundsRemainStrict() {
+        val valid=rule("bill",100).copy(statementKey="s".repeat(200),statementTotal=true)
         assertNull(ForecastValidation.error(valid))
         assertNotNull(ForecastValidation.error(valid.copy(statementKey="s".repeat(201))))
         assertNotNull(ForecastValidation.error(valid.copy(statementKey="bad\u0000link")))
-        assertNotNull(ForecastValidation.error(valid.copy(legacySource="l".repeat(513))))
-        assertNotNull(ForecastValidation.error(valid.copy(legacySource="bad\u0000source")))
+        assertNotNull(ForecastValidation.error(valid.copy(title="x".repeat(201))))
     }
-
 }
