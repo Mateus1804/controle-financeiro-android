@@ -67,7 +67,7 @@ private val Dark = darkColorScheme(
 @Immutable
 data class FinanceColors(val income: Color, val expense: Color, val chart: List<Color>)
 private val LightFinance = FinanceColors(Color(0xFF5B4969), Color(0xFF526C57), listOf(
-    Color(0xFF765C88), Color(0xFF58765F), Color(0xFF9B7FA8), Color(0xFF88715E), Color(0xFF657A8A), Color(0xFF8A747F)))
+    Color(0xFF765C88), Color(0xFF7C9E82), Color(0xFF9B7FA8), Color(0xFF88715E), Color(0xFF657A8A), Color(0xFF8A747F)))
 private val DarkFinance = FinanceColors(Color(0xFFD6C7E6), Color(0xFFB4CFB8), listOf(
     Color(0xFFD6C7E6), Color(0xFF9ABD9F), Color(0xFFC1A1D0), Color(0xFFC8AA90), Color(0xFFA3B9CA), Color(0xFFD0AEBF)))
 val LocalFinanceColors = staticCompositionLocalOf { LightFinance }
