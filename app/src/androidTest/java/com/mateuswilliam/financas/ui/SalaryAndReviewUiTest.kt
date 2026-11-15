@@ -33,10 +33,8 @@ class SalaryAndReviewUiTest {
                 Category.HOME, ForecastFrequency.ONCE, now))
         }
         rule.openRendlyMonth()
-        rule.waitUntil(10000) { rule.onAllNodesWithTag("month-expenses", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-        rule.waitUntil(10000) { rule.onAllNodes(hasTestTag("month-expenses") and hasText("1.200,00", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithTag("month-expenses", useUnmergedTree = true).assertTextContains("1.200,00", substring = true)
-        rule.onNodeWithTag("month-income", useUnmergedTree = true).assertTextContains("0,00", substring = true)
+        rule.waitUntil(10000) { rule.onAllNodes(hasText(Money.format(120000)) and hasAnyAncestor(hasTestTag("month-expenses")), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNode(hasText(Money.format(0)) and hasAnyAncestor(hasTestTag("month-income")), useUnmergedTree = true).assertExists()
         assertEquals(1, runBlocking { app.repository.exportRecords().size })
         rule.newRendlyRecord(com.mateuswilliam.financas.core.Movement.EXPENSE)
         rule.onNodeWithText("Registrar despesa").assertExists()
