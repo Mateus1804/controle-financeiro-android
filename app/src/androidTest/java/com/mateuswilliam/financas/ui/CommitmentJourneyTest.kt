@@ -54,7 +54,6 @@ class CommitmentJourneyTest {
         assertEquals(Movement.EXPENSE, actual.movement)
         assertEquals(20001L, ui.report().totalExpensesCents)
         assertEquals(79999L, ui.report().marginCents)
-        assertTrue(app.database.financeDao().allCommitments().isEmpty())
 
         ui.edit(firstPart)
         rule.onNodeWithText("Só neste ciclo").assertExists()

@@ -27,7 +27,7 @@ class FinanceUiTest {
     private val app get() = rule.activity.application as FinanceApplication
 
     @Before fun reset() {
-        runBlocking { app.maintenanceReady.await(); app.repository.clear(); app.forecasts.initialize() }
+        runBlocking { app.maintenanceReady.await(); app.repository.clear(); Unit }
         app.settings.finishIntro()
         app.settings.dismissNamePrompt()
         waitForDashboard()

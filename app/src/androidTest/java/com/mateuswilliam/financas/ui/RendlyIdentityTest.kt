@@ -35,7 +35,7 @@ class RendlyIdentityTest {
     @Test fun captureFictionalHomeInBothThemes() = kotlinx.coroutines.runBlocking<Unit> {
         val app = rule.activity.application as FinanceApplication
         app.repository.clear()
-        app.forecasts.initialize()
+        Unit
         app.settings.dismissNamePrompt()
         val date = java.time.LocalDate.now()
         app.forecasts.saveRule(com.mateuswilliam.financas.core.ForecastRule("rendly-income-example", date, "Renda fictícia", com.mateuswilliam.financas.core.ForecastKind.INCOME, 300000,

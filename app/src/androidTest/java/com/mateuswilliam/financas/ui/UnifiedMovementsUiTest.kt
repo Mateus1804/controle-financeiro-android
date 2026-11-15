@@ -47,7 +47,6 @@ class UnifiedMovementsUiTest {
         assertEquals(5000L, if (movement == Movement.INCOME) totals.income else totals.expenses)
         assertEquals(5000L, if (movement == Movement.INCOME) ui.report().incomeCents else ui.report().totalExpensesCents)
         assertTrue(ui.data().overrides.isEmpty())
-        assertTrue(runBlocking { ui.app.repository.recurring.first().isEmpty() })
         rule.activityRule.scenario.recreate()
         assertEquals(listOf(saved), runBlocking { ui.app.repository.exportRecords() })
         assertEquals(1, ui.data().rules.size)

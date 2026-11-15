@@ -29,7 +29,7 @@ internal class ForecastReportTestDriver(
         runBlocking {
             app.maintenanceReady.await()
             app.repository.clear()
-            app.forecasts.initialize()
+            Unit
             app.forecasts.setCycleDay(1, today)
         }
         app.settings.finishIntro()

@@ -28,7 +28,6 @@ class IntegratedFinanceUiTest {
 
     @Test fun projectionsUseForecastIncomeWithoutTurningMonthlyReferenceIntoRevenue() = runBlocking<Unit> {
         val date = LocalDate.now()
-        app.repository.saveMonthlyPlan(MonthlyIncomePlan(YearMonth.from(date), 999999, 3000))
         val salary = ForecastRule("salary", date, "Salário fictício", ForecastKind.INCOME,
             10000, Category.SALARY, ForecastFrequency.MONTHLY, date)
         val rent = ForecastRule("rent", date, "Aluguel fictício", ForecastKind.EXPENSE,
@@ -49,9 +48,9 @@ class IntegratedFinanceUiTest {
         // O resumo mensal apresenta a referência manual; o ciclo usa somente as previsões cadastradas.
         rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("salary-month-summary"))
         rule.waitUntil(10000) {
-            rule.onAllNodes(hasTestTag("salary-remaining") and hasText(Money.format(999999), substring = true)).fetchSemanticsNodes().isNotEmpty()
+            rule.onAllNodes(hasTestTag("salary-remaining") and hasText(Money.format(10000), substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
-        rule.onNodeWithTag("salary-remaining").assertTextContains(Money.format(999999))
+        rule.onNodeWithTag("salary-remaining").assertTextContains(Money.format(10000))
         val lineTag = "forecast-actions:rent:${report.lines.single { it.itemId == rent.itemId }.occurrenceKey}"
         rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(lineTag))
         rule.onNodeWithText("Aluguel fictício").assertExists()
@@ -59,7 +58,6 @@ class IntegratedFinanceUiTest {
         val projection = "projection-margin-${period.start}"
         rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag(projection))
         rule.onNodeWithTag(projection).assertTextContains(Money.format(report.marginCents))
-        assertEquals(999999L, app.database.financeDao().allMonthlyPlans().single().incomeCents)
         assertTrue(app.repository.exportRecords().isEmpty())
     }
 }

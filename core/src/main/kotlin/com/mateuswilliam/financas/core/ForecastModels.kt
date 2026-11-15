@@ -14,7 +14,7 @@ data class ForecastRule(
     val cycleAnchored: Boolean = false, val group: ForecastGroup = ForecastGroup.COMMITMENT,
     val estimated: Boolean = false, val active: Boolean = true,
     val statementKey: String = "", val statementTotal: Boolean = false,
-    val account: String = "", val legacySource: String? = null,
+    val account: String = "",
 )
 data class ForecastOverride(
     val itemId: String, val occurrenceKey: String, val amountCents: Long? = null,

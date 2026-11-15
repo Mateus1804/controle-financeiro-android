@@ -9,13 +9,13 @@ data class ForecastRuleEntity(val itemId:String, val effectiveFrom:String, val t
  val kind:String, val amountCents:Long, val category:Category, val frequency:String,
  val startDate:String, val dayOfMonth:Int, val installmentCount:Int, val cycleAnchored:Boolean,
  val group:String, val estimated:Boolean, val active:Boolean, val statementKey:String,
- val statementTotal:Boolean, val account:String, val legacySource:String?) {
+ val statementTotal:Boolean, val account:String) {
  fun model() = ForecastRule(itemId, LocalDate.parse(effectiveFrom), title, ForecastKind.valueOf(kind), amountCents,
  category, ForecastFrequency.valueOf(frequency), LocalDate.parse(startDate), dayOfMonth, installmentCount,
- cycleAnchored, ForecastGroup.valueOf(group), estimated, active, statementKey, statementTotal, account, legacySource)
+ cycleAnchored, ForecastGroup.valueOf(group), estimated, active, statementKey, statementTotal, account)
  companion object { fun from(r:ForecastRule) = ForecastRuleEntity(r.itemId,r.effectiveFrom.toString(),r.title,r.kind.name,
  r.amountCents,r.category,r.frequency.name,r.startDate.toString(),r.dayOfMonth,r.installmentCount,r.cycleAnchored,
- r.group.name,r.estimated,r.active,r.statementKey,r.statementTotal,r.account,r.legacySource) }
+ r.group.name,r.estimated,r.active,r.statementKey,r.statementTotal,r.account) }
 }
 @Entity(tableName = "forecast_overrides", primaryKeys = ["itemId", "occurrenceKey"])
 data class ForecastOverrideEntity(val itemId:String,val occurrenceKey:String,val amountCents:Long?,val date:String?,

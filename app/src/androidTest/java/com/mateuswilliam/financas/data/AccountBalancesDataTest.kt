@@ -98,36 +98,4 @@ class AccountBalancesDataTest {
         } finally { db.close() }
     }
 
-    @Test fun versionEightMigrationPreservesRecordsAndLeavesOldBalancesUnknown() = runBlocking {
-        val name = "migration-account-balances"
-        context.deleteDatabase(name)
-        val schema = InstrumentationRegistry.getInstrumentation().context.assets
-            .open("com.mateuswilliam.financas.data.FinanceDatabase/8.json").bufferedReader().use { JSONObject(it.readText()).getJSONObject("database") }
-        val path = context.getDatabasePath(name)
-        path.parentFile!!.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(path, null).use { db ->
-            val entities = schema.getJSONArray("entities")
-            for (index in 0 until entities.length()) {
-                val entity = entities.getJSONObject(index)
-                val table = entity.getString("tableName")
-                db.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", table))
-                val indices = entity.optJSONArray("indices")
-                if (indices != null) for (i in 0 until indices.length()) db.execSQL(indices.getJSONObject(i).getString("createSql").replace("\${TABLE_NAME}", table))
-            }
-            val setup = schema.getJSONArray("setupQueries")
-            for (i in 0 until setup.length()) db.execSQL(setup.getString(i))
-            db.execSQL("INSERT INTO accounts VALUES ('a', 'A', 1)")
-            db.execSQL("INSERT INTO records VALUES ('legacy', NULL, 100, 'REFUND', 'PIX', 'FOOD', 'A', 'Legado', 1792800000000, '')")
-            db.version = 8
-        }
-        val db = Room.databaseBuilder(context, FinanceDatabase::class.java, name).addMigrations(FinanceDatabase.MIGRATION_8_9, FinanceDatabase.MIGRATION_9_10).build()
-        try {
-            val dao = db.financeDao()
-            assertFalse(dao.allAccounts().single().archived)
-            assertEquals(Movement.EXPENSE, dao.allRecords().single().reversalMovement)
-            assertNull(dao.allRecords().single().originalRecordId)
-            assertTrue(dao.allAccountBalanceEvents().isEmpty())
-            assertNull(FinanceRepository(db, CapturePreferences(context)).observeAccountBalances().first().single().balanceCents)
-        } finally { db.close(); context.deleteDatabase(name) }
-    }
 }

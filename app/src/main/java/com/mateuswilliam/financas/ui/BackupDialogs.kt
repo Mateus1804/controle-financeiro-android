@@ -63,10 +63,7 @@ fun BackupPreviewDialog(preview: StagedRestore, busy: Boolean, onCancel: () -> U
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             IconBadge(R.drawable.ic_restore)
             Text("Backup de ${shortDate(preview.createdAt)} conferido em uma base temporária.")
-            Text("${preview.records} lançamentos · ${preview.pending} pendências · ${preview.accounts} contas cadastradas\n${preview.budgets} orçamentos · ${preview.recurring} recorrências")
-            if (preview.monthlyPlans + preview.purchases + preview.commitments + preview.fixedRecurring > 0) {
-                Text("${preview.monthlyPlans} configurações mensais de renda · ${preview.purchases} compras parceladas\n${preview.commitments} compromissos · ${preview.fixedRecurring} recorrências fixas")
-            }
+            Text("${preview.records} lançamentos · ${preview.pending} pendências · ${preview.accounts} contas cadastradas · ${preview.forecasts} previsões")
             Text("A restauração substitui os dados financeiros locais. Crie um backup atual antes de continuar. Captura e lembretes ficam pausados; consentimento e permissões do Android não são transferidos.")
             Row(Modifier.fillMaxWidth().toggleable(value = confirmed, enabled = !busy, role = Role.Checkbox, onValueChange = { confirmed = it }), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Checkbox(confirmed, onCheckedChange = null, enabled = !busy)

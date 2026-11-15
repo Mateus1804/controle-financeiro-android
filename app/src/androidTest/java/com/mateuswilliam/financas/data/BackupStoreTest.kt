@@ -34,8 +34,8 @@ class BackupStoreTest {
         val draft = repository.capture(input, simulation = true)!!
         repository.save(record("notificacao"), draft.id)
         repository.capture(input.copy(sourceKey = "fixture:2"), simulation = true)
-        repository.saveBudget(MonthlyBudget("2026-10", Category.FOOD, 10000))
-        repository.saveRecurring(RecurringPlan("previsao", "Aluguel fictício", 60000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME, "Inter pessoal", "2026-10-31", 31))
+        ForecastRepository(database).saveRule(ForecastRule("previsao", java.time.LocalDate.parse("2026-10-01"), "Aluguel fictício", ForecastKind.EXPENSE,
+            60000, Category.HOME, ForecastFrequency.MONTHLY, java.time.LocalDate.parse("2026-10-31")))
         preferences.setAppearance(Appearance.DARK)
         val expected = repository.snapshot()
         val secret = password()
@@ -52,8 +52,7 @@ class BackupStoreTest {
         assertEquals(expected.records.toSet(), restored.records.toSet())
         assertEquals(expected.drafts.toSet(), restored.drafts.toSet())
         assertEquals(expected.accounts.toSet(), restored.accounts.toSet())
-        assertEquals(expected.budgets, restored.budgets)
-        assertEquals(expected.recurring, restored.recurring)
+        assertEquals(expected.forecastRules, restored.forecastRules)
         assertEquals(Appearance.DARK, preferences.snapshot().appearance)
         assertFalse(preferences.snapshot().enabled); assertFalse(preferences.snapshot().remindersEnabled)
         assertTrue(preferences.snapshot().consented); assertTrue(preferences.snapshot().lockEnabled)

@@ -15,12 +15,12 @@ internal object ForecastSnapshots {
         "kind" to r.kind,"amountCents" to r.amountCents,"category" to r.category.name,"frequency" to r.frequency,
         "startDate" to r.startDate,"dayOfMonth" to r.dayOfMonth,"installmentCount" to r.installmentCount,
         "cycleAnchored" to r.cycleAnchored,"group" to r.group,"estimated" to r.estimated,"active" to r.active,
-        "statementKey" to r.statementKey,"statementTotal" to r.statementTotal,"account" to r.account,"legacySource" to r.legacySource)
+        "statementKey" to r.statementKey,"statementTotal" to r.statementTotal,"account" to r.account)
     fun rule(j:JSONObject)=ForecastRuleEntity(j.text("itemId",320),j.text("effectiveFrom",10),j.text("title",256),
         j.text("kind",20),j.long("amountCents"),Category.valueOf(j.text("category",30)),j.text("frequency",20),
         j.text("startDate",10),j.integer("dayOfMonth",1,31),j.integer("installmentCount",1,600),j.bool("cycleAnchored"),
         j.text("group",20),j.bool("estimated"),j.bool("active"),j.text("statementKey",200),j.bool("statementTotal"),
-        j.text("account",80),j.nullableText("legacySource",512))
+        j.text("account",80))
     fun overrideJson(o:ForecastOverrideEntity)=json("itemId" to o.itemId,"occurrenceKey" to o.occurrenceKey,"amountCents" to o.amountCents,
         "date" to o.date,"ignored" to o.ignored,"active" to o.active,"title" to o.title,"category" to o.category?.name)
     fun overrideRow(j:JSONObject)=ForecastOverrideEntity(j.text("itemId",320),j.text("occurrenceKey",40),
@@ -45,8 +45,7 @@ internal object ForecastSnapshots {
         s.forecastOverrides.forEach { o ->
             require(o.itemId in ids && o.occurrenceKey.matches(Regex("once|month:\\d{4}-\\d{2}|installment:[1-9]\\d*|cycle:\\d{4}-\\d{2}-\\d{2}")))
             require(validOccurrenceKey(o.occurrenceKey))
-            require(o.amountCents==null || o.amountCents != 0L && o.amountCents in -Money.MAX_CENTS..Money.MAX_CENTS)
-            require(o.amountCents==null || o.amountCents>=0 || s.forecastRules.any { it.itemId==o.itemId && it.legacySource!=null })
+            require(o.amountCents==null || o.amountCents in 1..Money.MAX_CENTS)
             o.date?.let(LocalDate::parse)
             require(o.title==null || o.title.isNotBlank() && o.title.length<=256 && '\u0000' !in o.title)
         }
@@ -60,6 +59,6 @@ internal object ForecastSnapshots {
             }
         }
         ForecastCalculator.reserveBalance(s.reserveEvents.map { it.model() })
-        s.forecastMeta.forEach { m -> require(when(m.key) { "legacyImported" -> m.value=="1"; "reserveGoal" -> m.value.toLongOrNull()?.let { it in 0..Money.MAX_CENTS }==true; else -> false }) }
+        s.forecastMeta.forEach { m -> require(when(m.key) { "reserveGoal" -> m.value.toLongOrNull()?.let { it in 0..Money.MAX_CENTS }==true; else -> false }) }
     }
 }

@@ -35,7 +35,6 @@ class PurchaseManagementUiTest {
         assertEquals(3, corrected.installmentCount)
         assertEquals(listOf(7000L, 7000L, 7000L), (0L..2L).map { ui.report(month.plusMonths(it)).totalExpensesCents })
         assertEquals(0L, ui.report(month.plusMonths(3)).totalExpensesCents)
-        assertTrue(runBlocking { ui.app.database.financeDao().allPurchases().isEmpty() })
         ui.assertNoRecords()
     }
 

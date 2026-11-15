@@ -68,6 +68,7 @@ fun RecordEditor(
     initialRecurring: Boolean = false,
     realizedOnly: Boolean = false,
     onOpenExpenseForecast: (() -> Unit)? = null,
+    forecastData: ForecastDataset? = null,
     rememberedCategory: Category? = null,
     merchantLabel: String? = null,
 ) {
@@ -96,6 +97,8 @@ fun RecordEditor(
     var accountEdited by rememberSaveable { mutableStateOf(false) }
     var originalRecordId by rememberSaveable { mutableStateOf(initial?.originalRecordId) }
     var reversalMovement by rememberSaveable { mutableStateOf(initial?.reversalMovement ?: Movement.EXPENSE) }
+    var forecastItemId by rememberSaveable { mutableStateOf(initial?.forecastItemId) }
+    var forecastOccurrenceKey by rememberSaveable { mutableStateOf(initial?.forecastOccurrenceKey) }
     var destination by rememberSaveable { mutableStateOf(initial?.destination.orEmpty()) }
     var date by rememberSaveable { mutableStateOf(originalDate.toLocalDate().toString()) }
     var recurringDay by rememberSaveable { mutableIntStateOf(recurring?.dayOfMonth ?: LocalDate.parse(date).dayOfMonth) }
@@ -125,7 +128,8 @@ fun RecordEditor(
         if (purchaseMode) PaymentMethod.CARD else method, category, bank, description,
         LocalDate.parse(date).atTime(originalDate.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
         if (movement == Movement.TRANSFER) destination else "",
-        originalRecordId = if (movement == Movement.REFUND) originalRecordId else null, reversalMovement = reversalMovement)
+        originalRecordId = if (movement == Movement.REFUND) originalRecordId else null, reversalMovement = reversalMovement,
+        forecastItemId = forecastItemId, forecastOccurrenceKey = forecastOccurrenceKey)
     val recurringValue = RecurringPlan(id, description.trim(), cents ?: 0, movement, method, category,
         bank, date, recurringDay, recurring?.active ?: true)
     val error = when {
@@ -250,12 +254,27 @@ fun RecordEditor(
                     }
                 }, modifier = Modifier.fillMaxWidth().testTag(if (recurringMode) "recurring-due-date" else "record-date")) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("${if (recurringMode) if (recurrenceOnlyMonth) "Vencimento deste mês" else "Início / primeiro vencimento" else "Data"}: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
                 FinanceDisclosure("Mais detalhes", "record-payment-details") {
+                    if (forecastData != null && movement in setOf(Movement.EXPENSE, Movement.INCOME)) {
+                        val forecastLines = remember(forecastData, date, movement) {
+                            ForecastCalculator.report(forecastData, CycleCalendar.periodContaining(LocalDate.parse(date), forecastData.cycleRules)).lines
+                                .filter { !it.ignored && it.kind == if (movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE }
+                        }
+                        val selectedLink = forecastItemId?.let { item -> item to forecastOccurrenceKey!! }
+                        val options = (listOf<Pair<String,String>?>(null) + forecastLines.map { it.itemId to it.occurrenceKey } + listOfNotNull(selectedLink)).distinct()
+                        ChoiceField("Relacionar com previsão (opcional)", selectedLink, options, { pair ->
+                            if (pair == null) "Sem vínculo" else forecastLines.firstOrNull { it.itemId == pair.first && it.occurrenceKey == pair.second }
+                                ?.let { "${privateDisplayText(it.title, hideAmounts)} · ${it.date.format(DateTimeFormatter.ofPattern("dd/MM"))}" } ?: "Previsão vinculada"
+                        }) { pair -> forecastItemId = pair?.first; forecastOccurrenceKey = pair?.second }
+                        Text("Relacionar evita somar novamente a mesma previsão nas projeções. O orçamento continua independente de confirmar pagamentos.", style = MaterialTheme.typography.bodySmall)
+                    }
+
                 if (recurring == null && preset == null && !installmentConfirmation) ChoiceField("Movimentação", movement,
                     Movement.entries.toList(), { it.label }) {
                     if (movement != it) {
                         category = if (it == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER
                         categoryEdited = false
                         destination = ""
+                        forecastItemId = null; forecastOccurrenceKey = null
                         originalRecordId = null
                         reversalMovement = Movement.EXPENSE
                     }

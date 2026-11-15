@@ -33,7 +33,7 @@ class ForecastJourneyTest {
     private fun waitRules(count: Int) = rule.waitUntil(10000) { model.dataset.value?.rules?.size == count }
 
     @Before fun reset() {
-        runBlocking { app.repository.clear(); app.forecasts.initialize(); app.forecasts.setCycleDay(5, today) }
+        runBlocking { app.repository.clear(); app.forecasts.setCycleDay(5, today) }
         app.settings.finishIntro(); app.settings.dismissNamePrompt(); model.refresh()
         rule.waitUntil(10000) { model.dataset.value?.let { it.rules.isEmpty() && it.cycleRules.lastOrNull()?.day == 5 } == true }
         rule.waitForIdle()
@@ -76,7 +76,6 @@ class ForecastJourneyTest {
         val next = CycleCalendar.periodContaining(period().endExclusive, current().cycleRules)
         assertEquals(300000L, ForecastCalculator.report(current(), next).incomeCents)
         assertTrue(runBlocking { app.repository.exportRecords().isEmpty() })
-        assertTrue(runBlocking { app.database.financeDao().allMonthlyPlans().isEmpty() })
         rule.onNodeWithText("Registrar recebimento").assertDoesNotExist()
         rule.onNodeWithText("Marcar como pago").assertDoesNotExist()
     }

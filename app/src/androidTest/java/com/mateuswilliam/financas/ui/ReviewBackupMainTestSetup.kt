@@ -15,7 +15,7 @@ internal fun AndroidComposeTestRule<ActivityScenarioRule<MainActivity>, MainActi
     runBlocking {
         app.maintenanceReady.await()
         app.repository.clear()
-        app.forecasts.initialize()
+        Unit
     }
     app.settings.finishIntro()
     app.settings.dismissNamePrompt()

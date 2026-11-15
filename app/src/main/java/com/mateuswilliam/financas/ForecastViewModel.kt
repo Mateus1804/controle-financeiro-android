@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mateuswilliam.financas.core.*
-import com.mateuswilliam.financas.data.MonthlyPlanEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,31 +19,19 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
     val busy = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
     val loadError = MutableStateFlow<String?>(null)
-    val legacyIncome = MutableStateFlow<List<MonthlyPlanEntity>>(emptyList())
     private var observing: Job? = null
     init { observe() }
     private fun observe() {
         observing = viewModelScope.launch {
             try {
                 app.maintenanceReady.await()
-                repository.initialize()
-                legacyIncome.value = app.database.financeDao().allMonthlyPlans()
                 repository.dataset.collect { dataset.value = it; loadError.value = null }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { loadError.value = "Não foi possível abrir o planejamento. Seus dados foram preservados. Tente novamente." }
         }
     }
 
-    fun monthlyPlan(month: YearMonth) = app.database.financeDao().observeMonthlyPlan(month.toString())
-
-    fun refresh() = viewModelScope.launch {
-        if (observing?.isActive != true) { observe(); return@launch }
-        try {
-            repository.initialize()
-            legacyIncome.value = app.database.financeDao().allMonthlyPlans()
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { message.value = "Não foi possível atualizar o planejamento. Tente novamente." }
-    }
+    fun refresh() { if (observing?.isActive != true) observe() }
     fun saveRule(rule: ForecastRule, onSaved: () -> Unit) = action {
         repository.saveRule(rule)
         onSaved()

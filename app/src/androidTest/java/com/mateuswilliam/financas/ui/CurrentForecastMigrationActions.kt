@@ -25,7 +25,7 @@ internal class CurrentForecastUi(
     private var selectedMonth = month
 
     fun reset() {
-        runBlocking { app.repository.clear(); app.forecasts.initialize() }
+        runBlocking { app.repository.clear(); Unit }
         app.settings.finishIntro()
         app.settings.dismissNamePrompt()
         model.refresh()

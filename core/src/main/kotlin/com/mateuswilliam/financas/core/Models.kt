@@ -47,10 +47,15 @@ data class Record(
     val destination: String = "",
     val originalRecordId: String? = null,
     val reversalMovement: Movement = Movement.EXPENSE,
+    val forecastItemId: String? = null, val forecastOccurrenceKey: String? = null,
 )
 
 object RecordValidation {
     fun error(record: Record): String? = when {
+        (record.forecastItemId == null) != (record.forecastOccurrenceKey == null) -> "Vínculo de previsão incompleto."
+        record.forecastItemId != null && (record.movement !in setOf(Movement.INCOME, Movement.EXPENSE) ||
+            record.forecastItemId.isBlank() || record.forecastItemId.length > 200 || '\u0000' in record.forecastItemId ||
+            record.forecastOccurrenceKey!!.isBlank() || record.forecastOccurrenceKey.length > 40 || '\u0000' in record.forecastOccurrenceKey) -> "Vínculo de previsão inválido."
         record.originalRecordId != null && (record.movement != Movement.REFUND || record.originalRecordId.isBlank() ||
             record.originalRecordId.length > 128 || '\u0000' in record.originalRecordId || record.originalRecordId == record.id) -> "Vínculo de estorno inválido."
         record.movement == Movement.REFUND && record.reversalMovement !in setOf(Movement.EXPENSE, Movement.INCOME) -> "Escolha a natureza do estorno."

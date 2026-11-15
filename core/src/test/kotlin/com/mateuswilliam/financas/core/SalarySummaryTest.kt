@@ -14,17 +14,16 @@ class SalarySummaryTest {
     private fun record(id: String, cents: Long, movement: Movement, category: Category) =
         Record(id, cents, movement, PaymentMethod.PIX, category, "Carteira", id, at)
 
-    private fun forecast(id: String, cents: Long, category: Category, source: String? = null) =
+    private fun forecast(id: String, cents: Long, category: Category) =
         ForecastRule(id, day, id, if (category == Category.SALARY) ForecastKind.INCOME else ForecastKind.EXPENSE,
-            cents, category, ForecastFrequency.ONCE, day, legacySource = source)
+            cents, category, ForecastFrequency.ONCE, day)
 
     @Test fun salaryAndRemainingExpensesUseDifferentSources() {
-        val records = listOf(record("gasto", 120000, Movement.EXPENSE, Category.FOOD),
+        val records = listOf(record("gasto", 120000, Movement.EXPENSE, Category.FOOD).copy(forecastItemId = "vinculado", forecastOccurrenceKey = "once"),
             record("pix", 900000, Movement.INCOME, Category.OTHER_INCOME))
         val data = ForecastDataset(rules = listOf(forecast("salario", 300000, Category.SALARY),
-            forecast("conta", 60000, Category.HOME), forecast("importado", 120000, Category.FOOD, "record:gasto"),
-            forecast("vinculado", 120000, Category.FOOD)),
-            recordLinks = mapOf(("vinculado" to "once") to setOf("gasto")))
+            forecast("conta", 60000, Category.HOME),
+            forecast("vinculado", 120000, Category.FOOD)))
         val summary = SalarySummaries.month(records, data, month, zone, at)
         assertEquals(300000L, summary.salaryCents)
         assertEquals("40.00", summary.usedPercentage.toString())

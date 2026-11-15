@@ -49,7 +49,7 @@ internal fun ForecastEditor(
     var onlyOccurrence by rememberSaveable { mutableStateOf(initialOnlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var invalidMoney by rememberSaveable { mutableStateOf(false) }
-    val signedRefund = (source?.amountCents ?: 0) < 0
+    val signedRefund = false
     val scoped = onlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE
     val occurrenceAmount = rememberTextFieldState(initialText = (line?.amountCents ?: source?.amountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val ruleAmount = rememberTextFieldState(initialText = source?.amountCents?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
@@ -61,7 +61,7 @@ internal fun ForecastEditor(
         if (source != null && line != null) source.startDate else start, day,
         count.toIntOrNull() ?: 1, undated && frequency == ForecastFrequency.MONTHLY,
         group, estimated, source?.active ?: true, if (kind == ForecastKind.EXPENSE) statement.trim() else "",
-        kind == ForecastKind.EXPENSE && statementTotal, account.trim(), source?.legacySource)
+        kind == ForecastKind.EXPENSE && statementTotal, account.trim())
     val error = when {
         cents == null || cents <= 0 -> "Informe um valor maior que zero."
         title.isBlank() -> "Informe uma descrição."
@@ -86,7 +86,6 @@ internal fun ForecastEditor(
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição da previsão para edição") {
                 OutlinedTextField(title, { title = it.take(200) }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
             }
-            if (signedRefund) Text("Estorno importado: o ajuste mantém sua natureza e seu sinal negativo.", style = MaterialTheme.typography.bodySmall)
             if (!scoped && !signedRefund) ChoiceField("Tipo", kind, ForecastKind.entries, { if (it == ForecastKind.INCOME) "Receita" else "Despesa" }) {
                 if (!busy) { kind = it; category = if (it == ForecastKind.INCOME) Category.SALARY else Category.OTHER }
             }
