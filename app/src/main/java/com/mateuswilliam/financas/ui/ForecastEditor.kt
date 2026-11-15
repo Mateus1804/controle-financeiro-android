@@ -29,7 +29,7 @@ internal fun ForecastEditor(
     initialKind: ForecastKind = ForecastKind.EXPENSE, initialTitle: String = "",
     initialCategory: Category? = null, initialFrequency: ForecastFrequency = ForecastFrequency.MONTHLY,
     knownStatements: List<String> = emptyList(),
-    existingOverride: ForecastOverride? = null,
+    existingOverride: ForecastOverride? = null, initialOnlyOccurrence: Boolean = true,
 ) {
     val source = rule ?: line?.rule
     val id = rememberSaveable { source?.itemId ?: UUID.randomUUID().toString() }
@@ -46,7 +46,7 @@ internal fun ForecastEditor(
     var account by rememberSaveable { mutableStateOf(source?.account.orEmpty()) }
     var statement by rememberSaveable { mutableStateOf(source?.statementKey.orEmpty()) }
     var statementTotal by rememberSaveable { mutableStateOf(source?.statementTotal ?: false) }
-    var onlyOccurrence by rememberSaveable { mutableStateOf(line != null && source?.frequency != ForecastFrequency.ONCE) }
+    var onlyOccurrence by rememberSaveable { mutableStateOf(initialOnlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var invalidMoney by rememberSaveable { mutableStateOf(false) }
     val signedRefund = (source?.amountCents ?: 0) < 0
@@ -78,8 +78,11 @@ internal fun ForecastEditor(
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Planeje o que espera receber ou gastar. Nenhum pagamento ou recebimento será registrado.")
             if (line != null && source?.frequency != ForecastFrequency.ONCE) {
-                ChoiceField("Aplicar alteração", onlyOccurrence, listOf(true, false), { if (it) "Só neste ciclo" else "Deste ciclo em diante" }) { if (!busy) onlyOccurrence = it }
+                ChoiceField("Aplicar alteração", onlyOccurrence, listOf(true, false), { if (it) "Alterar só este mês" else "Aplicar deste mês em diante" }) { if (!busy) onlyOccurrence = it }
             }
+            if (line != null && source?.frequency != ForecastFrequency.ONCE) Text(
+                if (scoped) "Só esta ocorrência será alterada; os outros meses serão preservados."
+                else "Esta ocorrência e as futuras serão alteradas; o histórico anterior será preservado.", style = MaterialTheme.typography.bodySmall)
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição da previsão para edição") {
                 OutlinedTextField(title, { title = it.take(200) }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
             }
