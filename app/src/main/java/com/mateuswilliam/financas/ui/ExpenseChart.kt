@@ -44,9 +44,9 @@ fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGro
     val chartAlpha by androidx.compose.animation.core.animateFloatAsState(if (report.total > 0L) 1f else 0f, label = "Entrada do gráfico")
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionTitle("Mapa de gastos", "Despesas confirmadas antes dos estornos")
+            SectionTitle("Mapa de gastos", "Gastos registrados antes dos estornos")
             ChoiceField("Agrupar por", dimension, ExpenseDimension.entries.toList(), { it.label }) { dimension = it }
-            if (report.total == 0L) Text("Nenhuma despesa confirmada neste período.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (report.total == 0L) Text("Nenhum gasto registrado neste período.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             else {
                 val summary = if (hidden) "Mapa de gastos oculto. Valores e percentuais não são lidos em voz alta."
                 else "Despesas brutas ${Money.format(report.total)}. " + visible.take(3).joinToString(". ") {
