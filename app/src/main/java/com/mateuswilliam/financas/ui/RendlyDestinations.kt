@@ -15,20 +15,9 @@ import java.time.YearMonth
 internal fun MoreScreen(onOpen: (Int) -> Unit) {
     LazyColumn(Modifier.fillMaxSize().testTag("more-list"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { SectionTitle("Mais", "Planejamento e preferências") }
-        listOf(9 to "Salário", 7 to "Planejador", 8 to "Reserva de emergência", 10 to "Comprometimento", 6 to "Ajustes").forEach { (destination, label) ->
+        listOf(7 to "Planejador", 8 to "Reserva de emergência", 10 to "Comprometimento", 6 to "Ajustes").forEach { (destination, label) ->
             item { OutlinedButton({ onOpen(destination) }, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("more-$destination")) { Text(label) } }
         }
-    }
-}
-
-@Composable
-internal fun SalaryScreen(month: YearMonth, onMonth: (YearMonth) -> Unit, summary: SalarySummary, payday: PaydayBudget?,
-    accounts: List<AccountBalance>, hidden: Boolean, onEditSalary: () -> Unit, onAccounts: () -> Unit, onNewSalary: () -> Unit) {
-    LazyColumn(Modifier.testTag("salary-screen"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { MonthPicker(month, onMonth) }
-        item { MonthlyResultCard(summary, hidden, onEditSalary) }
-        item { PaydayBudgetCard(payday, accounts.any { !it.archived && it.balanceCents != null }, hidden,
-            partialBalance = accounts.any { !it.archived && it.balanceCents == null }, onAccounts = onAccounts, onSalary = onNewSalary) }
     }
 }
 

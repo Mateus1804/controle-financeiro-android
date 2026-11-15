@@ -45,13 +45,6 @@ class IntegratedFinanceUiTest {
         assertEquals(5000L, report.marginCents)
         assertEquals(setOf(salary.itemId, rent.itemId), data.rules.map { it.itemId }.toSet())
         assertTrue(app.repository.exportRecords().isEmpty())
-        // O resumo mensal apresenta a referência manual; o ciclo usa somente as previsões cadastradas.
-        rule.openRendlySalary()
-        rule.onNodeWithTag("salary-screen").performScrollToNode(hasTestTag("salary-month-summary"))
-        rule.waitUntil(10000) {
-            rule.onAllNodes(hasTestTag("salary-remaining") and hasText(Money.format(10000), substring = true)).fetchSemanticsNodes().isNotEmpty()
-        }
-        rule.onNodeWithTag("salary-remaining").assertTextContains(Money.format(10000))
         val lineTag = "forecast-actions:rent:${report.lines.single { it.itemId == rent.itemId }.occurrenceKey}"
         rule.openRendlyPlanner()
         rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(lineTag))
@@ -72,7 +65,7 @@ class MainAccountsUiTest {
 
     @Test fun explicitZeroBalancePersistsWithoutRevenueAndStatementActionSelectsTheAccount() {
         rule.openRendlySalary()
-        rule.onNodeWithTag("salary-screen").performScrollToNode(hasTestTag("payday-accounts"))
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("payday-accounts"))
         rule.onNodeWithTag("payday-accounts").performClick()
         rule.onNodeWithTag("new-account-balance").performClick()
         rule.onNodeWithTag("balance-account-name").performTextInput("Carteira pessoal")

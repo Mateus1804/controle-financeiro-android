@@ -31,25 +31,6 @@ class VisualRefinementUiTest {
         check()
     }
 
-    @Test fun salaryExceededKeepsRealPercentageAbove100() = both({
-        MonthlyResultCard(SalarySummary(100000, false, 125000, null), hidden = false) {}
-    }) {
-        rule.onNodeWithText("Gastos acima do salário").assertExists()
-        rule.onNodeWithText("Salário utilizado: 125,00%").assertExists()
-    }
-
-    @Test fun salaryHiddenRevealsNoValuesOrPercentages() = both({
-        MonthlyResultCard(SalarySummary(100000, false, 40000, 10000), hidden = true) {}
-    }) {
-        rule.onNodeWithText("Salário utilizado: ••••").assertExists()
-        rule.onAllNodesWithText("40,00%", substring = true).assertCountEquals(0)
-        rule.onAllNodesWithText("R$", substring = true).assertCountEquals(0)
-    }
-
-    @Test fun missingSalaryOffersRegistration() = both({
-        MonthlyResultCard(SalarySummary(null, false, 40000, null), hidden = false) {}
-    }) { rule.onNodeWithText("Informar salário líquido").assertHasClickAction() }
-
     @Test fun emptyMonthShowsMessageAndNoLegend() = both({
         ExpenseChart(emptyList(), month, hidden = false) {}
     }) { rule.onNodeWithText("Nenhum gasto registrado neste período.").assertExists() }

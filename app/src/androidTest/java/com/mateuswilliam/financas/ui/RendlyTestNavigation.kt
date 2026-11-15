@@ -21,7 +21,7 @@ internal fun ComposeContentTestRule.openRendlyMoreDestination(tag: String, desti
     waitUntil(10000) { onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
 }
 internal fun ComposeContentTestRule.openRendlyPlanner() = openRendlyMoreDestination("forecast-dashboard",7)
-internal fun ComposeContentTestRule.openRendlySalary() = openRendlyMoreDestination("salary-screen",9)
+internal fun ComposeContentTestRule.openRendlySalary() = openRendlyPlanner()
 internal fun ComposeContentTestRule.openRendlySettings() = openRendlyMoreDestination("settings-list",6)
 internal fun ComposeContentTestRule.openRendlyCommitment() = openRendlyMoreDestination("commitment-screen",10)
 internal fun ComposeContentTestRule.openRendlyReserve() = openRendlyMoreDestination("forecast-reserve",8)

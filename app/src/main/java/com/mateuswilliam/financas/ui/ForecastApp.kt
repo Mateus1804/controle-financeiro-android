@@ -72,11 +72,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val asOf = remember(resumeCount, financeState.records) { System.currentTimeMillis() }
     val realized = remember(financeState.records, asOf) { financeState.records.filter { it.occurredAt <= asOf } }
     val duplicateIndex = remember(financeState.manualRecords) { DuplicateCandidates(financeState.manualRecords) }
-    val salarySummary = remember(financeState.records, data, month, zone, asOf) {
-        runCatching { SalarySummaries.month(financeState.records, data, month, zone, asOf) }.getOrElse {
-            SalarySummaries.month(financeState.records, null, month, zone, asOf)
-        }
-    }
+    val accountTotal = remember(financeState.accountBalances) { AccountTotal.of(financeState.accountBalances) }
     val monthComparison = remember(realized, month, zone) { MonthComparisons.compare(realized, month, LocalDate.now(), zone) }
     val knownBalances = remember(financeState.accountBalances) { financeState.accountBalances.filter { !it.archived && it.balanceCents != null } }
     val paydayBudget = remember(data, financeState.records, knownBalances, asOf) {
@@ -208,7 +204,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         navigation.recordCategory, { navigation.recordCategory = it; navigation.expenseDimension = null },
                         financeState.accountBalances.map { it.account }, navigation.accountFilterKey, { navigation.accountFilterKey = it },
                         { openActual(recordId = it.id) }, navigation.expenseDimension?.let { ExpenseFilter(it, navigation.expenseKey, navigation.expenseLabel) },
-                        { navigation.expenseDimension = null })
+                        { navigation.expenseDimension = null }, accountTotal) { editors.accountsOpen = true }
                     navigation.tab == 1 -> GraphsScreen(realized, month, { navigation.monthText = it.toString() }, monthComparison, hidden,
                         onFilter = { navigation.accountFilterKey = null; navigation.recordCategory = null; navigation.expenseDimension = it.dimension; navigation.expenseKey = it.key; navigation.expenseLabel = it.label; navigation.tab = 0 },
                         onCategory = { navigation.accountFilterKey = null; navigation.expenseDimension = null; navigation.recordCategory = it; navigation.tab = 0 })
@@ -237,16 +233,13 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onSimulate = { editors.simulationEditor = true }, onDiscard = { editors.simulation = null },
                         onAdopt = { editors.simulation?.let { value -> model.saveRule(value) { editors.simulation = null } } }, onOpen = { select(it.start); navigation.tab = 7 },
                         represented = represented)
-                    navigation.tab == 9 -> SalaryScreen(month, { navigation.monthText = it.toString() }, salarySummary, paydayBudget,
-                        financeState.accountBalances, hidden, {
-                            val salary = snapshot.let { MonthlyForecasts.lines(it, month).firstOrNull { line -> line.kind == ForecastKind.INCOME && line.category == Category.SALARY } }
-                            if (salary != null) edit(salary) else newItem(ForecastKind.INCOME, "Salário")
-                        }, { editors.accountsOpen = true }, { newItem(ForecastKind.INCOME, "Salário") })
                     navigation.tab == 10 -> CommitmentScreen(report, hidden)
                     navigation.tab == 2 -> FixedForecastScreen(snapshot, month, { navigation.monthText = it.toString() }, hidden, busy, { edit(it) }, { edit(it, false) }, model::ignore, model::stop,
                         { newItem(ForecastKind.EXPENSE) }, { editors.templates = true })
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
+                        item { PaydayBudgetCard(paydayBudget, accountTotal.hasBalance, hidden, partialBalance = accountTotal.partial,
+                            onAccounts = { editors.accountsOpen = true }, onSalary = { newItem(ForecastKind.INCOME, "Salário") }) }
                         item { ForecastCyclePicker(period, { select(period.start.minusDays(1)) }, { select(period.endExclusive) }, { navigation.followingCurrent = true; navigation.browsing = today.toString() }, { editors.cycleEditor = true }) }
                         item { Text(if (closed) "Ciclo encerrado · valores estimados" else "Planejamento do ciclo · valores estimados", style = MaterialTheme.typography.labelMedium) }
                         item { TextButton({ navigation.tab = 11 }, Modifier.fillMaxWidth()) { Text("Projetar próximos ciclos") } }

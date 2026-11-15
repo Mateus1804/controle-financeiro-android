@@ -22,7 +22,8 @@ import java.time.format.DateTimeFormatter
 internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth: (YearMonth) -> Unit,
     hidden: Boolean, category: Category?, onCategory: (Category?) -> Unit, accounts: List<AccountOption>,
     accountKey: String?, onAccount: (String?) -> Unit, onEdit: (Record) -> Unit,
-    expenseFilter: ExpenseFilter? = null, onClearExpenseFilter: () -> Unit = {}) {
+    expenseFilter: ExpenseFilter? = null, onClearExpenseFilter: () -> Unit = {},
+    accountTotal: AccountTotal? = null, onAccounts: () -> Unit = {}) {
     val zone = ZoneId.systemDefault()
     val selected = remember(records, month, category, accountKey, expenseFilter, zone) {
         Ledger.month(records.filter { record ->
@@ -37,6 +38,7 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
     LazyColumn(Modifier.fillMaxSize().padding(bottom = 80.dp).testTag("records-list"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { MonthPicker(month, onMonth) }
+        accountTotal?.let { total -> item { AccountTotalCard(total, hidden, onAccounts) } }
         item {
             Column(Modifier.testTag("month-totals"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (category != null || accountKey != null || expenseFilter != null) Text("Totais dos lançamentos filtrados", style = MaterialTheme.typography.labelMedium)
@@ -80,5 +82,21 @@ private fun MonthFigure(label: String, cents: Long, hidden: Boolean, tag: String
     Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.testTag(tag)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         Amount(cents, hidden, size = 22, maxLines = 1)
+    }
+}
+
+@Composable
+private fun AccountTotalCard(total: AccountTotal, hidden: Boolean, onAccounts: () -> Unit) {
+    Surface(Modifier.fillMaxWidth().testTag("account-total"), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer,
+        onClick = onAccounts) {
+        Column(Modifier.padding(FinanceSpacing.card).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Conta total", style = MaterialTheme.typography.titleSmall)
+            if (total.hasBalance) Amount(total.cents, hidden, Modifier.testTag("account-total-amount"), size = 32)
+            Text(when {
+                !total.hasBalance -> "Informe o saldo de uma conta para ver o total dos seus bancos."
+                total.partial -> "Saldo parcial: faltam contas sem saldo informado. Toque para ajustar."
+                else -> "Soma de todas as contas. Toque para ajustar os saldos."
+            }, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
