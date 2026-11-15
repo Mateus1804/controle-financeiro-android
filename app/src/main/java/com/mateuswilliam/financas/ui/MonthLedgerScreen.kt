@@ -44,10 +44,12 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
                     MonthFigure("Receitas", selected.income, hidden, "month-income")
                     MonthFigure("Despesas", selected.expenses, hidden, "month-expenses")
                     MonthFigure("Saldo do mês", selected.result, hidden, "month-net")
-                } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.weight(1f)) { MonthFigure("Receitas", selected.income, hidden, "month-income") }
-                    Box(Modifier.weight(1f)) { MonthFigure("Despesas", selected.expenses, hidden, "month-expenses") }
-                    Box(Modifier.weight(1f)) { MonthFigure("Saldo do mês", selected.result, hidden, "month-net") }
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Box(Modifier.weight(1f)) { MonthFigure("Receitas", selected.income, hidden, "month-income") }
+                        Box(Modifier.weight(1f)) { MonthFigure("Despesas", selected.expenses, hidden, "month-expenses") }
+                    }
+                    MonthFigure("Saldo do mês", selected.result, hidden, "month-net")
                 }
                 Text("Receitas menos despesas registradas. Transferências próprias não mudam o resultado.", style = MaterialTheme.typography.bodySmall)
             }
@@ -77,6 +79,6 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
 private fun MonthFigure(label: String, cents: Long, hidden: Boolean, tag: String) {
     Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.testTag(tag)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
-        Amount(cents, hidden, size = 22)
+        Amount(cents, hidden, size = 22, maxLines = 1)
     }
 }

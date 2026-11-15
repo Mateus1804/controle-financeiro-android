@@ -23,6 +23,15 @@ class MonthLedgerScreenTest {
         rule.onNodeWithText("05/11/2026").assertIsDisplayed()
         rule.onAllNodesWithTag("payday-budget").assertCountEquals(0)
     }
+    @Test fun monthlyFiguresKeepLargeAmountsOnOneLine() {
+        val income = 1234567890L
+        val expense = 321000L
+        rule.setContent { FinanceTheme { MonthLedgerScreen(listOf(record("Renda", income, Movement.INCOME), record("Gasto", expense, Movement.EXPENSE)),
+            month, {}, false, null, {}, emptyList(), null, {}, {}) } }
+        rule.onNodeWithText(Money.format(income), useUnmergedTree = true).assertStartAlignedTextFits("Receita mensal", singleLine = true)
+        rule.onNodeWithText(Money.format(expense), useUnmergedTree = true).assertStartAlignedTextFits("Despesa mensal", singleLine = true)
+        rule.onNodeWithText(Money.format(income - expense), useUnmergedTree = true).assertStartAlignedTextFits("Saldo mensal", singleLine = true)
+    }
     @Test fun hiddenFiguresDoNotExposeAmounts() {
         rule.setContent { FinanceTheme { MonthLedgerScreen(listOf(record("Salário", 100000, Movement.INCOME)), month, {}, true, null, {}, emptyList(), null, {}, {}) } }
         rule.onNodeWithTag("month-net").assertTextContains("••••", substring = true)
