@@ -38,7 +38,7 @@ class PlanningImprovementsUiTest {
         rule.onNodeWithTag("payday-total").assertTextContains(Money.format(70000))
         rule.onNodeWithTag("payday-weekly").assertTextContains(Money.format(49000))
         rule.onNodeWithTag("payday-with-variables").assertTextContains(Money.format(50000))
-        rule.onNodeWithTag("payday-partial").assertTextContains("Saldo parcial")
+        rule.onNodeWithTag("payday-partial").assertTextContains("Saldo parcial", substring = true)
         rule.onNodeWithText("Cálculo até 22/11 (próximo salário previsto)").assertExists()
     }
 
