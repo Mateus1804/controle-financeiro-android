@@ -170,10 +170,16 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val backupImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { editors.restoreUri = uri.toString(); editors.backupDialog = 2 }
     }
+    fun editorScope() = if (navigation.tab == 2) BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1)) else period
+    fun rememberScope() { val chosen = editorScope(); editors.scopeStart = chosen.start.toString(); editors.scopeEnd = chosen.endExclusive.toString() }
     fun newItem(kind: ForecastKind, title: String? = null) {
+        rememberScope(); editors.initialFrequency = if (navigation.tab == 2 || title != null) ForecastFrequency.MONTHLY else ForecastFrequency.ONCE
         editors.editItem = null; editors.editKey = null; editors.legacyMonth = null; editors.template = title; editors.initialKind = kind; editors.editor = true
     }
-    fun edit(line: ForecastLine) { editors.editItem = line.itemId; editors.editKey = line.occurrenceKey; editors.legacyMonth = null; editors.template = null; editors.editor = true }
+    fun edit(line: ForecastLine, onlyOccurrence: Boolean = true) {
+        rememberScope(); editors.onlyOccurrence = onlyOccurrence
+        editors.editItem = line.itemId; editors.editKey = line.occurrenceKey; editors.legacyMonth = null; editors.template = null; editors.editor = true
+    }
     fun showReserve(kind: ReserveEventKind, allocation: Boolean = false) { editors.allocating = allocation; editors.reserveKind = kind }
     fun select(date: LocalDate) { navigation.followingCurrent = false; navigation.browsing = date.toString() }
     fun parentTab() = when (navigation.tab) { 5 -> 6; 6, 7, 8, 9, 10 -> 3; 11 -> 7; else -> 0 }
@@ -243,7 +249,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     navigation.tab == 9 -> SalaryScreen(month, { navigation.monthText = it.toString() }, salarySummary, paydayBudget,
                         oldState.accountBalances, hidden, { editors.salaryEditor = true }, { editors.accountsOpen = true }, { newItem(ForecastKind.INCOME, "Salário") })
                     navigation.tab == 10 -> CommitmentScreen(report, hidden)
-                    navigation.tab == 2 -> FixedForecastScreen(snapshot, month, { navigation.monthText = it.toString() }, hidden, busy, ::edit, model::ignore, model::stop,
+                    navigation.tab == 2 -> FixedForecastScreen(snapshot, month, { navigation.monthText = it.toString() }, hidden, busy, { edit(it) }, { edit(it, false) }, model::ignore, model::stop,
                         { newItem(ForecastKind.EXPENSE) }, { editors.templates = true })
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
                         item { SectionTitle("Planejamento", "As previsões ficam fora do extrato e dos gastos realizados.") }
@@ -270,7 +276,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             }
                             Text("O vencimento organiza as datas; seu orçamento não depende de confirmar pagamentos.", style = MaterialTheme.typography.bodySmall)
                         }
-                        forecastLineItems(report.lines, hidden, busy, ::edit, model::ignore, model::stop)
+                        forecastLineItems(report.lines, hidden, busy, { edit(it) }, model::ignore, model::stop, { edit(it, false) })
                         item { FinanceDisclosure("Histórico e dados anteriores", "forecast-legacy-data") {
                             Text("As fontes antigas foram preservadas. Recorrências, parcelas e registros vinculados foram aproveitados uma única vez. Rendas de referência antigas precisam de revisão antes de virar previsão.", style = MaterialTheme.typography.bodySmall)
                             TextButton({ navigation.tab = 11 }) { Text("Revisar rendas de referência antigas") }
@@ -344,7 +350,9 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     if (editors.appPicker) AppPickerDialog(apps, loadingApps, settings.packages, { editors.appPicker = false }) {
         finance.preferences.selectPackages(it); editors.appPicker = false
     }
-    val selectedLine = report?.lines?.firstOrNull { it.itemId == editors.editItem && it.occurrenceKey == editors.editKey }
+    val editingPeriod = if (editors.scopeStart != null && editors.scopeEnd != null) BudgetPeriod(LocalDate.parse(editors.scopeStart), LocalDate.parse(editors.scopeEnd)) else period
+    val editorReport = remember(snapshot, editingPeriod) { snapshot?.let { ForecastCalculator.report(it, editingPeriod) } }
+    val selectedLine = editorReport?.lines?.firstOrNull { it.itemId == editors.editItem && it.occurrenceKey == editors.editKey }
     if (editors.dueDates && report != null) AlertDialog(onDismissRequest = { editors.dueDates = false },
         title = { Text("Próximos vencimentos") }, text = {
             LazyColumn(Modifier.heightIn(max = 400.dp)) {
@@ -362,10 +370,10 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val oldIncome = legacyIncome.firstOrNull { it.month == editors.legacyMonth }
     val referenceRule = oldIncome?.let { ForecastRule("monthly-reference:${it.month}", period.start, "Renda anterior · revisar", ForecastKind.INCOME,
         it.incomeCents, Category.OTHER_INCOME, ForecastFrequency.ONCE, period.start, legacySource = "monthly-reference:${it.month}") }
-    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.template, editors.legacyMonth, editors.initialKind) {
-        ForecastEditor(rule = selectedLine?.rule ?: selectedRule ?: referenceRule, line = selectedLine, period = period, busy = busy, hidden = hidden,
+    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.template, editors.legacyMonth, editors.initialKind, editors.onlyOccurrence, editors.scopeStart) {
+        ForecastEditor(rule = selectedLine?.rule ?: selectedRule ?: referenceRule, line = selectedLine, period = editingPeriod, busy = busy, hidden = hidden,
             onDismiss = { editors.editor = false }, onSaveRule = { model.saveRule(it) { editors.editor = false } }, onSaveOverride = { model.saveOverride(it) { editors.editor = false } },
-            initialKind = editors.initialKind, initialFrequency = if (editors.initialKind == ForecastKind.EXPENSE && editors.template == null) ForecastFrequency.ONCE else ForecastFrequency.MONTHLY, initialTitle = editors.template.orEmpty(), initialCategory = fixedExpenseTemplates.firstOrNull { it.title == editors.template }?.category,
+            initialKind = editors.initialKind, initialFrequency = editors.initialFrequency, initialOnlyOccurrence = editors.onlyOccurrence, initialTitle = editors.template.orEmpty(), initialCategory = fixedExpenseTemplates.firstOrNull { it.title == editors.template }?.category,
             knownStatements = snapshot.rules.map { it.statementKey }.filter { it.isNotBlank() }.distinct(),
             existingOverride = snapshot.overrides.firstOrNull { it.itemId == selectedLine?.itemId && it.occurrenceKey == selectedLine?.occurrenceKey })
     }

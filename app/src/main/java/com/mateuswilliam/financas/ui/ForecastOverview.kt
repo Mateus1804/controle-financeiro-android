@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -37,7 +38,7 @@ internal fun ForecastCyclePicker(period: BudgetPeriod, onPrevious: () -> Unit, o
 }
 
 internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: Boolean, busy: Boolean,
-    onEdit: (ForecastLine) -> Unit, onIgnore: (ForecastLine) -> Unit, onStop: (ForecastLine) -> Unit) {
+    onEdit: (ForecastLine) -> Unit, onIgnore: (ForecastLine) -> Unit, onStop: (ForecastLine) -> Unit, onEditFuture: ((ForecastLine) -> Unit)? = null) {
     items(lines, key = { "${it.itemId}:${it.occurrenceKey}" }) { line ->
         val group = when {
             line.kind == ForecastKind.INCOME -> "Renda"
@@ -49,9 +50,8 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
             !line.included -> "Já incluído na fatura"
             else -> null
         }
-        Card(onClick = { onEdit(line) }, enabled = !busy,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Surface(modifier = Modifier.fillMaxWidth().clickable(enabled = !busy, onClickLabel = "Editar previsão") { onEdit(line) },
+            color = MaterialTheme.colorScheme.surfaceContainerLow) {
         ListItem(colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.testTag("forecast-line:${line.itemId}:${line.occurrenceKey}"),
             headlineContent = { Text(privateDisplayText(line.title, hidden), style = MaterialTheme.typography.titleMedium) },
             supportingContent = {
@@ -65,8 +65,10 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
                     Amount(line.amountCents, hidden, size = 14)
                     ContextualActions(privateDisplayText(line.title, hidden), "forecast-actions:${line.itemId}:${line.occurrenceKey}", !busy,
                         buildList {
-                            add(FinanceAction("Editar", { onEdit(line) }))
-                            add(FinanceAction(if (line.ignored) "Restaurar somente ocorrência" else "Ignorar somente ocorrência", { onIgnore(line) }))
+                            add(FinanceAction(if (line.frequency == ForecastFrequency.ONCE) "Editar" else "Alterar só este mês", { onEdit(line) }))
+                            if (line.frequency != ForecastFrequency.ONCE && onEditFuture != null)
+                                add(FinanceAction("Aplicar deste mês em diante", { onEditFuture(line) }))
+                            add(FinanceAction(if (line.ignored) "Restaurar este mês" else "Pular este mês", { onIgnore(line) }))
                             if (line.frequency != ForecastFrequency.ONCE)
                                 add(FinanceAction("Interromper futuras", { onStop(line) }, destructive = true))
                         })
