@@ -1,7 +1,7 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
 <group android:scaleX="0.56" android:scaleY="0.56" android:translateX="24" android:translateY="23">
-<path android:name="curva" android:fillColor="#0F6B63" android:pathData="M30 20 Q30 17 33 17 H57 C80 17 91 31 91 46 C91 57 85 65 78 69 L94 89 Q96 92 92 92 H78 Q76 92 75 90 L66 71 V59 C71 57 76 52 76 46 C76 38 70 32 60 32 H33 Q30 32 30 29 Z"/>
-<path android:name="barra1" android:fillColor="#94DBCC" android:pathData="M17 69 Q17 65 21 65 H27 Q31 65 31 69 V88 Q31 92 27 92 H21 Q17 92 17 88 Z"/>
-<path android:name="barra2" android:fillColor="#66BFB0" android:pathData="M33 58 Q33 54 37 54 H43 Q47 54 47 58 V88 Q47 92 43 92 H37 Q33 92 33 88 Z"/>
-<path android:name="barra3" android:fillColor="#31998D" android:pathData="M49 47 Q49 43 53 43 H59 Q63 43 63 47 V88 Q63 92 59 92 H53 Q49 92 49 88 Z"/>
+<path android:name="curva" android:fillColor="#765C88" android:pathData="M30 20 Q30 17 33 17 H57 C80 17 91 31 91 46 C91 57 85 65 78 69 L94 89 Q96 92 92 92 H78 Q76 92 75 90 L66 71 V59 C71 57 76 52 76 46 C76 38 70 32 60 32 H33 Q30 32 30 29 Z"/>
+<path android:name="barra1" android:fillColor="#E0D5EB" android:pathData="M17 69 Q17 65 21 65 H27 Q31 65 31 69 V88 Q31 92 27 92 H21 Q17 92 17 88 Z"/>
+<path android:name="barra2" android:fillColor="#C9B6D8" android:pathData="M33 58 Q33 54 37 54 H43 Q47 54 47 58 V88 Q47 92 43 92 H37 Q33 92 33 88 Z"/>
+<path android:name="barra3" android:fillColor="#A28BB3" android:pathData="M49 47 Q49 43 53 43 H59 Q63 43 63 47 V88 Q63 92 59 92 H53 Q49 92 49 88 Z"/>
 </group></vector>
