@@ -47,7 +47,7 @@ internal class ForecastReportTestDriver(
     fun waitRules(count: Int) = waitData { it.rules.size == count }
     fun scroll(tag: String) {
         if (tag.startsWith("salary-") || tag.startsWith("payday-")) {
-            rule.openRendlySalary(); rule.onNodeWithTag("salary-screen").performScrollToNode(hasTestTag(tag))
+            rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
         } else { rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag)) }
     }
     fun clickTag(tag: String, dashboard: Boolean = false) {

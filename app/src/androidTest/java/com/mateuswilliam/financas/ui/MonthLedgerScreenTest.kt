@@ -23,6 +23,21 @@ class MonthLedgerScreenTest {
         rule.onNodeWithText("05/11/2026").assertIsDisplayed()
         rule.onAllNodesWithTag("payday-budget").assertCountEquals(0)
     }
+    @Test fun accountTotalSumsAllBanksAndDoesNotChangeWithTransfers() {
+        fun account(name: String, cents: Long?) = AccountBalance(AccountOption(AccountNames.key(name), name, 0L), false, cents, null)
+        val total = AccountTotal.of(listOf(account("Banco A", 150000), account("Banco B", 50000)))
+        rule.setContent { FinanceTheme { MonthLedgerScreen(listOf(record("Entre contas", 50000, Movement.TRANSFER)), month, {}, false, null, {}, emptyList(), null, {}, {},
+            accountTotal = total) } }
+        rule.onNodeWithTag("account-total-amount", useUnmergedTree = true).assertTextContains(Money.format(200000), substring = true)
+        rule.onNodeWithTag("month-net").assertTextContains(Money.format(0), substring = true)
+    }
+    @Test fun accountTotalIsMarkedPartialAndHidesValue() {
+        fun account(name: String, cents: Long?) = AccountBalance(AccountOption(AccountNames.key(name), name, 0L), false, cents, null)
+        val total = AccountTotal.of(listOf(account("Banco A", 150000), account("Nova", null)))
+        rule.setContent { FinanceTheme { MonthLedgerScreen(emptyList(), month, {}, true, null, {}, emptyList(), null, {}, {}, accountTotal = total) } }
+        rule.onNodeWithText("Saldo parcial", substring = true, useUnmergedTree = true).assertExists()
+        rule.onAllNodesWithText("R$", substring = true, useUnmergedTree = true).assertCountEquals(0)
+    }
     @Test fun monthlyFiguresKeepLargeAmountsOnOneLine() {
         val income = 1234567890L
         val expense = 321000L

@@ -21,7 +21,7 @@ internal fun ComposeContentTestRule.openRendlyMoreDestination(tag: String, desti
     waitUntil(10000) { onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
 }
 internal fun ComposeContentTestRule.openRendlyPlanner() = openRendlyMoreDestination("forecast-dashboard",7)
-internal fun ComposeContentTestRule.openRendlySalary() = openRendlyMoreDestination("salary-screen",9)
+internal fun ComposeContentTestRule.openRendlySalary() = openRendlyPlanner()
 internal fun ComposeContentTestRule.openRendlySettings() = openRendlyMoreDestination("settings-list",6)
 internal fun ComposeContentTestRule.openRendlyCommitment() = openRendlyMoreDestination("commitment-screen",10)
 internal fun ComposeContentTestRule.openRendlyReserve() = openRendlyMoreDestination("forecast-reserve",8)
@@ -35,7 +35,8 @@ internal fun ComposeContentTestRule.openRendlyGraphs() { clickRendlyTab("Gráfic
 internal fun ComposeContentTestRule.openRendlyProjections() {
     openRendlyPlanner()
     onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Projetar próximos ciclos"))
-    onNodeWithText("Projetar próximos ciclos").performClick()
+    onNodeWithText("Projetar próximos ciclos").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+    waitUntil(10000) { onAllNodesWithTag("forecast-projections").fetchSemanticsNodes().isNotEmpty() }
 }
 internal fun ComposeContentTestRule.newRendlyRecord(kind: Movement = Movement.EXPENSE) {
     openRendlyMonth()
