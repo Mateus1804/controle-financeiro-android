@@ -87,8 +87,8 @@ private fun MonthFigure(label: String, cents: Long, hidden: Boolean, tag: String
 
 @Composable
 private fun AccountTotalCard(total: AccountTotal, hidden: Boolean, onAccounts: () -> Unit) {
-    Surface(Modifier.fillMaxWidth().testTag("account-total"), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer,
-        onClick = onAccounts) {
+    Surface(onClick = onAccounts, modifier = Modifier.fillMaxWidth().testTag("account-total"), shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.primaryContainer) {
         Column(Modifier.padding(FinanceSpacing.card).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Conta total", style = MaterialTheme.typography.titleSmall)
             if (total.hasBalance) Amount(total.cents, hidden, Modifier.testTag("account-total-amount"), size = 32)
