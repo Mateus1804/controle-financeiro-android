@@ -52,6 +52,7 @@ internal class ForecastReportTestDriver(
     }
     fun clickTag(tag: String, dashboard: Boolean = false) {
         if (tag == "dashboard-notification-review") { rule.openRendlyReview(); return }
+        if (tag == "open-accounts") { rule.openRendlySettings(); rule.onNodeWithTag("settings-accounts").performClick(); return }
         if (tag == "forecast-settings") { rule.openRendlySettings(); return }
         if (tag == "add-realized-expense" || tag == "add-realized-income") {
             rule.newRendlyRecord(if (tag.endsWith("income")) Movement.INCOME else Movement.EXPENSE); return

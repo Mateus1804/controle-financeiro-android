@@ -55,6 +55,7 @@ internal class CurrentForecastUi(
         if (tag == "add-realized-income" || tag == "add-realized-expense") {
             rule.newRendlyRecord(if (tag.endsWith("income")) Movement.INCOME else Movement.EXPENSE); return
         }
+        if (tag == "open-accounts") { rule.openRendlySettings(); rule.onNodeWithTag("settings-accounts").performClick(); return }
         if (tag == "forecast-settings") { rule.openRendlySettings(); return }
         if (tag == "dashboard-notification-review") { rule.openRendlyReview(); return }
         val target = hasTestTag(tag)
