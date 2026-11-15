@@ -112,7 +112,7 @@ internal fun ForecastEditor(
             }
             if (!scoped) ForecastToggle("Valor estimado", estimated, !busy) { estimated = it }
             if (!undated || frequency != ForecastFrequency.MONTHLY) {
-                OutlinedButton(onClick = { showFinanceDatePicker(context, datePickerTheme, LocalDate.parse(date)) { date = it.toString(); day = it.dayOfMonth } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(commitmentDateFormat)}") }
+                OutlinedButton(onClick = { showFinanceDatePicker(context, datePickerTheme, LocalDate.parse(date)) { date = it.toString(); day = it.dayOfMonth } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(financeDateFormat)}") }
                 if (!scoped && frequency != ForecastFrequency.ONCE) ChoiceField("Dia habitual", day, (1..31).toList(), { "Dia $it" }) { if (!busy) day = it }
             }
             if (!scoped) FinanceDisclosure("Mais detalhes", "forecast-details") {

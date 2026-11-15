@@ -62,7 +62,7 @@ class UnifiedMovementsUiTest {
         ui.waitData { it.overrides.singleOrNull()?.amountCents == 7500L }
         assertEquals(7500L, ui.report().totalExpensesCents)
         assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
-        ui.action(ui.report().lines.single(), "Ignorar somente ocorrência")
+        ui.action(ui.report().lines.single(), "Pular este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == true }
         assertEquals(0L, ui.report().totalExpensesCents)
         assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
@@ -126,7 +126,7 @@ class UnifiedMovementsUiTest {
         val actual = Record("realized", 2500, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
             "Carteira", "Despesa realizada", System.currentTimeMillis())
         seedActual(actual)
-        ui.clickText("Projeções")
+        rule.openRendlyProjections()
         rule.onNodeWithTag("forecast-projections").assertExists()
         rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag("projection-margin-${month.atDay(1)}"))
         rule.onNodeWithTag("projection-margin-${month.atDay(1)}").assertTextContains(Money.format(-5000))
@@ -143,8 +143,7 @@ class UnifiedMovementsUiTest {
     }
 
     private fun openStatement() {
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Ver extrato do mês"))
-        ui.clickText("Ver extrato do mês")
+        rule.openRendlyMonth()
         rule.onNodeWithTag("records-list").assertExists()
     }
 }

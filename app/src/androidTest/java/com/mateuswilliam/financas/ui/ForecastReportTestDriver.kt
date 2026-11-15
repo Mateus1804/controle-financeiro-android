@@ -36,9 +36,7 @@ internal class ForecastReportTestDriver(
         app.settings.dismissNamePrompt()
         model.refresh()
         waitData { it.rules.isEmpty() && it.cycleRules.lastOrNull()?.day == 1 }
-        rule.waitUntil(10000) {
-            rule.onAllNodes(hasTestTag("add-realized-expense") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
-        }
+        rule.openRendlyPlanner()
         rule.waitForIdle()
     }
 
@@ -47,9 +45,18 @@ internal class ForecastReportTestDriver(
         rule.waitForIdle()
     }
     fun waitRules(count: Int) = waitData { it.rules.size == count }
-    fun scroll(tag: String) = rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
+    fun scroll(tag: String) {
+        if (tag.startsWith("salary-") || tag.startsWith("payday-")) {
+            rule.openRendlySalary(); rule.onNodeWithTag("salary-screen").performScrollToNode(hasTestTag(tag))
+        } else { rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag)) }
+    }
     fun clickTag(tag: String, dashboard: Boolean = false) {
-        if (dashboard) scroll(tag)
+        if (tag == "dashboard-notification-review") { rule.openRendlyReview(); return }
+        if (tag == "forecast-settings") { rule.openRendlySettings(); return }
+        if (tag == "add-realized-expense" || tag == "add-realized-income") {
+            rule.newRendlyRecord(if (tag.endsWith("income")) Movement.INCOME else Movement.EXPENSE); return
+        }
+        if (dashboard) { rule.openRendlyPlanner(); scroll(tag) }
         rule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
     }
     fun clickText(text: String) {
@@ -63,8 +70,8 @@ internal class ForecastReportTestDriver(
         clickTag("forecast-save")
     }
     fun openActions(line: ForecastLine) = clickTag("forecast-actions:${line.itemId}:${line.occurrenceKey}", dashboard = true)
-    fun edit(line: ForecastLine) { openActions(line); clickText("Editar") }
-    fun openProjections() = clickText("Projeções")
+    fun edit(line: ForecastLine) { openActions(line); clickText(if (line.frequency == ForecastFrequency.ONCE) "Editar" else "Alterar só este mês") }
+    fun openProjections() = rule.openRendlyProjections()
     fun assertProjection(period: BudgetPeriod, percentage: String?, marginCents: Long) {
         val text = "Gastos totais: ${percentage?.let { "$it% da renda" } ?: "renda não informada"}"
         rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag("projection-margin-${period.start}"))

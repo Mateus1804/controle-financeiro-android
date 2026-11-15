@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import java.time.LocalDate
 
+internal val financeDateFormat: java.time.format.DateTimeFormatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
 @Composable
 internal fun CycleDayEditor(
     currentDay: Int, busy: Boolean = false, preview: (Int) -> BudgetPeriod,
@@ -24,7 +26,7 @@ internal fun CycleDayEditor(
         title = { DialogSystemBars(); Text("Início do ciclo") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ChoiceField("Dia de início", day, (1..31).toList(), { "Dia $it" }) { if (!busy) day = it }
-            Text("${if (firstConfiguration) "Ciclo inicial" else "Próximo ciclo"}: ${next.start.format(commitmentDateFormat)} a ${next.endExclusive.minusDays(1).format(commitmentDateFormat)}")
+            Text("${if (firstConfiguration) "Ciclo inicial" else "Próximo ciclo"}: ${next.start.format(financeDateFormat)} a ${next.endExclusive.minusDays(1).format(financeDateFormat)}")
             Text(if (firstConfiguration) "Esta configuração define o ciclo atual. Nos meses mais curtos, o dia é ajustado ao último dia do mês."
                 else "A mudança vale na próxima fronteira. Os ciclos anteriores são preservados. Nos meses mais curtos, o dia é ajustado ao último dia do mês.", style = MaterialTheme.typography.bodySmall)
         } },

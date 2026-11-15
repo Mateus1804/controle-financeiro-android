@@ -58,6 +58,9 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
             }, onChange = onAccount)
             if (category != null || accountKey != null || expenseFilter != null) TextButton({ onCategory(null); onAccount(null); onClearExpenseFilter() }) { Text("Limpar filtros") }
         } }
+        if (accountKey != null) item { InputChip(selected = true, onClick = { onAccount(null) },
+            label = { Text("Conta: ${privateDisplayText(accounts.firstOrNull { it.key == accountKey }?.label ?: "Conta arquivada", hidden)} · Limpar filtro") }) }
+        if (category != null) item { InputChip(selected = true, onClick = { onCategory(null) }, label = { Text("${category.label} · Limpar filtro") }) }
         if (expenseFilter != null) item { InputChip(selected = true, onClick = onClearExpenseFilter,
             label = { Text("${privateDisplayText(expenseFilter.label, hidden)} · Limpar filtro") }) }
         if (groups.isEmpty()) item { Text("Nenhum lançamento neste mês. Use + para acrescentar.") }

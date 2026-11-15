@@ -33,6 +33,7 @@ class CompactUiInteractionTest {
         rule.waitUntil(10000) {
             model.dataset.value?.let { it.rules.isEmpty() && it.cycleRules.lastOrNull()?.day == 5 } == true
         }
+        rule.openRendlyPlanner()
         rule.waitForIdle()
     }
 
@@ -49,11 +50,11 @@ class CompactUiInteractionTest {
         rule.onNodeWithTag(trigger).assertContentDescriptionEquals("Mais ações de Compra compacta")
             .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
         clickTag(trigger)
-        rule.onNodeWithText("Ignorar somente ocorrência").assertIsDisplayed()
+        rule.onNodeWithText("Pular este mês").assertIsDisplayed()
         rule.onNodeWithText("Interromper futuras").assertIsDisplayed()
         clickText("Editar")
         rule.onNodeWithText("Editar previsão").assertIsDisplayed()
-        rule.onNodeWithText("Só neste ciclo").assertExists()
+        rule.onNodeWithText("Alterar só este mês").assertExists()
         clickText("Cancelar")
         assertEquals(before, current())
         assertEquals(10000L, ForecastCalculator.report(current(), cycle).totalExpensesCents)

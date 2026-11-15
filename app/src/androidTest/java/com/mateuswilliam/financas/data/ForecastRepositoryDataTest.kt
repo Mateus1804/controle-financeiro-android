@@ -41,6 +41,20 @@ class ForecastRepositoryDataTest {
             assertEquals(0L,summary.pendingExpensesCents)
         } finally { settings.reset(); db.close() }
     }
+    @Test fun linkedForecastCannotChangeItsNatureAndBackupRemainsValid() = runBlocking {
+        val db=Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val repo=FinanceRepository(db,CapturePreferences(context)); val forecasts=ForecastRepository(db)
+            val day=LocalDate.parse("2026-11-01")
+            val rule=ForecastRule("conta",day,"Conta",ForecastKind.EXPENSE,10000,Category.OTHER,ForecastFrequency.MONTHLY,day)
+            forecasts.saveRule(rule)
+            repo.save(Record("gasto",10000,Movement.EXPENSE,PaymentMethod.PIX,Category.OTHER,"Carteira","Conta",1,
+                forecastItemId="conta",forecastOccurrenceKey="month:2026-11"),null)
+            assertTrue(runCatching { forecasts.saveRule(rule.copy(kind=ForecastKind.INCOME,category=Category.OTHER_INCOME)) }.isFailure)
+            assertEquals(ForecastKind.EXPENSE,forecasts.dataset.first().rules.single().kind)
+            BackupSnapshot.validate(repo.snapshot())
+        } finally { db.close() }
+    }
     @Test fun oldPayloadIsRejectedBeforeReplacingLocalData() = runBlocking {
         val db=Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
         try {

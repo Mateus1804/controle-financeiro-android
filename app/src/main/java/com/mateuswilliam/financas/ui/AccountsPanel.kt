@@ -25,7 +25,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.absoluteValue
 
 @Composable
-internal fun AccountsOverview(balances: List<AccountBalance>, hidden: Boolean, onOpen: () -> Unit) {
+internal fun AccountsOverview(balances: List<AccountBalance>, hidden: Boolean, onOpen: (() -> Unit)? = null) {
     val known = balances.filter { it.balanceCents != null }
     val unknownCount = balances.size - known.size
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
@@ -33,7 +33,7 @@ internal fun AccountsOverview(balances: List<AccountBalance>, hidden: Boolean, o
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (unknownCount > 0 && known.isNotEmpty()) "Saldo disponível conhecido (parcial)" else "Saldo disponível nas contas",
                     Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                TextButton(onClick = onOpen, modifier = Modifier.testTag("open-accounts")) { Text("Contas") }
+                if (onOpen != null) TextButton(onClick = onOpen, modifier = Modifier.testTag("open-accounts")) { Text("Contas") }
             }
             if (known.isNotEmpty()) Amount(known.sumOf { it.balanceCents ?: 0 }, hidden, Modifier.testTag("accounts-total"), size = 26)
             else Text("Configure os saldos para saber quanto possui.", style = MaterialTheme.typography.bodyMedium)
@@ -53,6 +53,7 @@ internal fun AccountsManager(balances: List<AccountBalance>, references: List<Ac
     ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         DialogSystemBars()
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            AccountsOverview(balances, hidden)
             Text("Minhas contas", style = MaterialTheme.typography.headlineSmall)
             Text("Cadastre suas contas próprias e carteira. Limite de cartão não é saldo disponível.", style = MaterialTheme.typography.bodySmall)
             Button(onClick = { editingKey = "" }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("new-account-balance")) {
@@ -161,16 +162,3 @@ internal val fixedExpenseTemplates = listOf(
     FixedExpenseTemplate("Água", Category.HOME), FixedExpenseTemplate("Internet", Category.SERVICES),
     FixedExpenseTemplate("Celular ou telefone", Category.SERVICES),
 )
-
-@Composable
-internal fun OptionalSetup(onAccounts: () -> Unit, onTemplate: (FixedExpenseTemplate) -> Unit) {
-    FinanceDisclosure("Configuração inicial (opcional)", "optional-finance-setup") {
-        Text("Configure suas contas e escolha os gastos fixos que utiliza. Você preencherá os valores antes de salvar.", style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = onAccounts, modifier = Modifier.fillMaxWidth()) { Text("Configurar minhas contas") }
-        fixedExpenseTemplates.forEach { template ->
-            TextButton(onClick = { onTemplate(template) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("fixed-template-${template.title}")) {
-                Text(template.title)
-            }
-        }
-    }
-}

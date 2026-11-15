@@ -46,15 +46,17 @@ class IntegratedFinanceUiTest {
         assertEquals(setOf(salary.itemId, rent.itemId), data.rules.map { it.itemId }.toSet())
         assertTrue(app.repository.exportRecords().isEmpty())
         // O resumo mensal apresenta a referência manual; o ciclo usa somente as previsões cadastradas.
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("salary-month-summary"))
+        rule.openRendlySalary()
+        rule.onNodeWithTag("salary-screen").performScrollToNode(hasTestTag("salary-month-summary"))
         rule.waitUntil(10000) {
             rule.onAllNodes(hasTestTag("salary-remaining") and hasText(Money.format(10000), substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
         rule.onNodeWithTag("salary-remaining").assertTextContains(Money.format(10000))
         val lineTag = "forecast-actions:rent:${report.lines.single { it.itemId == rent.itemId }.occurrenceKey}"
+        rule.openRendlyPlanner()
         rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(lineTag))
         rule.onNodeWithText("Aluguel fictício").assertExists()
-        rule.onNode(hasText("Projeções") and hasClickAction()).performClick()
+        rule.openRendlyProjections()
         val projection = "projection-margin-${period.start}"
         rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag(projection))
         rule.onNodeWithTag(projection).assertTextContains(Money.format(report.marginCents))
@@ -69,7 +71,8 @@ class MainAccountsUiTest {
     @Before fun reset() = rule.resetReviewBackupMain()
 
     @Test fun explicitZeroBalancePersistsWithoutRevenueAndStatementActionSelectsTheAccount() {
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("payday-accounts"))
+        rule.openRendlySalary()
+        rule.onNodeWithTag("salary-screen").performScrollToNode(hasTestTag("payday-accounts"))
         rule.onNodeWithTag("payday-accounts").performClick()
         rule.onNodeWithTag("new-account-balance").performClick()
         rule.onNodeWithTag("balance-account-name").performTextInput("Carteira pessoal")
@@ -96,9 +99,9 @@ class MainAccountsUiTest {
         assertEquals(0L, balance.reference!!.balanceCents)
         assertEquals("Saldo inicial", balance.reference!!.reason)
         runBlocking { app.repository.setAccountArchived(balance.account.key, true) }
-        rule.onNode(hasText("Orçamento") and hasClickAction()).performClick()
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("open-accounts"))
-        rule.onNodeWithTag("open-accounts").performClick()
+        rule.openRendlyMonth()
+        rule.openRendlySettings()
+        rule.onNodeWithTag("settings-accounts").performClick()
         rule.waitUntil(10000) { rule.onAllNodesWithText("Carteira pessoal · Arquivada").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Carteira pessoal · Arquivada").performClick()
         rule.onNodeWithTag("records-list").performScrollToNode(hasText("Conta: Carteira pessoal · Limpar filtro"))

@@ -42,7 +42,7 @@ class BackupDocumentFlowTest {
         val oldFlags = info.flags
         automation.serviceInfo = info.apply { flags = flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS }
         try {
-            rule.onNodeWithTag("forecast-settings").performClick()
+            rule.openRendlySettings()
             rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Criar backup criptografado"))
             rule.onNodeWithText("Criar backup criptografado").performClick()
             rule.onNodeWithText("Senha do backup").performTextInput(secret)

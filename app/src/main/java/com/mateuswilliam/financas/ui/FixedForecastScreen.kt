@@ -14,7 +14,7 @@ import java.time.YearMonth
 @Composable
 internal fun FixedForecastScreen(data: ForecastDataset, month: YearMonth, onMonth: (YearMonth) -> Unit, hidden: Boolean, busy: Boolean,
     onEdit: (ForecastLine) -> Unit, onEditFuture: (ForecastLine) -> Unit, onIgnore: (ForecastLine) -> Unit, onStop: (ForecastLine) -> Unit, onNew: () -> Unit, onTemplates: () -> Unit) {
-    val lines = remember(data, month) { ForecastCalculator.report(data, BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1))).lines
+    val lines = remember(data, month) { MonthlyForecasts.lines(data, month)
         .filter { it.kind == ForecastKind.EXPENSE && it.frequency != ForecastFrequency.ONCE } }
     LazyColumn(Modifier.testTag("fixed-screen"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle("Fixas e parcelas", "Previsões mensais. Não é necessário confirmar pagamentos.") }

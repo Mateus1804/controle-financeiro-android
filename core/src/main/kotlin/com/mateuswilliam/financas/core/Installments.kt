@@ -56,7 +56,8 @@ object Installments {
                 val amount = baseCents + if (number.toLong() <= extraCents) 1L else 0L
                 val installment = Installment(number, date, amount)
                 if (number < installmentCount) {
-                    date = LocalDate.parse(Recurrences.followingDate(date.toString(), dayOfMonth))
+                    val nextMonth = YearMonth.from(date).plusMonths(1)
+                    date = nextMonth.atDay(minOf(dayOfMonth, nextMonth.lengthOfMonth()))
                 }
                 installment
             }

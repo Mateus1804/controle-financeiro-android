@@ -22,7 +22,7 @@ class MonthlyRecurringUiTest {
 
     @Test fun editingThisCycleSurvivesRecreationAndKeepsTheFollowingMonth() {
         ui.open(ui.report().lines.single())
-        rule.onNodeWithText("Só neste ciclo").assertExists()
+        rule.onNodeWithText("Alterar só este mês").assertExists()
         rule.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("7500")
         rule.onNodeWithTag("forecast-title").performScrollTo().performTextReplacement("Conta ajustada só neste mês")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
@@ -50,7 +50,7 @@ class MonthlyRecurringUiTest {
         val tag = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
         ui.scroll(tag); ui.clickTag(tag)
         rule.onNodeWithText("Editar").assertExists()
-        rule.onNodeWithText("Ignorar somente ocorrência").assertExists()
+        rule.onNodeWithText("Pular este mês").assertExists()
         rule.onNodeWithText("Registrar pagamento").assertDoesNotExist()
         rule.onNodeWithText("Confirmar pagamento").assertDoesNotExist()
         assertEquals(5000L, ui.report().totalExpensesCents)
@@ -59,7 +59,7 @@ class MonthlyRecurringUiTest {
     }
 
     @Test fun anIgnoredCycleOffersRestoreAndKeepsTheFollowingMonth() {
-        ui.action(ui.report().lines.single(), "Ignorar somente ocorrência")
+        ui.action(ui.report().lines.single(), "Pular este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == true }
         assertEquals(0L, ui.report().totalExpensesCents)
         assertEquals(5000L, ui.report(month.plusMonths(1)).totalExpensesCents)
@@ -67,9 +67,9 @@ class MonthlyRecurringUiTest {
         assertTrue(ignored.ignored)
         val tag = "forecast-actions:${ignored.itemId}:${ignored.occurrenceKey}"
         ui.scroll(tag); ui.clickTag(tag)
-        rule.onNodeWithText("Restaurar somente ocorrência").assertExists()
+        rule.onNodeWithText("Restaurar este mês").assertExists()
         rule.onNodeWithText("Pular este mês").assertDoesNotExist()
-        ui.clickText("Restaurar somente ocorrência")
+        ui.clickText("Restaurar este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == false }
         assertEquals(5000L, ui.report().totalExpensesCents)
         ui.assertNoRecords()
@@ -95,7 +95,7 @@ class MonthlyRecurringUiTest {
         runBlocking { ui.app.forecasts.saveOverride(ForecastOverride(plan.itemId, "month:$month", 6250)) }
         ui.waitData { it.overrides.singleOrNull()?.amountCents == 6250L }
         ui.open(ui.report().lines.single())
-        ui.clickText("Só neste ciclo"); ui.clickText("Deste ciclo em diante")
+        ui.clickText("Alterar só este mês"); ui.clickText("Aplicar deste mês em diante")
         val amount = rule.onNodeWithTag("forecast-amount").performScrollTo().fetchSemanticsNode()
             .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text
         assertEquals(5000L, MoneyInput.normalize(amount)?.toLongOrNull())

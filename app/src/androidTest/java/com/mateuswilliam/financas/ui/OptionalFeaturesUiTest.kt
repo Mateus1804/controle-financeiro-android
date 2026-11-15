@@ -38,11 +38,14 @@ class OptionalFeaturesUiTest {
     private fun draft(id: String, source: String = id) = DraftEntity(id, source, "fixture.local", "Inter pessoal",
         "EXEMPLO FICTÍCIO · $id", "Compra aprovada no cartão de R$ 42,90. Mercado Exemplo.", 4290,
         Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Dados fictícios para revisão.", System.currentTimeMillis(), System.currentTimeMillis() - 60_000)
-    private fun scrollForecast(matcher: SemanticsMatcher) = rule.onNodeWithTag("forecast-dashboard").performScrollToNode(matcher)
+    private fun scrollForecast(matcher: SemanticsMatcher) {
+        rule.openRendlyPlanner()
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(matcher)
+    }
     private fun openReview(id: String) {
         val model = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
         rule.waitUntil(10000) { model.state.value.pending.any { it.id == id } }
-        rule.onNodeWithTag("dashboard-notification-review").performClick()
+        rule.openRendlyReview()
         rule.waitUntil(5000) { rule.onAllNodesWithTag("pending-list").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("pending-list").performScrollToNode(hasTestTag("review-$id"))
         rule.onNodeWithTag("review-$id").performClick()
@@ -65,7 +68,7 @@ class OptionalFeaturesUiTest {
         assertTrue(app.repository.exportRecords().isEmpty())
         rule.dismissFeedback("Previsão salva")
         rule.activityRule.scenario.recreate()
-        rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("records-list").fetchSemanticsNodes().isNotEmpty() }
         val data = app.forecasts.dataset.first()
         val period = CycleCalendar.periodContaining(LocalDate.now(), data.cycleRules)
         val line = ForecastCalculator.report(data, period).lines.single { it.itemId == saved.itemId }
@@ -88,7 +91,7 @@ class OptionalFeaturesUiTest {
         app.forecasts.saveRule(planned)
         rule.waitForIdle()
         assertTrue(app.repository.exportRecords().isEmpty())
-        rule.onNodeWithTag("add-realized-expense").performClick()
+        rule.newRendlyRecord(com.mateuswilliam.financas.core.Movement.EXPENSE)
         rule.onNodeWithTag("amount-input").performTextInput("60000")
         rule.onNodeWithText("Descrição").performScrollTo().performTextInput("Aluguel realizado fictício")
         rule.onNodeWithText("Descrição").performScrollTo().performImeAction()
@@ -100,7 +103,7 @@ class OptionalFeaturesUiTest {
         assertEquals(LocalDate.now(), Instant.ofEpochMilli(record.occurredAt).atZone(ZoneId.systemDefault()).toLocalDate())
         assertEquals(planned, app.forecasts.dataset.first().rules.single())
         rule.activityRule.scenario.recreate()
-        rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("records-list").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(listOf(record), app.repository.exportRecords())
         assertEquals(planned, app.forecasts.dataset.first().rules.single())
         rule.onNodeWithText("Confirmar pagamento").assertDoesNotExist()
@@ -203,7 +206,7 @@ class OptionalFeaturesUiTest {
         val initial = Record("password-cancellation", 12345, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
             "Conta fictícia", "Registro preservado após cancelar", System.currentTimeMillis())
         app.repository.save(initial, null)
-        rule.onNodeWithTag("forecast-settings").performClick()
+        rule.openRendlySettings()
         rule.onNodeWithTag("settings-list").performScrollToNode(hasText("Criar backup criptografado"))
         rule.onNodeWithText("Criar backup criptografado").performClick()
         rule.onNodeWithText("Senha do backup").performTextInput("curta")
@@ -227,7 +230,7 @@ class OptionalFeaturesUiTest {
             rule.runOnIdle { app.settings.setSecureScreen(true) }
             rule.waitForIdle()
             if (android.os.Build.VERSION.SDK_INT >= 29) {
-                rule.onNodeWithTag("add-realized-expense").performClick()
+                rule.newRendlyRecord(com.mateuswilliam.financas.core.Movement.EXPENSE)
                 rule.onNodeWithTag("record-date").performScrollTo().performClick()
                 rule.waitUntil(5000) { android.view.inspector.WindowInspector.getGlobalWindowViews().size >= 3 }
                 rule.runOnIdle {
@@ -261,7 +264,7 @@ class OptionalFeaturesUiTest {
             checkpoint("Ajustando fonte ampliada")
             command("settings put system font_scale 1.5")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.4f }
-            rule.onNodeWithText("Orçamento", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+            rule.onNodeWithText("Mês", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 assertTrue(action(layouts)); assertFalse(layouts.single().hasVisualOverflow)
                 repeat(layouts.single().lineCount) { assertFalse(layouts.single().isLineEllipsized(it)) }

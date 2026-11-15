@@ -24,7 +24,7 @@ class MerchantCategoriesUiTest {
             Category.FOOD, "Conta fictícia", "Histórico preservado", System.currentTimeMillis())
         app.repository.save(previous, null)
         app.merchantCategories.remember("mercado ficticio", Category.FOOD)
-        rule.onNodeWithTag("forecast-settings").performClick()
+        rule.openRendlySettings()
         rule.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("merchant-categories-settings"))
         rule.onNodeWithTag("merchant-categories-settings").performClick()
         rule.onNodeWithTag("merchant-actions-mercado ficticio").performClick()

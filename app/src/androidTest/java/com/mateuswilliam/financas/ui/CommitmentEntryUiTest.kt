@@ -91,7 +91,7 @@ class CommitmentEntryUiTest {
         val cycle = ui.period()
         val next = CycleCalendar.periodContaining(cycle.endExclusive, ui.current().cycleRules)
         ui.edit(ui.report().lines.single())
-        rule.onNodeWithText("Só neste ciclo").assertExists()
+        rule.onNodeWithText("Alterar só este mês").assertExists()
         ui.type("forecast-amount", "325019")
         ui.saveForecast()
         ui.waitData { it.overrides.singleOrNull()?.amountCents == 325019L }
@@ -111,13 +111,13 @@ class CommitmentEntryUiTest {
         val cycle = ui.period()
         val next = CycleCalendar.periodContaining(cycle.endExclusive, ui.current().cycleRules)
         ui.openActions(ui.report().lines.single { it.itemId == "rent" })
-        ui.clickText("Ignorar somente ocorrência")
+        ui.clickText("Pular este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == true }
         assertEquals(0L, ui.report().totalExpensesCents)
         assertEquals(100000L, ui.report().incomeCents)
         assertEquals(65000L, ui.report(next).totalExpensesCents)
         ui.openActions(ui.report().lines.single { it.itemId == "rent" })
-        ui.clickText("Restaurar somente ocorrência")
+        ui.clickText("Restaurar este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == false }
         assertEquals(65000L, ui.report().commitmentsCents)
         assertEquals(100000L, ui.report().incomeCents)

@@ -22,7 +22,7 @@ class ForecastRemovalUiTest {
         ui.seed(ForecastRule("compra-ficticia", month.atDay(1), "Compra fictícia", ForecastKind.EXPENSE,
             20000, Category.OTHER, ForecastFrequency.INSTALLMENTS, month.atDay(1), installmentCount = 2))
         val first = ui.report().lines.single()
-        ui.action(first, "Ignorar somente ocorrência")
+        ui.action(first, "Pular este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == true }
         assertEquals(0L, ui.report().totalExpensesCents)
         assertEquals(10000L, ui.report(month.plusMonths(1)).totalExpensesCents)
@@ -32,7 +32,7 @@ class ForecastRemovalUiTest {
         assertFalse(ignored.included)
         ui.scroll("forecast-line:${first.itemId}:${first.occurrenceKey}")
         rule.onNodeWithText("Ignorada neste ciclo").assertExists()
-        ui.action(ignored, "Restaurar somente ocorrência")
+        ui.action(ignored, "Restaurar este mês")
         ui.waitData { it.overrides.singleOrNull()?.ignored == false }
         assertEquals(10000L, ui.report().totalExpensesCents)
         assertEquals(10000L, ui.report(month.plusMonths(1)).totalExpensesCents)

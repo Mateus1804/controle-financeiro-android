@@ -28,17 +28,7 @@ object SalarySummaries {
         val realized = Ledger.month(records.filter { it.occurredAt <= asOf }, month, zone)
         val salaryEntries = realized.records.filter { it.category == Category.SALARY && it.incomeContribution() != 0L }
         val actualSalary = salaryEntries.sumOf { it.incomeContribution() }
-        val period = BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1))
-        val projected = data?.let {
-            val excluded = represented(records, it, asOf)
-            buildList {
-                var cycle = CycleCalendar.periodContaining(period.start, it.cycleRules)
-                while (cycle.start < period.endExclusive) {
-                    addAll(ForecastCalculator.report(it, cycle, excluded).lines.filter { line -> line.included && line.date in period })
-                    cycle = CycleCalendar.periodContaining(cycle.endExclusive, it.cycleRules)
-                }
-            }.distinctBy { line -> line.itemId to line.occurrenceKey }
-        }
+        val projected = data?.let { MonthlyForecasts.lines(it, month, represented(records, it, asOf)).filter { line -> line.included } }
         val salary = if (salaryEntries.isNotEmpty()) actualSalary else projected.orEmpty()
             .filter { it.included && it.kind == ForecastKind.INCOME && it.category == Category.SALARY }
             .sumOf { it.amountCents }

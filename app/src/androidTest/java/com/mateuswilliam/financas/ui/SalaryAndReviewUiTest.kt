@@ -32,14 +32,13 @@ class SalaryAndReviewUiTest {
             app.forecasts.saveRule(ForecastRule("bill", now, "Internet", ForecastKind.EXPENSE, 60000,
                 Category.HOME, ForecastFrequency.ONCE, now))
         }
-        rule.onNodeWithTag("forecast-settings").performClick()
-        rule.onNodeWithTag("forecast-settings").performClick()
+        rule.openRendlySalary()
         rule.waitUntil(10000) { rule.onAllNodesWithText("Salário utilizado: 40,00%").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Resultado do mês").assertExists()
         rule.onNodeWithTag("salary-remaining", useUnmergedTree = true).assertTextContains("1.800,00", substring = true)
         rule.onNodeWithTag("salary-projected", useUnmergedTree = true).assertTextContains("1.200,00", substring = true)
         assertEquals(1, runBlocking { app.repository.exportRecords().size })
-        rule.onNodeWithTag("add-realized-expense").performClick()
+        rule.newRendlyRecord(com.mateuswilliam.financas.core.Movement.EXPENSE)
         rule.onNodeWithText("Registrar despesa").assertExists()
         rule.onNodeWithText("Confirmar pagamento").assertDoesNotExist()
     }
@@ -49,8 +48,8 @@ class SalaryAndReviewUiTest {
             app.repository.capture(NotificationInput("test.bank", "test-purchase", "Banco de teste",
                 "Compra aprovada", "Compra aprovada no cartão de R$ 35,90", System.currentTimeMillis()), simulation = true)
         }!!
-        rule.waitUntil(10000) { rule.onAllNodesWithText("Revisar notificações (1)").fetchSemanticsNodes().isNotEmpty() }
-        rule.onNodeWithText("Revisar notificações (1)").performClick()
+        rule.openRendlyReview()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("review-${captured.id}").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("review-${captured.id}").performClick()
         rule.onNodeWithText("Conferir movimentação").assertExists()
         assertEquals(0, runBlocking { app.repository.exportRecords().size })
@@ -62,7 +61,7 @@ class SalaryAndReviewUiTest {
     }
 
     @Test fun reviewIsReachableWithCaptureOff() {
-        rule.onNodeWithTag("dashboard-notification-review").performClick()
+        rule.openRendlyReview()
         rule.onNodeWithText("Caixa de revisão").assertExists()
         rule.onNodeWithText("Captura desativada").assertExists()
         rule.onNodeWithText("Configurar captura").performClick()

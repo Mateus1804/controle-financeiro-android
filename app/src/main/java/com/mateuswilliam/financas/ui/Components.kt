@@ -177,8 +177,8 @@ fun groupedShape(index: Int, count: Int): RoundedCornerShape = RoundedCornerShap
     bottomStart = if (index == count - 1) 20.dp else 0.dp, bottomEnd = if (index == count - 1) 20.dp else 0.dp)
 
 @Composable
-internal fun FinanceDisclosure(title: String, tag: String, content: @Composable ColumnScope.() -> Unit) {
-    var expanded by rememberSaveable(tag) { mutableStateOf(false) }
+internal fun FinanceDisclosure(title: String, tag: String, initiallyExpanded: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    var expanded by rememberSaveable(tag) { mutableStateOf(initiallyExpanded) }
     Column {
         TextButton(onClick = { expanded = !expanded },
             modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch).testTag(tag).semantics {
