@@ -53,7 +53,7 @@ private val Dark = darkColorScheme(
     secondaryContainer = Color(0xFF344B38), onSecondaryContainer = Color(0xFFDCE9DD),
     tertiary = Color(0xFFCBB7D5), onTertiary = Color(0xFF382A40),
     tertiaryContainer = Color(0xFF4F4057), onTertiaryContainer = Color(0xFFF0E1FA),
-    background = Color.Black, onBackground = Color(0xFFF2ECF3),
+    background = Color(0xFF000000), onBackground = Color(0xFFF2ECF3),
     surface = Color(0xFF17121A), onSurface = Color(0xFFF2ECF3),
     surfaceVariant = Color(0xFF302733), onSurfaceVariant = Color(0xFFD0C7D1),
     surfaceContainerLowest = Color(0xFF120D15), surfaceContainerLow = Color(0xFF1A141D),
