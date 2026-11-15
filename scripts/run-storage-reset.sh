@@ -3,7 +3,8 @@ set -euo pipefail
 mkdir -p qa
 package=com.mateuswilliam.financas
 [[ "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" == 35 ]]
-adb install -r -t ci-apks/app-debug.apk
+adb install -r -t ci-apks/previous-debug.apk
+adb shell run-as "$package" id -u | tr -d '\r' > qa/uid-before-update.txt
 adb shell am force-stop "$package"
 # O conteúdo anterior é intencionalmente incompatível: não deve ser lido nem convertido.
 python3 - <<'PY'
@@ -25,6 +26,10 @@ cat > qa/reset-preferences.xml <<'XML'
 XML
 adb push qa/reset-preferences.xml /data/local/tmp/reset-preferences.xml
 adb shell run-as "$package" cp /data/local/tmp/reset-preferences.xml shared_prefs/capture_settings.xml
+# Atualiza a instalação existente, sem desinstalar nem limpar os dados.
+adb install -r -t ci-apks/app-debug.apk
+adb shell run-as "$package" id -u | tr -d '\r' > qa/uid-after-update.txt
+cmp qa/uid-before-update.txt qa/uid-after-update.txt
 adb install -r -t ci-apks/app-debug-androidTest.apk
 timeout --foreground 8m adb shell am instrument -w -r -e intentionalReset true -e class com.mateuswilliam.financas.data.InstalledResetTest "$package.test/com.mateuswilliam.financas.IsolatedAndroidTestRunner" | tee qa/intentional-reset.log
 python3 scripts/verify-instrumentation.py qa/intentional-reset.log
