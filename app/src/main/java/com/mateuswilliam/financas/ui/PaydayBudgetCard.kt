@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import java.time.LocalDate
@@ -55,11 +56,11 @@ internal fun PaydayBudgetCard(budget: PaydayBudget?, hasBalance: Boolean, hidden
 @Composable
 private fun PaydayLine(label: String, cents: Long, hidden: Boolean, modifier: Modifier = Modifier) {
     if (label.length > 40 || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.25f) {
-        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier.semantics(mergeDescendants = true) {}.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
             Amount(cents, hidden, size = 16)
         }
-    } else Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    } else Row(modifier.semantics(mergeDescendants = true) {}.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Amount(cents, hidden, Modifier.widthIn(max = 160.dp), size = 16)
     }
