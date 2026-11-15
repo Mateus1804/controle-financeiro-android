@@ -264,11 +264,7 @@ class OptionalFeaturesUiTest {
             checkpoint("Ajustando fonte ampliada")
             command("settings put system font_scale 1.5")
             rule.waitUntil(10000) { rule.activity.resources.configuration.fontScale >= 1.4f }
-            rule.onNodeWithText("Mês", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                assertTrue(action(layouts)); assertFalse(layouts.single().hasVisualOverflow)
-                repeat(layouts.single().lineCount) { assertFalse(layouts.single().isLineEllipsized(it)) }
-            }
+            rule.onNodeWithText("Mês", useUnmergedTree = true).assertStartAlignedTextFits("Mês")
             rule.activityRule.scenario.onActivity { activity ->
                 assertFalse(WindowCompat.getInsetsController(activity.window, activity.window.decorView).isAppearanceLightStatusBars)
             }

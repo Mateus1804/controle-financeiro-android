@@ -18,7 +18,7 @@ class MonthLedgerScreenTest {
     @Test fun transferDoesNotChangeMonthlyResultAndRowsHaveDayHeading() {
         val rows = listOf(record("Salário", 100000, Movement.INCOME), record("Mercado", 30000, Movement.EXPENSE), record("Entre contas", 50000, Movement.TRANSFER))
         rule.setContent { FinanceTheme { MonthLedgerScreen(rows, month, {}, false, null, {}, emptyList(), null, {}, {}) } }
-        rule.onNodeWithTag("month-net").assertTextContains("R$ 700,00", substring = true)
+        rule.onNodeWithTag("month-net").assertTextContains(Money.format(70000), substring = true)
         rule.onNodeWithTag("records-list").performScrollToNode(hasText("05/11/2026"))
         rule.onNodeWithText("05/11/2026").assertIsDisplayed()
         rule.onAllNodesWithTag("payday-budget").assertCountEquals(0)

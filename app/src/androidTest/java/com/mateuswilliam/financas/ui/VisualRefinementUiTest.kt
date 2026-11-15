@@ -52,7 +52,7 @@ class VisualRefinementUiTest {
 
     @Test fun emptyMonthShowsMessageAndNoLegend() = both({
         ExpenseChart(emptyList(), month, hidden = false) {}
-    }) { rule.onNodeWithText("Nenhuma despesa confirmada neste período.").assertExists() }
+    }) { rule.onNodeWithText("Nenhum gasto registrado neste período.").assertExists() }
 
     @Test fun manyCategoriesGroupSmallestInOthersAndHiddenHidesPercentages() {
         val records = Category.entries.take(8).mapIndexed { i, c -> expense("e$i", (800L - i * 90), c) }

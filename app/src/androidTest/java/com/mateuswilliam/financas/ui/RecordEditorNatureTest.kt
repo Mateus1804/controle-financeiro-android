@@ -68,6 +68,7 @@ class RecordEditorNatureTest {
         rule.setContent { FinanceTheme {
             RecordEditor(null, null, false, {}, {}, null, null, emptyList(), "Carteira", { it }, balances = listOf(wallet))
         } }
+        rule.openRecordDetails()
         rule.onNodeWithText("Escolher conta").performScrollTo().assertExists()
         rule.onNodeWithText("Carteira").assertDoesNotExist()
     }

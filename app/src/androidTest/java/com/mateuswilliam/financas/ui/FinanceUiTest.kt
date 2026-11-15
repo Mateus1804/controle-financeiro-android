@@ -140,8 +140,7 @@ class FinanceUiTest {
             "Banco de exemplo", "EXEMPLO — compra aprovada", "Compra aprovada de R$ 42,90 no supermercado de exemplo.",
             4290, Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Confira os dados sugeridos antes de confirmar.", now, now - 60_000))
         rule.waitUntil(10000) {
-            rule.onAllNodes(hasTestTag("month-net") and hasText("2.811,60", substring = true),
-                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            rule.onAllNodes(hasTestTag("month-net") and hasText("2.811,60", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
         screenshot("resumo")
         for (theme in listOf(Appearance.DARK, Appearance.LIGHT)) {
@@ -217,6 +216,7 @@ class FinanceUiTest {
         rule.onNodeWithTag("amount-input").performTextInput("1234")
         // O teclado mede a janela fora do relógio Compose; o toque só ocorre após estabilizar a geometria.
         waitForStableBounds(rule.onNodeWithTag("amount-input"))
+        rule.openRecordDetails()
         val addAccount = rule.onNodeWithContentDescription("Adicionar Conta ou banco de origem").performScrollTo()
         waitForStableBounds(addAccount)
         addAccount.performClick()

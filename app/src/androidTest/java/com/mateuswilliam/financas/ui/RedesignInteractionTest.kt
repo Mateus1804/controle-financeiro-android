@@ -23,7 +23,7 @@ class RedesignInteractionTest {
         runBlocking { app.repository.clear(); Unit }
         app.settings.finishIntro(); app.settings.dismissNamePrompt()
         waitForEnabled(hasTestTag("add-movement"))
-        rule.waitUntil(10000) { rule.onAllNodesWithTag("forecast-dashboard").fetchSemanticsNodes().isNotEmpty() }
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("records-list").fetchSemanticsNodes().isNotEmpty() }
         rule.waitForIdle()
     }
 
