@@ -28,9 +28,9 @@ class MonthLedgerScreenTest {
         val expense = 321000L
         rule.setContent { FinanceTheme { MonthLedgerScreen(listOf(record("Renda", income, Movement.INCOME), record("Gasto", expense, Movement.EXPENSE)),
             month, {}, false, null, {}, emptyList(), null, {}, {}) } }
-        rule.onNodeWithText(Money.format(income), useUnmergedTree = true).assertStartAlignedTextFits("Receita mensal", singleLine = true)
-        rule.onNodeWithText(Money.format(expense), useUnmergedTree = true).assertStartAlignedTextFits("Despesa mensal", singleLine = true)
-        rule.onNodeWithText(Money.format(income - expense), useUnmergedTree = true).assertStartAlignedTextFits("Saldo mensal", singleLine = true)
+        rule.onNode(hasText(Money.format(income)) and hasAnyAncestor(hasTestTag("month-income")), useUnmergedTree = true).assertStartAlignedTextFits("Receita mensal", singleLine = true)
+        rule.onNode(hasText(Money.format(expense)) and hasAnyAncestor(hasTestTag("month-expenses")), useUnmergedTree = true).assertStartAlignedTextFits("Despesa mensal", singleLine = true)
+        rule.onNode(hasText(Money.format(income - expense)) and hasAnyAncestor(hasTestTag("month-net")), useUnmergedTree = true).assertStartAlignedTextFits("Saldo mensal", singleLine = true)
     }
     @Test fun hiddenFiguresDoNotExposeAmounts() {
         rule.setContent { FinanceTheme { MonthLedgerScreen(listOf(record("Salário", 100000, Movement.INCOME)), month, {}, true, null, {}, emptyList(), null, {}, {}) } }
