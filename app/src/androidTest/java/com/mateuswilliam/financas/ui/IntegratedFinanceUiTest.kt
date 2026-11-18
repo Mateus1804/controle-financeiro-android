@@ -46,8 +46,8 @@ class IntegratedFinanceUiTest {
         assertEquals(setOf(salary.itemId, rent.itemId), data.rules.map { it.itemId }.toSet())
         assertTrue(app.repository.exportRecords().isEmpty())
         val lineTag = "forecast-actions:rent:${report.lines.single { it.itemId == rent.itemId }.occurrenceKey}"
-        rule.openRendlyPlanner()
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(lineTag))
+        rule.openRendlyMonth()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(lineTag))
         rule.onNodeWithText("Aluguel fictício").assertExists()
         rule.openRendlyProjections()
         val projection = "projection-margin-${period.start}"

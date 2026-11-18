@@ -10,50 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
-import java.time.Instant
+import com.mateuswilliam.financas.core.Record
+import java.time.YearMonth
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-@Composable
-internal fun ForecastReserveScreen(data: ForecastDataset, report: ForecastReport, hidden: Boolean, busy: Boolean,
-    onSet: () -> Unit, onAdd: () -> Unit, onWithdraw: () -> Unit, onGoal: () -> Unit) {
-    val balance = report.reserveBalanceCents
-    LazyColumn(Modifier.testTag("forecast-reserve"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { SectionTitle("Reserva de emergência", "Dinheiro informado por você, separado da renda e dos gastos do orçamento") }
-        item { Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-            Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Saldo atual informado", style = MaterialTheme.typography.titleMedium)
-                if (balance == null) Text("Reserva ainda não informada") else Amount(balance, hidden, Modifier.testTag("reserve-balance"), size = 30)
-                Button(onSet, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("reserve-set")) { Text(if (balance == null) "Informar minha reserva" else "Corrigir saldo informado") }
-                if (balance != null) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onAdd, enabled = !busy, modifier = Modifier.weight(1f).testTag("reserve-add")) { Text("Adicionar") }
-                    OutlinedButton(onWithdraw, enabled = !busy && balance > 0, modifier = Modifier.weight(1f).testTag("reserve-withdraw")) { Text("Retirar") }
-                }
-                Text("Nenhuma sobra ou déficit altera esta reserva automaticamente.", style = MaterialTheme.typography.bodySmall)
-            }
-        } }
-        item {
-            Text("Meta opcional", style = MaterialTheme.typography.titleMedium)
-            data.reserveGoalCents?.let { goal ->
-                Amount(goal, hidden)
-                if (balance != null && goal > 0 && !hidden) {
-                    LinearProgressIndicator(progress = { (balance.toDouble() / goal).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-                    Text(if (balance >= goal) "Meta alcançada" else "Faltam ${Money.format(goal - balance)}", style = MaterialTheme.typography.bodySmall)
-                }
-            } ?: Text("Você pode definir uma meta sem informar renda novamente.", style = MaterialTheme.typography.bodySmall)
-            TextButton(onGoal, enabled = !busy, modifier = Modifier.testTag("reserve-edit-goal")) { Text("Definir ou alterar meta") }
-        }
-        item { SectionTitle("Histórico da reserva", "Aportes não são despesas; retiradas não são receitas") }
-        data.reserveEvents.sortedByDescending { it.id }.forEach { event -> item(key = event.id) {
-            ListItem(headlineContent = { Text(when (event.kind) { ReserveEventKind.SET -> "Saldo informado / correção"; ReserveEventKind.ADD -> "Aporte informado"; ReserveEventKind.WITHDRAW -> "Retirada informada" }) },
-                supportingContent = { Column {
-                    Text(privateDisplayText(event.reason, hidden), style = MaterialTheme.typography.bodySmall)
-                    Text(shortDate(event.createdAt), style = MaterialTheme.typography.labelSmall)
-                    event.cycleStart?.let { Text("Destinação do ciclo iniciado em ${it.format(financeDateFormat)}", style = MaterialTheme.typography.labelSmall) }
-                } }, trailingContent = { Amount(event.amountCents, hidden, size = 16) })
-        } }
-    }
-}
 
 @Composable
 internal fun ReserveGoalEditor(existing: Long?, busy: Boolean, hidden: Boolean, onDismiss: () -> Unit, onSave: (Long?) -> Unit) {
@@ -72,13 +31,19 @@ internal fun ReserveGoalEditor(existing: Long?, busy: Boolean, hidden: Boolean, 
 @Composable
 internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPeriod, simulation: ForecastRule?, hidden: Boolean, busy: Boolean,
     onSimulate: () -> Unit, onDiscard: () -> Unit, onAdopt: () -> Unit, onOpen: (BudgetPeriod) -> Unit,
-    represented: Set<Pair<String, String>> = emptySet()) {
+    records: List<Record>, asOf: Long) {
+    val zone = ZoneId.systemDefault()
     val periods = remember(data.cycleRules, selected) {
-        buildList { var next = selected; repeat(6) { add(next); next = CycleCalendar.periodContaining(next.endExclusive, data.cycleRules) } }
+        val month = YearMonth.from(selected.start)
+        List(6) { index -> FinancialPeriods.month(month.plusMonths(index.toLong()), data.cycleRules) }
     }
-    val projected = remember(data, simulation, periods, represented) { periods.map { period ->
-        ForecastCalculator.report(data, period, represented) to simulation?.let { ForecastCalculator.report(data.copy(rules = data.rules + it), period, represented) }
-    } }
+    val projected = remember(data, simulation, periods, records, asOf, zone) {
+        val simulatedData = simulation?.let { data.copy(rules = data.rules + it) }
+        periods.map { period ->
+            val base = CentralFinance.summarize(records, data, period, zone, asOf).projectedReport
+            base to simulatedData?.let { CentralFinance.summarize(records, it, period, zone, asOf).projectedReport }
+        }
+    }
     LazyColumn(Modifier.testTag("forecast-projections"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             SectionTitle("Próximos ciclos", "O mesmo orçamento, considerando o término das parcelas e os ajustes de cada período")

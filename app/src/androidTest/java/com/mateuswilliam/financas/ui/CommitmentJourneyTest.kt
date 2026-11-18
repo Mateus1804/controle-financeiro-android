@@ -20,16 +20,10 @@ class CommitmentJourneyTest {
     @Before fun reset() = ui.reset()
 
     @Test fun forecastToIndependentExpenseOccurrenceAdjustmentStopAndEncryptedRestore() = runBlocking<Unit> {
-        ui.clickTag("forecast-add-income", dashboard = true)
-        ui.type("forecast-title", "Salário fictício")
-        ui.type("forecast-amount", "100000")
+        ui.startForecast(Movement.INCOME, "Salário fictício", "100000")
         ui.saveForecast()
         ui.waitRules(1)
-        ui.clickTag("forecast-add-expense", dashboard = true)
-        ui.type("forecast-title", "Compra prevista fictícia")
-        rule.onNodeWithText("Uma vez").performScrollTo().performClick()
-        rule.onNodeWithText("Parcelada").performClick()
-        ui.type("forecast-amount", "60001")
+        ui.startForecast(Movement.EXPENSE, "Compra prevista fictícia", "60001", ForecastFrequency.INSTALLMENTS)
         ui.type("forecast-installment-count", "3")
         ui.saveForecast()
         ui.waitRules(2)
@@ -66,12 +60,12 @@ class CommitmentJourneyTest {
         assertEquals(20000L, ui.report(next).totalExpensesCents)
         assertEquals(listOf(actual), app.repository.exportRecords())
         ui.openProjections()
-        ui.assertProjection(cycle, "22,50", 77500)
+        ui.assertProjection(cycle, "44,50", 55500)
         rule.runOnIdle { app.settings.hideAmounts(true) }
         rule.onAllNodesWithText("Percentual oculto").onFirst().assertExists()
-        rule.onAllNodes(hasText("22,50%", substring = true) or hasContentDescription("22,50%", substring = true)).assertCountEquals(0)
-        rule.onAllNodes(hasText(Money.format(77500), substring = true) or
-            hasContentDescription(Money.format(77500), substring = true)).assertCountEquals(0)
+        rule.onAllNodes(hasText("44,50%", substring = true) or hasContentDescription("44,50%", substring = true)).assertCountEquals(0)
+        rule.onAllNodes(hasText(Money.format(55500), substring = true) or
+            hasContentDescription(Money.format(55500), substring = true)).assertCountEquals(0)
         rule.runOnIdle { app.settings.hideAmounts(false) }
 
         rule.openRendlyPlanner()

@@ -46,10 +46,13 @@ internal class ForecastReportTestDriver(
     }
     fun waitRules(count: Int) = waitData { it.rules.size == count }
     fun scroll(tag: String) {
-        if (tag.startsWith("salary-") || tag.startsWith("payday-")) {
-            rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
+        if (tag.startsWith("forecast-actions:") || tag.startsWith("forecast-line:")) {
+            rule.openRendlyMonth(); rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag))
         } else { rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag)) }
     }
+    fun startForecast(kind: Movement, title: String, amount: String,
+        frequency: ForecastFrequency = if (kind == Movement.INCOME) ForecastFrequency.MONTHLY else ForecastFrequency.ONCE) =
+        rule.newRendlyForecast(kind, title, amount, frequency)
     fun clickTag(tag: String, dashboard: Boolean = false) {
         if (tag == "dashboard-notification-review") { rule.openRendlyReview(); return }
         if (tag == "open-accounts") { rule.openRendlySettings(); rule.onNodeWithTag("settings-accounts").performClick(); return }
@@ -57,7 +60,7 @@ internal class ForecastReportTestDriver(
         if (tag == "add-realized-expense" || tag == "add-realized-income") {
             rule.newRendlyRecord(if (tag.endsWith("income")) Movement.INCOME else Movement.EXPENSE); return
         }
-        if (dashboard) { rule.openRendlyPlanner(); scroll(tag) }
+        if (dashboard) scroll(tag)
         rule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
     }
     fun clickText(text: String) {

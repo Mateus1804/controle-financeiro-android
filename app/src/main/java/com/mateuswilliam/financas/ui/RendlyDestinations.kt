@@ -22,14 +22,15 @@ internal fun MoreScreen(onOpen: (Int) -> Unit) {
 }
 
 @Composable
-internal fun CommitmentScreen(report: ForecastReport, hidden: Boolean) {
+internal fun CommitmentScreen(summary: CentralFinancialSummary, hidden: Boolean) {
+    val report = summary.projectedReport
     LazyColumn(Modifier.testTag("commitment-screen"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { SectionTitle("Comprometimento", "Previsões do ciclo ${report.period.start} a ${report.period.endExclusive.minusDays(1)}") }
-        item { Text("Receitas previstas"); Amount(report.incomeCents, hidden) }
+        item { SectionTitle("Comprometimento", "Registrado e previsto no ciclo ${report.period.start} a ${report.period.endExclusive.minusDays(1)}") }
+        item { Text("Receitas registradas e previstas"); Amount(report.incomeCents, hidden) }
         item { Text("Gastos fixos e compromissos"); Amount(report.commitmentsCents, hidden) }
-        item { Text("Gastos totais previstos"); Amount(report.totalExpensesCents, hidden) }
+        item { Text("Gastos registrados e previstos"); Amount(report.totalExpensesCents, hidden) }
         item { Text("Margem prevista"); Amount(report.marginCents, hidden) }
         item { Text(if (hidden) "Renda comprometida: ••••" else "Renda comprometida: ${report.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("%") ?: "informe uma receita"}") }
-        item { RendlyCategories(report, hidden) }
+        item { RendlyCategories(summary, hidden) }
     }
 }

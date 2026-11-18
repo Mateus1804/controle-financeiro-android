@@ -28,11 +28,14 @@ data class ExpenseFilter(val dimension: ExpenseDimension, val key: String, val l
 }
 
 object ExpenseReports {
-    fun month(records: List<Record>, month: YearMonth, zone: ZoneId, dimension: ExpenseDimension): ExpenseReport {
+    fun month(records: List<Record>, month: YearMonth, zone: ZoneId, dimension: ExpenseDimension): ExpenseReport =
+        period(records, BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1)), zone, dimension)
+
+    fun period(records: List<Record>, period: BudgetPeriod, zone: ZoneId, dimension: ExpenseDimension): ExpenseReport {
         val totals = linkedMapOf<String, Pair<String, Long>>()
         var refunds = 0L
         records.forEach { record ->
-            if (YearMonth.from(Instant.ofEpochMilli(record.occurredAt).atZone(zone)) != month) return@forEach
+            if (Instant.ofEpochMilli(record.occurredAt).atZone(zone).toLocalDate() !in period) return@forEach
             if (record.expenseContribution() < 0) refunds = Math.addExact(refunds, -record.expenseContribution())
             if (record.movement != Movement.EXPENSE) return@forEach
             val key = dimension.key(record)

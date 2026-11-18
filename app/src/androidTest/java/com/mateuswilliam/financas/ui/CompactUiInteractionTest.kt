@@ -87,7 +87,7 @@ class CompactUiInteractionTest {
         val stopped = current()
         rule.activityRule.scenario.recreate()
         rule.waitUntil(10000) { model.dataset.value == stopped }
-        rule.onNodeWithTag("forecast-dashboard").assertIsDisplayed()
+        rule.onNodeWithTag("records-list").assertIsDisplayed()
         assertEquals(stopped, current())
         assertEquals(25000L, ForecastCalculator.report(current(), previous).totalExpensesCents)
         assertEquals(0L, ForecastCalculator.report(current(), next).totalExpensesCents)
@@ -95,7 +95,7 @@ class CompactUiInteractionTest {
     }
 
     private fun actions(line: ForecastLine) = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
-    private fun scroll(tag: String) = rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
+    private fun scroll(tag: String) { rule.openRendlyMonth(); rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag)) }
     private fun clickTag(tag: String) = rule.onNodeWithTag(tag)
         .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
     private fun clickText(text: String) = rule.onNode(hasText(text) and hasClickAction())

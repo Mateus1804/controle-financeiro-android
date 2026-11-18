@@ -30,6 +30,7 @@ internal fun ForecastEditor(
     initialCategory: Category? = null, initialFrequency: ForecastFrequency = ForecastFrequency.MONTHLY,
     knownStatements: List<String> = emptyList(),
     existingOverride: ForecastOverride? = null, initialOnlyOccurrence: Boolean = true,
+    initialAmountCents: Long? = null, initialStartDate: LocalDate? = null, initialAccount: String = "",
 ) {
     val source = rule ?: line?.rule
     val id = rememberSaveable { source?.itemId ?: UUID.randomUUID().toString() }
@@ -40,10 +41,10 @@ internal fun ForecastEditor(
     var group by rememberSaveable { mutableStateOf(source?.group ?: ForecastGroup.COMMITMENT) }
     var estimated by rememberSaveable { mutableStateOf(source?.estimated ?: false) }
     var undated by rememberSaveable { mutableStateOf(source?.cycleAnchored ?: false) }
-    var date by rememberSaveable { mutableStateOf((line?.date ?: source?.startDate ?: period.start).toString()) }
+    var date by rememberSaveable { mutableStateOf((line?.date ?: source?.startDate ?: initialStartDate ?: period.start).toString()) }
     var day by rememberSaveable { mutableIntStateOf(source?.dayOfMonth ?: LocalDate.parse(date).dayOfMonth) }
     var count by rememberSaveable { mutableStateOf(source?.installmentCount?.toString() ?: "") }
-    var account by rememberSaveable { mutableStateOf(source?.account.orEmpty()) }
+    var account by rememberSaveable { mutableStateOf(source?.account ?: initialAccount) }
     var statement by rememberSaveable { mutableStateOf(source?.statementKey.orEmpty()) }
     var statementTotal by rememberSaveable { mutableStateOf(source?.statementTotal ?: false) }
     var onlyOccurrence by rememberSaveable { mutableStateOf(initialOnlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE) }
@@ -51,8 +52,8 @@ internal fun ForecastEditor(
     var invalidMoney by rememberSaveable { mutableStateOf(false) }
     val signedRefund = false
     val scoped = onlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE
-    val occurrenceAmount = rememberTextFieldState(initialText = (line?.amountCents ?: source?.amountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
-    val ruleAmount = rememberTextFieldState(initialText = source?.amountCents?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
+    val occurrenceAmount = rememberTextFieldState(initialText = (line?.amountCents ?: source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
+    val ruleAmount = rememberTextFieldState(initialText = (source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val amount = if (scoped) occurrenceAmount else ruleAmount
     val cents = if (invalidMoney) null else MoneyInput.cents(amount.text.toString())
     val start = if (undated && frequency == ForecastFrequency.MONTHLY) period.start else LocalDate.parse(date)
@@ -90,11 +91,11 @@ internal fun ForecastEditor(
                 if (!busy) { kind = it; category = if (it == ForecastKind.INCOME) Category.SALARY else Category.OTHER }
             }
             ChoiceField("Categoria", category, categoriesFor(if (kind == ForecastKind.INCOME) Movement.INCOME else Movement.EXPENSE), { it.label }) { if (!busy) category = it }
-            if (!scoped) ChoiceField("Frequência", frequency, ForecastFrequency.entries.filter { kind == ForecastKind.EXPENSE || it != ForecastFrequency.INSTALLMENTS }, {
+            if (!scoped) ChoiceField("Frequência", frequency, ForecastFrequency.entries, {
                 when (it) { ForecastFrequency.ONCE -> "Uma vez"; ForecastFrequency.MONTHLY -> "Mensal"; ForecastFrequency.INSTALLMENTS -> "Parcelada" }
             }) { if (!busy) frequency = it }
             PrivateValueGate(hidden, "Mostrar valor da previsão para edição") {
-                MoneyAmountField(amount, attempted, !busy, label = if (!scoped && frequency == ForecastFrequency.INSTALLMENTS) "Valor total da compra (R$)" else "Valor previsto (R$)", tag = "forecast-amount", onInvalidInput = { invalidMoney = it })
+                MoneyAmountField(amount, attempted, !busy, label = if (!scoped && frequency == ForecastFrequency.INSTALLMENTS) "Valor total a parcelar (R$)" else "Valor previsto (R$)", tag = "forecast-amount", onInvalidInput = { invalidMoney = it })
                 if (!scoped && frequency == ForecastFrequency.INSTALLMENTS) {
                     OutlinedTextField(count, { if (it.length <= 3 && it.all(Char::isDigit)) count = it }, enabled = !busy, label = { Text("Quantidade de parcelas (1 a 600)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth().testTag("forecast-installment-count"))
                     val n = count.toIntOrNull()

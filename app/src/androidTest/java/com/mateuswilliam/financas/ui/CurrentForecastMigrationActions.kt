@@ -49,7 +49,13 @@ internal class CurrentForecastUi(
         rule.waitUntil(10000) { model.dataset.value?.let(predicate) == true }
     }
     fun scroll(tag: String) {
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
+        if (tag.startsWith("forecast-cycle-")) {
+            rule.openRendlyPlanner()
+            rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
+        } else {
+            rule.openRendlyMonth()
+            rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag))
+        }
     }
     fun clickTag(tag: String) {
         if (tag == "add-realized-income" || tag == "add-realized-expense") {

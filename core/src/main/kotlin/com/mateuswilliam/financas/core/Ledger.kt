@@ -15,9 +15,12 @@ data class MonthlySummary(
 }
 
 object Ledger {
-    fun month(records: List<Record>, month: YearMonth, zone: ZoneId): MonthlySummary {
+    fun month(records: List<Record>, month: YearMonth, zone: ZoneId): MonthlySummary =
+        period(records, BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1)), zone)
+
+    fun period(records: List<Record>, period: BudgetPeriod, zone: ZoneId): MonthlySummary {
         val selected = records.filter {
-            YearMonth.from(Instant.ofEpochMilli(it.occurredAt).atZone(zone)) == month
+            Instant.ofEpochMilli(it.occurredAt).atZone(zone).toLocalDate() in period
         }.sortedByDescending { it.occurredAt }
         val expenses = selected.sumOf {
             it.expenseContribution()

@@ -25,11 +25,17 @@ class ForecastJourneyTest {
     private fun current() = runBlocking { app.forecasts.dataset.first() }
     private fun period() = CycleCalendar.periodContaining(today, current().cycleRules)
     private fun clickTag(tag: String) {
-        if (tag.startsWith("forecast-cycle-") || tag == "forecast-add-income" || tag == "forecast-add-expense") scroll(tag)
+        if (tag.startsWith("forecast-cycle-")) scroll(tag)
         rule.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
     }
     private fun clickText(text: String) = rule.onNode(hasText(text) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-    private fun scroll(tag: String) = rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
+    private fun scroll(tag: String) {
+        if (tag.startsWith("forecast-actions:")) {
+            rule.openRendlyMonth(); rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag))
+        } else {
+            rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
+        }
+    }
     private fun waitRules(count: Int) = rule.waitUntil(10000) { model.dataset.value?.rules?.size == count }
 
     @Before fun reset() {
@@ -52,14 +58,13 @@ class ForecastJourneyTest {
     }
 
     @Test fun salaryRegisteredOnceFeedsAllExpensesAndOneCycleEditPreservesFuture() {
-        clickTag("forecast-add-income")
-        rule.onNodeWithTag("forecast-title").performTextInput("Salário")
-        rule.onNodeWithTag("forecast-amount").performScrollTo().performTextInput("300000")
+        rule.newRendlyForecast(Movement.INCOME, "Salário", "300000", category = Category.SALARY)
         androidx.test.espresso.Espresso.closeSoftKeyboard(); clickTag("forecast-save")
         waitRules(1); rule.dismissFeedback("Previsão salva")
         val salary = current().rules.single()
         assertEquals(ForecastFrequency.MONTHLY, salary.frequency)
-        assertEquals("", salary.account)
+        assertEquals(Category.SALARY, salary.category)
+        assertTrue(salary.account.isNotBlank())
         runBlocking { seed(includeSalary = false) }; waitRules(4)
         rule.openRendlyPlanner()
         rule.onNodeWithTag("payday-budget").assertExists()
@@ -82,25 +87,39 @@ class ForecastJourneyTest {
         rule.onNodeWithText("Marcar como pago").assertDoesNotExist()
     }
 
-    @Test fun closedSurplusAllocationIsExplicitPersistsAndDoesNotChangeExpenseRatio() = runBlocking<Unit> {
+    @Test fun surplusTransferIsExplicitPersistsAndDoesNotChangePeriodResult() = runBlocking<Unit> {
         val old = CycleCalendar.periodContaining(period().start.minusDays(1), current().cycleRules)
-        app.forecasts.saveRule(ForecastRule("old-income", old.start, "Renda anterior", ForecastKind.INCOME, 300000, Category.SALARY, ForecastFrequency.ONCE, old.start))
-        app.forecasts.saveRule(ForecastRule("old-cost", old.start, "Gastos anteriores", ForecastKind.EXPENSE, 220000, Category.OTHER, ForecastFrequency.ONCE, old.start))
-        app.forecasts.addReserveEvent(ReserveEventKind.SET, 200000, "Reserva inicial")
-        waitRules(2); clickTag("forecast-cycle-previous")
-        scroll("forecast-allocate-surplus"); clickTag("forecast-allocate-surplus")
-        rule.onNodeWithTag("reserve-amount").performScrollTo().performTextInput("50000")
-        androidx.test.espresso.Espresso.closeSoftKeyboard(); clickTag("reserve-save")
-        rule.waitUntil(10000) { model.dataset.value?.reserveEvents?.size == 2 }
-        val report = ForecastCalculator.report(current(), old)
-        assertEquals(250000L, report.reserveBalanceCents)
-        assertEquals(50000L, report.allocatedCents); assertEquals(30000L, report.unallocatedCents)
-        assertEquals(220000L, report.totalExpensesCents); assertEquals("73.33", report.expensePercentage?.toPlainString())
+        val at = old.start.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        app.repository.configureAccountBalance("Conta principal", 0, at, "Saldo inicial")
+        app.repository.configureAccountBalance("Reserva de emergência", 200000, at, "Saldo inicial")
+        app.repository.save(Record("old-income", 300000, Movement.INCOME, PaymentMethod.PIX, Category.SALARY,
+            "Conta principal", "Renda anterior", at), null)
+        app.repository.save(Record("old-cost", 220000, Movement.EXPENSE, PaymentMethod.PIX, Category.OTHER,
+            "Conta principal", "Gastos anteriores", at), null)
+        rule.openRendlyReserve()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("reserve-add").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("reserve-add").performScrollTo().assertIsEnabled().performClick()
+        rule.onNodeWithTag("amount-input").performScrollTo().performTextReplacement("50000")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        rule.onNode(hasText("Salvar lançamento") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().size == 3 } }
+        val records = app.repository.exportRecords()
+        val transfer = records.single { it.movement == Movement.TRANSFER }
+        assertEquals("Conta principal", transfer.bank)
+        assertEquals("Reserva de emergência", transfer.destination)
+        assertEquals(50000L, transfer.amountCents)
+        val oldResult = Ledger.period(records, old, java.time.ZoneId.systemDefault())
+        assertEquals(220000L, oldResult.expenses)
+        assertEquals(80000L, oldResult.result)
+        val balances = app.repository.observeAccountBalances().first()
+        assertEquals(250000L, balances.single { it.account.label == "Reserva de emergência" }.balanceCents)
+        assertEquals(30000L, balances.single { it.account.label == "Conta principal" }.balanceCents)
+        assertEquals(280000L, balances.sumOf { it.balanceCents ?: 0 })
+        assertTrue(current().reserveEvents.isEmpty())
         rule.activityRule.scenario.recreate(); rule.waitForIdle()
-        assertEquals(report, ForecastCalculator.report(current(), old))
         rule.openRendlyReserve()
         rule.onNodeWithTag("reserve-balance").assertTextContains("2.500,00", substring = true)
-        assertTrue(app.repository.exportRecords().isEmpty())
+        assertEquals(records, app.repository.exportRecords())
     }
 
     @Test fun simulationHasNoWritesUntilAdoptedAndInstallmentsEnd() = runBlocking<Unit> {

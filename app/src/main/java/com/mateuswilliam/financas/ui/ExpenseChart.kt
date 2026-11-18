@@ -29,11 +29,14 @@ import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, onGroup: (ExpenseFilter) -> Unit) {
+fun ExpenseChart(records: List<Record>, month: YearMonth, hidden: Boolean, period: BudgetPeriod? = null, onGroup: (ExpenseFilter) -> Unit) {
     var dimension by rememberSaveable { mutableStateOf(ExpenseDimension.CATEGORY) }
     var allGroups by rememberSaveable { mutableStateOf(false) }
     val zone = ZoneId.systemDefault()
-    val report = remember(records, month, zone, dimension) { ExpenseReports.month(records, month, zone, dimension) }
+    val report = remember(records, month, period, zone, dimension) {
+        if (period == null) ExpenseReports.month(records, month, zone, dimension)
+        else ExpenseReports.period(records, period, zone, dimension)
+    }
     val palette = LocalFinanceColors.current.chart
     fun groupColor(key: String) = palette[Math.floorMod(key.hashCode(), palette.size)]
     val legend = remember(report) { ExpenseLegend.of(report) }

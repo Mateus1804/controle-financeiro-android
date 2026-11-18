@@ -47,3 +47,27 @@ internal fun ComposeContentTestRule.openRecordDetails() {
     if (onAllNodesWithContentDescription("Meio de pagamento").fetchSemanticsNodes().isEmpty())
         onNodeWithTag("record-payment-details").performScrollTo().performClick()
 }
+
+/** Cadastro único: os dados são digitados uma vez e seguem para as opções de previsão. */
+internal fun ComposeContentTestRule.newRendlyForecast(
+    kind: Movement, title: String, amountDigits: String,
+    frequency: com.mateuswilliam.financas.core.ForecastFrequency = com.mateuswilliam.financas.core.ForecastFrequency.MONTHLY,
+    category: com.mateuswilliam.financas.core.Category? = null,
+) {
+    newRendlyRecord(kind)
+    onNodeWithTag("amount-input").performScrollTo().performTextReplacement(amountDigits)
+    onNodeWithTag("record-description").performScrollTo().performTextReplacement(title)
+    androidx.test.espresso.Espresso.closeSoftKeyboard()
+    if (category != null) {
+        onNodeWithContentDescription("Categoria").performScrollTo().performClick()
+        onNodeWithText(category.label).performScrollTo().performClick()
+    }
+    onNodeWithContentDescription("Frequência").performScrollTo().performClick()
+    onNodeWithText(if (frequency == com.mateuswilliam.financas.core.ForecastFrequency.INSTALLMENTS) "Parcelada" else "Mensal").performClick()
+    onNode(hasText("Continuar previsão") and hasClickAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+    waitUntil(10000) { onAllNodesWithTag("forecast-title").fetchSemanticsNodes().isNotEmpty() }
+    if (frequency == com.mateuswilliam.financas.core.ForecastFrequency.ONCE) {
+        onNodeWithContentDescription("Frequência").performScrollTo().performClick()
+        onNodeWithText("Uma vez").performClick()
+    }
+}

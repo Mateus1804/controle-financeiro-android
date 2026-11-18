@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas.core
 
 import java.time.LocalDate
+import java.time.ZoneOffset
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -60,6 +61,65 @@ class PaydayBudgetTest {
         assertEquals(20000L, budget.variableForecastCents)
         assertEquals(50000L, budget.withVariablesCents)
         assertEquals(49000L, budget.weeklyCents)
+    }
+
+    private val zone = ZoneOffset.UTC
+    private fun at(date: LocalDate) = date.atStartOfDay(zone).toInstant().toEpochMilli()
+    private fun scheduled(id: String, date: LocalDate, cents: Long, movement: Movement, category: Category) =
+        Record(id, cents, movement, PaymentMethod.PIX, category, "Principal", id, at(date))
+
+    @Test fun `scheduled linked expense replaces forecast amount date and keeps commitment group`() {
+        val rent = line("rent", today.plusDays(1), 90000).rule
+        val salary = line("salary", today.plusDays(10), 400000, ForecastKind.INCOME, Category.SALARY).rule
+        val record = scheduled("scheduled-rent", today.plusDays(3), 30000, Movement.EXPENSE, Category.HOME)
+            .copy(forecastItemId="rent", forecastOccurrenceKey="once")
+        val lines = PaydayBudgets.upcomingLines(ForecastDataset(rules=listOf(rent,salary)),listOf(record),zone,at(today))
+        val occurrences = lines.filter { it.itemId == "rent" }
+        assertEquals(1,occurrences.size)
+        assertEquals(today.plusDays(3),occurrences.single().date)
+        assertEquals(30000L,occurrences.single().amountCents)
+        val payday = PaydayBudgets.nextPayday(lines,emptyList(),today)!!
+        val budget = PaydayBudgets.compute(100000,lines,today,payday)
+        assertEquals(70000L,budget.totalCents)
+        assertEquals(49000L,budget.weeklyCents)
+    }
+
+    @Test fun `future salary record replaces linked forecast date and supports salary without a rule`() {
+        val salary = line("salary",today.plusDays(2),400000,ForecastKind.INCOME,Category.SALARY).rule
+        val record = scheduled("scheduled-salary",today.plusDays(5),390000,Movement.INCOME,Category.SALARY)
+            .copy(forecastItemId="salary",forecastOccurrenceKey="once")
+        val lines = PaydayBudgets.upcomingLines(ForecastDataset(rules=listOf(salary)),listOf(record),zone,at(today))
+        assertEquals(1,lines.size)
+        assertEquals(390000L,lines.single().amountCents)
+        assertEquals(today.plusDays(5),PaydayBudgets.nextPayday(lines,emptyList(),today))
+        val plain = record.copy(forecastItemId=null,forecastOccurrenceKey=null)
+        val noRule = PaydayBudgets.upcomingLines(ForecastDataset(),listOf(plain),zone,at(today))
+        assertEquals(today.plusDays(5),PaydayBudgets.nextPayday(noRule,emptyList(),today))
+    }
+
+    @Test fun `salary received today selects following monthly occurrence without counting paid expenses again`() {
+        val salary = line("salary",today,400000,ForecastKind.INCOME,Category.SALARY).rule.copy(frequency=ForecastFrequency.MONTHLY)
+        val rent = line("rent",today,30000).rule
+        val received = scheduled("received",today,390000,Movement.INCOME,Category.SALARY)
+            .copy(forecastItemId="salary",forecastOccurrenceKey="month:2026-11")
+        val paid = scheduled("paid",today,28000,Movement.EXPENSE,Category.HOME)
+            .copy(forecastItemId="rent",forecastOccurrenceKey="once")
+        val lines = PaydayBudgets.upcomingLines(ForecastDataset(rules=listOf(salary,rent)),listOf(received,paid),zone,at(today))
+        assertFalse(lines.any { it.itemId == "rent" })
+        assertEquals(today.plusMonths(1),PaydayBudgets.nextPayday(lines,emptyList(),today))
+    }
+
+    @Test fun `scheduled unlinked expenses stay variable and expenses rescheduled after salary are outside budget`() {
+        val salary = line("salary",today.plusDays(10),400000,ForecastKind.INCOME,Category.SALARY).rule
+        val rent = line("rent",today.plusDays(1),30000).rule
+        val later = scheduled("later-rent",today.plusDays(11),31000,Movement.EXPENSE,Category.HOME)
+            .copy(forecastItemId="rent",forecastOccurrenceKey="once")
+        val variable = scheduled("variable",today.plusDays(2),20000,Movement.EXPENSE,Category.FOOD)
+        val lines = PaydayBudgets.upcomingLines(ForecastDataset(rules=listOf(salary,rent)),listOf(later,variable),zone,at(today))
+        val budget = PaydayBudgets.compute(100000,lines,today,PaydayBudgets.nextPayday(lines,emptyList(),today)!!)
+        assertEquals(0L,budget.pendingCommitmentsCents)
+        assertEquals(20000L,budget.variableForecastCents)
+        assertEquals(80000L,budget.withVariablesCents)
     }
 
 }

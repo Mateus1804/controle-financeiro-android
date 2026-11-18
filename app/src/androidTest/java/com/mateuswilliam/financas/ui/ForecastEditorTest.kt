@@ -91,15 +91,4 @@ class ForecastEditorTest {
         compose.onNodeWithText("Mostrar vínculo da fatura para edição").assertExists()
     }
 
-    @Test fun reserveCannotWithdrawMoreThanKnownBalance() {
-        var saved = false
-        compose.setContent { FinanceTheme {
-            ReserveEditor(ReserveEventKind.WITHDRAW, 1000, false, false, {}, { _, _, _ -> saved = true })
-        } }
-        compose.onNodeWithTag("reserve-amount").performScrollTo().performTextReplacement("1001")
-        compose.onNodeWithTag("reserve-reason").performScrollTo().performTextInput("Emergência")
-        compose.onNodeWithTag("reserve-save").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
-        compose.runOnIdle { assertFalse(saved) }
-        compose.onNodeWithText("A retirada não pode superar o saldo da reserva.").performScrollTo().assertExists()
-    }
 }

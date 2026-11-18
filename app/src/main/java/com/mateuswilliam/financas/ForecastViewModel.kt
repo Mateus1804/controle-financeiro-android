@@ -56,11 +56,6 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
         onSaved()
         "Dia do ciclo salvo. Confira as datas completas do período."
     }
-    fun saveReserve(kind: ReserveEventKind, cents: Long, reason: String, cycle: LocalDate?, onSaved: () -> Unit) = action {
-        repository.addReserveEvent(kind, cents, reason, cycle)
-        onSaved()
-        "Reserva atualizada. Renda, gastos e percentual do orçamento foram preservados."
-    }
     fun saveReserveGoal(cents: Long?, onSaved: () -> Unit) = action {
         repository.setReserveGoal(cents)
         onSaved()

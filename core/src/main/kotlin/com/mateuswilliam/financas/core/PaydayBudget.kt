@@ -2,6 +2,8 @@ package com.mateuswilliam.financas.core
 
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.Instant
+import java.time.ZoneId
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -40,6 +42,31 @@ object PaydayBudgets {
             cycle = CycleCalendar.periodContaining(cycle.endExclusive, dataset.cycleRules)
         }
         return lines.distinctBy { it.itemId to it.occurrenceKey }
+    }
+
+    /** Scheduled entries replace linked forecasts immediately; received salary never remains a future payday. */
+    fun upcomingLines(dataset: ForecastDataset, records: List<Record>, zone: ZoneId, asOf: Long, horizonDays: Long = 62): List<ForecastLine> {
+        require(horizonDays > 0)
+        val today = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
+        val end = today.plusDays(horizonDays)
+        val represented = records.filter { it.forecastItemId != null && it.forecastOccurrenceKey != null }
+            .mapTo(hashSetOf()) { it.forecastItemId!! to it.forecastOccurrenceKey!! }
+        val forecast = upcomingLines(dataset.copy(reserveEvents = emptyList()), represented, today, horizonDays)
+        val scheduled = records.filter { it.occurredAt > asOf && it.movement in setOf(Movement.INCOME, Movement.EXPENSE) }
+            .mapNotNull { record ->
+                val date = Instant.ofEpochMilli(record.occurredAt).atZone(zone).toLocalDate()
+                if (date >= end) return@mapNotNull null
+                val kind = if (record.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
+                val linked = dataset.rules.filter { it.itemId == record.forecastItemId && it.effectiveFrom <= date }
+                    .maxByOrNull { it.effectiveFrom }
+                val id = record.forecastItemId ?: "record:${record.id}"
+                val key = record.forecastOccurrenceKey ?: "record:${record.id}"
+                val rule = linked ?: ForecastRule(id, date, record.description, kind, record.amountCents,
+                    record.category, ForecastFrequency.ONCE, date, group = ForecastGroup.VARIABLE, account = record.bank)
+                ForecastLine(id, key, record.description, date, record.amountCents, kind, record.category,
+                    rule.group, rule.frequency, false, false, true, rule.statementKey, rule.statementTotal, rule)
+            }
+        return (forecast + scheduled).sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
     }
 
     /** Compromissos de despesa ainda pendentes em [today, payday). */

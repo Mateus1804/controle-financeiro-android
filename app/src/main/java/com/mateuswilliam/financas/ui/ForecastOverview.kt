@@ -41,9 +41,9 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
     onEdit: (ForecastLine) -> Unit, onIgnore: (ForecastLine) -> Unit, onStop: (ForecastLine) -> Unit, onEditFuture: ((ForecastLine) -> Unit)? = null) {
     items(lines, key = { "${it.itemId}:${it.occurrenceKey}" }) { line ->
         val group = when {
-            line.kind == ForecastKind.INCOME -> "Renda"
-            line.group == ForecastGroup.VARIABLE -> "Gasto · Consumo"
-            else -> "Gasto · Compromisso"
+            line.kind == ForecastKind.INCOME -> "Previsto · Receita"
+            line.group == ForecastGroup.VARIABLE -> "Previsto · Gasto variável"
+            else -> "Previsto · Compromisso"
         }
         val status = when {
             line.ignored -> "Ignorada neste ciclo"
@@ -51,7 +51,7 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
             else -> null
         }
         Surface(modifier = Modifier.fillMaxWidth().clickable(enabled = !busy, onClickLabel = "Editar previsão") { onEdit(line) },
-            color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
         ListItem(colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.testTag("forecast-line:${line.itemId}:${line.occurrenceKey}"),
             headlineContent = { Text(privateDisplayText(line.title, hidden), style = MaterialTheme.typography.titleMedium) },
             supportingContent = {

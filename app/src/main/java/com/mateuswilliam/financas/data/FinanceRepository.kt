@@ -69,8 +69,10 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
         require(balanceCents in -Money.MAX_CENTS..Money.MAX_CENTS) { "Saldo fora do limite permitido." }
+        require(!AccountFunds.isReserve(label) || balanceCents >= 0) { "A reserva não pode ter saldo inicial negativo." }
         val date = java.time.Instant.ofEpochMilli(effectiveAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
         require(effectiveAt > 0 && effectiveAt == date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()) { "Informe o início da data de referência." }
+        require(!date.isAfter(LocalDate.now())) { "Use uma data de referência até hoje." }
         val cleanReason = reason.trim()
         require(cleanReason.isNotBlank() && cleanReason.length <= 200 && '\u0000' !in cleanReason) { "Informe um motivo com até 200 caracteres." }
         database.withTransaction {
@@ -146,6 +148,15 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
                 require(AccountNames.key(record.bank) != AccountNames.key(record.destination)) { "Escolha contas diferentes para a transferência." }
                 if (!unchangedLegacy) require(dao.accountByKey(AccountNames.key(record.bank))?.archived == false &&
                     dao.accountByKey(AccountNames.key(record.destination))?.archived == false) { "Cadastre as duas contas próprias antes de transferir." }
+                if (AccountFunds.isReserve(record.bank)) {
+                    val reserve = dao.accountByKey(AccountNames.key(record.bank))
+                    require(reserve != null) { "Cadastre a conta Reserva antes de resgatar." }
+                    val otherRecords = dao.allRecords().filterNot { editing && it.id == record.id }.map { it.toRecord() }
+                    val available = AccountBalances.calculate(listOf(reserve.toOption()), emptySet(),
+                        dao.allAccountBalanceEvents().map { it.toReference() }, otherRecords, record.occurredAt).single().balanceCents
+                    require(available != null) { "Informe o saldo inicial da reserva antes de resgatar." }
+                    require(record.amountCents <= available) { "Saldo insuficiente na reserva na data do resgate." }
+                }
             }
             if (editing) {
                 val previous = dao.recordById(record.id) ?: return@withTransaction false

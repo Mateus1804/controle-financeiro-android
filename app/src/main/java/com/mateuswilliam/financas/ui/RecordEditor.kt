@@ -57,10 +57,11 @@ fun RecordEditor(
     initialDescription: String = "",
     initialCategory: Category? = null,
     realizedOnly: Boolean = false,
-    onOpenExpenseForecast: (() -> Unit)? = null,
     forecastData: ForecastDataset? = null,
     rememberedCategory: Category? = null,
     merchantLabel: String? = null,
+    onOpenForecast: ((Record, ForecastFrequency) -> Unit)? = null,
+    initialFrequency: ForecastFrequency = ForecastFrequency.ONCE,
 ) {
     val initial = existing ?: preset
     val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: initialDate?.atTime(java.time.LocalTime.now())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis() }
@@ -87,6 +88,7 @@ fun RecordEditor(
     var destination by rememberSaveable { mutableStateOf(initial?.destination.orEmpty()) }
     var date by rememberSaveable { mutableStateOf(originalDate.toLocalDate().toString()) }
     var attempted by rememberSaveable { mutableStateOf(false) }
+    var frequency by rememberSaveable { mutableStateOf(initialFrequency) }
     var deleteDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val dateDialogTheme = if (MaterialTheme.colorScheme.background.luminance() < 0.5f)
@@ -104,7 +106,10 @@ fun RecordEditor(
         if (movement == Movement.TRANSFER) destination else "",
         originalRecordId = if (movement == Movement.REFUND) originalRecordId else null, reversalMovement = reversalMovement,
         forecastItemId = forecastItemId, forecastOccurrenceKey = forecastOccurrenceKey)
-    val error = if (realizedOnly && LocalDate.parse(date) > LocalDate.now()) "Use uma data até hoje. Para gastos futuros, crie uma previsão." else RecordValidation.error(record)
+    val canPlan = onOpenForecast != null && existing == null && draft == null && preset == null &&
+        movement in setOf(Movement.INCOME, Movement.EXPENSE)
+    val planning = canPlan && (frequency != ForecastFrequency.ONCE || LocalDate.parse(date) > LocalDate.now())
+    val error = if (realizedOnly && !planning && LocalDate.parse(date) > LocalDate.now()) "Use uma data até hoje. Para gastos futuros, crie uma previsão." else RecordValidation.error(record)
     val duplicates = remember(duplicateIndex, record, draft?.id) { if (draft != null) duplicateIndex?.find(record).orEmpty() else emptyList() }
 
     ModalBottomSheet(
@@ -118,12 +123,14 @@ fun RecordEditor(
             Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(when {
                     draft != null -> "Conferir movimentação"
+                    preset?.movement == Movement.TRANSFER -> "Transferir entre minhas contas"
                     preset != null -> "Conferir previsão"
                     existing != null -> "Editar lançamento"
                     else -> "Novo lançamento"
                 }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(when {
                     draft != null -> "A notificação só vira lançamento após revisão e confirmação."
+                    preset?.movement == Movement.TRANSFER -> "Confira origem, destino e valor. Transferências preservam seu patrimônio."
                     preset != null -> "Confira valor, conta e data efetiva antes de transformar a previsão em lançamento."
                     else -> "Valores, contas e categorias podem ser ajustados antes de salvar."
                 },
@@ -197,8 +204,14 @@ fun RecordEditor(
                         date = it.toString()
                     }
                 }, modifier = Modifier.fillMaxWidth().testTag("record-date")) { AppIcon(R.drawable.ic_calendar); Spacer(Modifier.width(8.dp)); Text("Data: ${LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }
+                if (canPlan) {
+                    ChoiceField("Frequência", frequency, ForecastFrequency.entries, {
+                        when (it) { ForecastFrequency.ONCE -> "Única"; ForecastFrequency.MONTHLY -> "Mensal"; ForecastFrequency.INSTALLMENTS -> "Parcelada" }
+                    }) { if (!busy) frequency = it }
+                    if (planning) Text("Continue para definir a previsão com os dados já preenchidos. Isso não registra um recebimento ou pagamento.", style = MaterialTheme.typography.bodySmall)
+                }
                 FinanceDisclosure("Mais detalhes", "record-payment-details", initiallyExpanded = movement == Movement.TRANSFER) {
-                    if (forecastData != null && movement in setOf(Movement.EXPENSE, Movement.INCOME)) {
+                    if (!planning && forecastData != null && movement in setOf(Movement.EXPENSE, Movement.INCOME)) {
                         val forecastLines = remember(forecastData, date, movement) {
                             ForecastCalculator.report(forecastData, CycleCalendar.periodContaining(LocalDate.parse(date), forecastData.cycleRules)).lines
                                 .filter { !it.ignored && it.kind == if (movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE }
@@ -215,6 +228,7 @@ fun RecordEditor(
                 if (preset == null) ChoiceField("Movimentação", movement,
                     Movement.entries.toList(), { it.label }) {
                     if (movement != it) {
+                        frequency = ForecastFrequency.ONCE
                         category = if (it == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER
                         categoryEdited = false
                         destination = ""
@@ -255,10 +269,6 @@ fun RecordEditor(
                 }
                 }
                 if (attempted && error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                if (onOpenExpenseForecast != null && movement == Movement.EXPENSE) TextButton(
-                    onClick = onOpenExpenseForecast, enabled = !busy,
-                    modifier = Modifier.heightIn(min = 48.dp)
-                ) { Text("Planejar despesa recorrente ou parcelada") }
                 if (onDelete != null) TextButton(onClick = { deleteDialog = true }, enabled = !busy) { Text("Excluir lançamento", color = MaterialTheme.colorScheme.error) }
                 Spacer(Modifier.height(8.dp))
             }
@@ -269,10 +279,10 @@ fun RecordEditor(
                 Button(onClick = {
                     attempted = true
                     if (error == null && !notificationChanged) {
-                        onSave(record)
+                        if (planning) onOpenForecast?.invoke(record, frequency) else onSave(record)
                     }
                 }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
-                    Text(if (busy) "Salvando…" else if (realizedOnly && draft != null) "Confirmar lançamento" else if (realizedOnly && existing == null && movement == Movement.EXPENSE) "Registrar despesa" else if (realizedOnly) "Salvar lançamento" else "Confirmar")
+                    Text(if (busy) "Salvando…" else if (planning) "Continuar previsão" else if (realizedOnly && draft != null) "Confirmar lançamento" else if (realizedOnly && existing == null && movement == Movement.EXPENSE) "Registrar despesa" else if (realizedOnly) "Salvar lançamento" else "Confirmar")
                 }
             }
         }

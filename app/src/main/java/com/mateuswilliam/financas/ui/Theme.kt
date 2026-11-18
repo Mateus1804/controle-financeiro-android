@@ -39,8 +39,8 @@ private val Light = lightColorScheme(
     background = Color.White, onBackground = Color(0xFF1C1B1F),
     surface = Color.White, onSurface = Color(0xFF1C1B1F),
     surfaceVariant = Color(0xFFF0EAF3), onSurfaceVariant = Color(0xFF504A53),
-    surfaceContainerLowest = Color(0xFFF7F3F9), surfaceContainerLow = Color(0xFFF7F3F9),
-    surfaceContainer = Color(0xFFF1EBF4), surfaceContainerHigh = Color(0xFFE9E2ED),
+    surfaceContainerLowest = Color(0xFFFAF8FB), surfaceContainerLow = Color(0xFFFAF8FB),
+    surfaceContainer = Color(0xFFF4F0F6), surfaceContainerHigh = Color(0xFFE9E2ED),
     surfaceContainerHighest = Color(0xFFE1D9E6),
     outline = Color(0xFF7B737E), outlineVariant = Color(0xFFD2CAD5),
     error = Color(0xFFAA3545), onError = Color.White,
@@ -56,7 +56,7 @@ private val Dark = darkColorScheme(
     background = Color(0xFF000000), onBackground = Color(0xFFF2ECF3),
     surface = Color(0xFF17121A), onSurface = Color(0xFFF2ECF3),
     surfaceVariant = Color(0xFF302733), onSurfaceVariant = Color(0xFFD0C7D1),
-    surfaceContainerLowest = Color(0xFF120D15), surfaceContainerLow = Color(0xFF1A141D),
+    surfaceContainerLowest = Color(0xFF101012), surfaceContainerLow = Color(0xFF18151B),
     surfaceContainer = Color(0xFF211A25), surfaceContainerHigh = Color(0xFF2B2330),
     surfaceContainerHighest = Color(0xFF382F3D),
     outline = Color(0xFF9B919D), outlineVariant = Color(0xFF514854),
@@ -94,6 +94,6 @@ fun FinanceTheme(darkTheme: Boolean = isSystemInDarkTheme(), dynamicColor: Boole
     CompositionLocalProvider(LocalFinanceColors provides if (darkTheme) DarkFinance else LightFinance) {
         MaterialTheme(colorScheme = colors, typography = FinanceTypography,
             shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(16.dp),
-                large = RoundedCornerShape(20.dp), extraLarge = RoundedCornerShape(24.dp)), content = content)
+                large = RoundedCornerShape(22.dp), extraLarge = RoundedCornerShape(28.dp)), content = content)
     }
 }
