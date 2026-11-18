@@ -39,8 +39,8 @@ class OptionalFeaturesUiTest {
         "EXEMPLO FICTÍCIO · $id", "Compra aprovada no cartão de R$ 42,90. Mercado Exemplo.", 4290,
         Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Dados fictícios para revisão.", System.currentTimeMillis(), System.currentTimeMillis() - 60_000)
     private fun scrollForecast(matcher: SemanticsMatcher) {
-        rule.openRendlyPlanner()
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(matcher)
+        rule.openRendlyMonth()
+        rule.onNodeWithTag("records-list").performScrollToNode(matcher)
     }
     private fun openReview(id: String) {
         val model = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
@@ -52,14 +52,9 @@ class OptionalFeaturesUiTest {
     }
 
     @Test fun monthlyForecastCanBeCreatedAndRecoveredAfterRecreation() = runBlocking<Unit> {
-        scrollForecast(hasTestTag("forecast-add-expense"))
-        rule.onNodeWithTag("forecast-add-expense").performClick()
-        rule.onNodeWithTag("forecast-title").performTextInput("Limite de consumo fictício")
-        rule.onNodeWithTag("forecast-amount").performScrollTo().performTextInput("10000")
+        rule.newRendlyForecast(Movement.EXPENSE, "Limite de consumo fictício", "10000")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         waitForKeyboard()
-        rule.onNodeWithContentDescription("Frequência").performScrollTo().performClick()
-        rule.onNodeWithText("Mensal").performClick()
         rule.onNodeWithTag("forecast-save").performClick()
         rule.waitUntil(10000) { runBlocking { app.forecasts.dataset.first().rules.size == 1 } }
         val saved = app.forecasts.dataset.first().rules.single()
@@ -268,7 +263,7 @@ class OptionalFeaturesUiTest {
             rule.activityRule.scenario.onActivity { activity ->
                 assertFalse(WindowCompat.getInsetsController(activity.window, activity.window.decorView).isAppearanceLightStatusBars)
             }
-            scrollForecast(hasTestTag("forecast-add-expense"))
+            scrollForecast(hasTestTag("forecast-line:mensal-ficticia:month:${java.time.YearMonth.now()}"))
             rule.onAllNodesWithText(Money.format(123456), substring = true).assertCountEquals(0)
             rule.onAllNodesWithContentDescription(Money.format(123456), substring = true).assertCountEquals(0)
             checkpoint("Capturando planejamento com fonte ampliada")
@@ -285,8 +280,9 @@ class OptionalFeaturesUiTest {
             checkpoint("Mudando orientação")
             rule.activityRule.scenario.onActivity { activity -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             rule.waitUntil(10000) { rule.activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
-            scrollForecast(hasTestTag("forecast-add-expense"))
-            rule.onNodeWithTag("forecast-add-expense").assertIsDisplayed().performClick()
+            scrollForecast(hasTestTag("forecast-line:mensal-ficticia:month:${java.time.YearMonth.now()}"))
+            rule.onNodeWithTag("forecast-actions:mensal-ficticia:month:${java.time.YearMonth.now()}").assertIsDisplayed().performClick()
+            rule.onNodeWithText("Alterar só este mês").performClick()
             rule.onNodeWithTag("forecast-title").assertExists()
             rule.onNodeWithText("Mostrar valor da previsão para edição").performScrollTo().assertIsDisplayed()
             rule.onNodeWithTag("forecast-amount").assertDoesNotExist()

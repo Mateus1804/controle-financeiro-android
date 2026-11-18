@@ -13,10 +13,12 @@ import com.mateuswilliam.financas.core.*
 private const val VISIBLE_ROWS = 5
 
 @Composable
-internal fun MonthComparisonCard(comparison: MonthComparison, hidden: Boolean, onCategory: (Category) -> Unit) {
+internal fun MonthComparisonCard(comparison: MonthComparison, hidden: Boolean, period: BudgetPeriod? = null, onCategory: (Category) -> Unit) {
     Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(Modifier.fillMaxWidth().testTag("month-comparison").padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            SectionTitle("Comparação com o mês anterior", comparison.throughDay?.let { "Do dia 1 ao dia $it de cada mês · gastos líquidos" } ?: "Gastos líquidos por categoria")
+            SectionTitle(if (period == null) "Comparação com o mês anterior" else "Comparação com o período anterior",
+                if (period == null) comparison.throughDay?.let { "Do dia 1 ao dia $it de cada mês · gastos líquidos" } ?: "Gastos líquidos por categoria"
+                else "Gastos líquidos nos períodos financeiros selecionados")
             if (comparison.differences.isEmpty()) Text("Sem gastos para comparar nestes períodos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             comparison.differences.take(VISIBLE_ROWS).forEach { diff ->
                 val worse = diff.deltaCents > 0

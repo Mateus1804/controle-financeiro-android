@@ -13,9 +13,9 @@ enum class PaymentMethod(val label: String) {
 enum class Category(val label: String) {
     FOOD("Alimentação"), HOME("Moradia"), TRANSPORT("Transporte"),
     HEALTH("Saúde"), EDUCATION("Educação"), LEISURE("Lazer"), OTHER("Outros"),
-    SERVICES("Serviços"), SALARY("Salário"), SELF_EMPLOYED("Trabalho autônomo"),
+    SERVICES("Serviços"), SALARY("Salário"), SELF_EMPLOYED("Freelancer / trabalho autônomo"),
     SALES("Vendas"), INVESTMENT("Rendimentos"), RENTAL_INCOME("Aluguéis recebidos"),
-    BENEFITS("Benefícios"), OTHER_INCOME("Outras receitas")
+    BENEFITS("Benefícios"), OTHER_INCOME("Outras receitas"), EXTRA_INCOME("Renda extra")
 }
 
 data class NotificationInput(
@@ -76,7 +76,7 @@ object RecordValidation {
 /** Categories offered for new entries; stored legacy categories remain valid. */
 fun categoriesFor(movement: Movement, reversalMovement: Movement = Movement.EXPENSE): List<Category> =
     when (if (movement == Movement.REFUND) reversalMovement else movement) {
-        Movement.INCOME -> listOf(Category.SALARY, Category.SELF_EMPLOYED, Category.SALES,
+        Movement.INCOME -> listOf(Category.SALARY, Category.SELF_EMPLOYED, Category.EXTRA_INCOME, Category.SALES,
             Category.INVESTMENT, Category.RENTAL_INCOME, Category.BENEFITS, Category.OTHER_INCOME)
         Movement.EXPENSE, Movement.UNKNOWN -> listOf(Category.FOOD, Category.HOME, Category.TRANSPORT,
             Category.HEALTH, Category.EDUCATION, Category.LEISURE, Category.OTHER, Category.SERVICES)

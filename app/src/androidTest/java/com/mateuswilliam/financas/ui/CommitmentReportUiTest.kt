@@ -27,7 +27,7 @@ class CommitmentReportUiTest {
 
     @Before fun reset() = ui.reset()
 
-    @Test fun selectedCycleGroupsCategoriesAndOnlyForecastEditsChangeItsProjection() = runBlocking<Unit> {
+    @Test fun selectedCycleGroupsRecordedAndForecastExpensesWithoutLosingTheActualRecord() = runBlocking<Unit> {
         val cycle = ui.period()
         val next = CycleCalendar.periodContaining(cycle.endExclusive, ui.current().cycleRules)
         ui.seed("renda", "Receita deste ciclo", 100000, ForecastKind.INCOME)
@@ -42,14 +42,14 @@ class CommitmentReportUiTest {
         assertEquals(33000L, ui.report(cycle).totalExpensesCents)
         assertEquals(67000L, ui.report(cycle).marginCents)
         scrollCategories()
-        assertCategory(Category.OTHER, 3000)
+        assertCategory(Category.OTHER, 93000)
         assertCategory(Category.HOME, 20000)
         rule.runOnIdle { app.settings.setAppearance(Appearance.LIGHT) }
         rule.waitForIdle(); capture("previsoes-categorias-claro")
         rule.runOnIdle { app.settings.setAppearance(Appearance.DARK) }
         rule.waitForIdle(); capture("previsoes-categorias-escuro")
         ui.openProjections()
-        ui.assertProjection(cycle, "33,00", 67000)
+        ui.assertProjection(cycle, "123,00", -23000)
         ui.assertProjection(next, "10,00", 180000)
 
         rule.openRendlyPlanner()
@@ -60,7 +60,7 @@ class CommitmentReportUiTest {
         assertEquals(20000L, ui.report(next).totalExpensesCents)
         assertEquals(listOf(actual), app.repository.exportRecords())
         ui.openProjections()
-        ui.assertProjection(cycle, "36,00", 64000)
+        ui.assertProjection(cycle, "126,00", -26000)
         ui.assertProjection(next, "10,00", 180000)
     }
 
@@ -110,7 +110,7 @@ class CommitmentReportUiTest {
         assertEquals(9500L, ui.report(cycle).totalExpensesCents)
         assertNull(ui.report(cycle).expensePercentage)
         rule.openRendlyPlanner()
-        ui.clickTag("forecast-add-income", dashboard = true)
+        ui.startForecast(Movement.INCOME, "Receita prevista", "100000")
         rule.onNode(hasText("Nova previsão") and hasAnyAncestor(isDialog())).assertIsDisplayed()
         rule.onNodeWithContentDescription("Tipo").assertTextContains("Receita")
         rule.onNodeWithTag("forecast-amount").assertExists()

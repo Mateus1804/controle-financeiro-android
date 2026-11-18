@@ -87,7 +87,8 @@ internal fun AccountsManager(balances: List<AccountBalance>, references: List<Ac
     editingKey?.let { key ->
         val balance = balances.find { it.account.key == key }
         key(key) { AccountBalanceEditor(balance, references.filter { it.accountKey == key }, hidden, busy,
-            onDismiss = { editingKey = null }, onSave = { name, cents, at, reason -> onSave(name, cents, at, reason) { editingKey = null } }) }
+            onDismiss = { editingKey = null }, onSave = { name, cents, at, reason -> onSave(name, cents, at, reason) { editingKey = null } },
+            knownBalances = balances, allReferences = references) }
     }
     archiveKey?.let { key ->
         AlertDialog(onDismissRequest = { if (!busy) archiveKey = null }, title = { DialogSystemBars(); Text("Arquivar conta?") },
@@ -98,14 +99,20 @@ internal fun AccountsManager(balances: List<AccountBalance>, references: List<Ac
 }
 
 @Composable
-private fun AccountBalanceEditor(existing: AccountBalance?, history: List<AccountBalanceReference>, hidden: Boolean, busy: Boolean,
-    onDismiss: () -> Unit, onSave: (String, Long, Long, String) -> Unit) {
-    val correction = history.isNotEmpty()
-    var name by rememberSaveable { mutableStateOf(existing?.account?.label.orEmpty()) }
+internal fun AccountBalanceEditor(existing: AccountBalance?, history: List<AccountBalanceReference>, hidden: Boolean, busy: Boolean,
+    onDismiss: () -> Unit, onSave: (String, Long, Long, String) -> Unit,
+    initialName: String = "", initialDate: LocalDate = LocalDate.now(),
+    knownBalances: List<AccountBalance> = emptyList(), allReferences: List<AccountBalanceReference> = history,
+    lockAccountName: Boolean = false) {
+    var name by rememberSaveable { mutableStateOf(existing?.account?.label ?: initialName) }
+    val accountKey = AccountNames.key(name)
+    val matching = existing ?: knownBalances.firstOrNull { it.account.key == accountKey }
+    val matchingHistory = allReferences.filter { it.accountKey == accountKey }
+    val correction = matchingHistory.isNotEmpty()
     val amount = rememberTextFieldState() // Empty deliberately: a correction must be entered explicitly.
     var negative by rememberSaveable { mutableStateOf(false) }
-    var date by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    var reason by rememberSaveable { mutableStateOf(if (correction) "" else "Saldo inicial") }
+    var date by rememberSaveable { mutableStateOf(initialDate.toString()) }
+    var reason by rememberSaveable(accountKey, correction) { mutableStateOf(if (correction) "" else "Saldo inicial") }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var invalid by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -114,6 +121,7 @@ private fun AccountBalanceEditor(existing: AccountBalance?, history: List<Accoun
     val error = when {
         AccountNames.clean(name).isBlank() -> "Informe o nome da conta."
         cents == null -> "Informe o saldo, inclusive se for zero."
+        AccountFunds.isReserve(name) && negative && cents != 0L -> "A reserva não pode ter saldo inicial negativo."
         LocalDate.parse(date).isAfter(LocalDate.now()) -> "Use uma data de referência até hoje."
         reason.isBlank() -> "Informe o motivo da correção."
         else -> null
@@ -123,9 +131,10 @@ private fun AccountBalanceEditor(existing: AccountBalance?, history: List<Accoun
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             PrivateValueGate(hidden, "Mostrar conta para edição") {
                 OutlinedTextField(name, { name = it.take(80) }, label = { Text("Nome / identificação da conta") },
-                    enabled = !busy && existing == null, modifier = Modifier.fillMaxWidth().testTag("balance-account-name"), singleLine = true)
+                    enabled = !busy && existing == null && !lockAccountName, modifier = Modifier.fillMaxWidth().testTag("balance-account-name"), singleLine = true)
             }
-            existing?.balanceCents?.let { Text(if (hidden) "Saldo atual oculto" else "Saldo calculado atual: ${Money.format(it)}", style = MaterialTheme.typography.bodySmall) }
+            matching?.balanceCents?.let { Text(if (hidden) "Saldo atual oculto" else "Saldo calculado atual: ${Money.format(it)}", style = MaterialTheme.typography.bodySmall) }
+            if (existing == null && correction) Text("Esta conta já possui saldo de referência. O novo valor será uma correção; informe o motivo. O histórico será preservado.", style = MaterialTheme.typography.bodySmall)
             PrivateValueGate(hidden, "Mostrar saldo para edição") {
                 MoneyAmountField(amount, attempted, !busy, label = "Saldo no início da data (R$)", tag = "account-balance-input", allowZero = true, onInvalidInput = { invalid = it })
             }
@@ -139,8 +148,8 @@ private fun AccountBalanceEditor(existing: AccountBalance?, history: List<Accoun
             Text("Informe o saldo no início desta data, antes das movimentações do dia. Lançamentos anteriores já estão incluídos nesse valor e não serão somados novamente. Saldo inicial e correções não são receitas nem despesas.", style = MaterialTheme.typography.bodySmall)
             OutlinedTextField(reason, { reason = it.take(200) }, label = { Text(if (correction) "Motivo da correção" else "Observação") }, enabled = !busy,
                 modifier = Modifier.fillMaxWidth().testTag("balance-reason"))
-            if (history.isNotEmpty()) FinanceDisclosure("Histórico de referências", "balance-history") {
-                history.sortedWith(compareByDescending<AccountBalanceReference> { it.effectiveAt }.thenByDescending { it.id }).forEach { ref ->
+            if (matchingHistory.isNotEmpty()) FinanceDisclosure("Histórico de referências", "balance-history") {
+                matchingHistory.sortedWith(compareByDescending<AccountBalanceReference> { it.effectiveAt }.thenByDescending { it.id }).forEach { ref ->
                     Text("${shortDate(ref.effectiveAt)} · ${if (hidden) "Valor oculto" else Money.format(ref.balanceCents)}", style = MaterialTheme.typography.bodySmall)
                     Text(privateDisplayText(ref.reason, hidden), style = MaterialTheme.typography.bodySmall)
                 }

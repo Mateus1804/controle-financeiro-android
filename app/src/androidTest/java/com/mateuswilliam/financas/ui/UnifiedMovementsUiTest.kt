@@ -118,7 +118,7 @@ class UnifiedMovementsUiTest {
         assertTrue(ui.data().overrides.isEmpty())
     }
 
-    @Test fun projectionsKeepAnalysisSeparateFromActualMovementManagement() {
+    @Test fun projectionsIncludeActualAndUnlinkedForecastExpensesWithoutEditingThem() {
         ui.seed(ForecastRule("analysis", month.atDay(1), "Despesa prevista", ForecastKind.EXPENSE,
             5000, Category.HOME, ForecastFrequency.MONTHLY, month.atDay(1)))
         val actual = Record("realized", 2500, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
@@ -127,7 +127,7 @@ class UnifiedMovementsUiTest {
         rule.openRendlyProjections()
         rule.onNodeWithTag("forecast-projections").assertExists()
         rule.onNodeWithTag("forecast-projections").performScrollToNode(hasTestTag("projection-margin-${month.atDay(1)}"))
-        rule.onNodeWithTag("projection-margin-${month.atDay(1)}").assertTextContains(Money.format(-5000))
+        rule.onNodeWithTag("projection-margin-${month.atDay(1)}").assertTextContains(Money.format(-7500))
         rule.onNodeWithText("Adicionar recorrência").assertDoesNotExist()
         rule.onNodeWithText("Registrar pagamento").assertDoesNotExist()
         assertEquals(5000L, ui.report().totalExpensesCents)

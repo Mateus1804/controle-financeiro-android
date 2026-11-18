@@ -24,3 +24,9 @@ Linhas removidas: SalaryScreen, MonthlyResultCard e três testes do cartão (cer
 Testes executados no CI do PR #52: build, lint, testes do core (incluindo AccountTotalTest) e suíte completa na API 35, mais o teste de reset. Todos verdes.
 
 Não foi feito: remover SalarySummary do core (ainda usado por testes e pelo cálculo do orçamento), unificar a exibição de receitas previstas em Comprometimento e Fixas, e mover a lista de contas só para Mais (hoje o toque na Conta total também abre o ajuste de saldos). Sem teste manual em aparelho físico.
+
+## Controle financeiro centralizado
+
+A aba Mês reúne registros, previsões, recorrências e saldos de referência. Receitas e despesas podem ser únicas, mensais ou parceladas. Resultado mostra as movimentações registradas no período. Planejador e Comprometimento combinam o registrado com as previsões pendentes. O ciclo também se aplica aos gráficos.
+
+A reserva usa a conta Reserva de emergência. Os eventos anteriores ficam no histórico de consulta porque não identificam a outra conta da transferência. O aplicativo mantém o banco, o identificador e a estrutura do backup desta base. As categorias atuais são identificadas por chaves estáveis. Categorias livres exigiriam uma estratégia própria de identificação e restauração.

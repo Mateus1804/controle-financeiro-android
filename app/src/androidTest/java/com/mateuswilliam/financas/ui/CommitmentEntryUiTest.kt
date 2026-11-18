@@ -21,11 +21,7 @@ class CommitmentEntryUiTest {
     @Before fun reset() = ui.reset()
 
     @Test fun installmentForecastDistributesEveryCentWithoutRecordingPayments() = runBlocking<Unit> {
-        ui.clickTag("forecast-add-expense", dashboard = true)
-        ui.type("forecast-title", "Notebook fictício")
-        rule.onNodeWithText("Uma vez").performScrollTo().performClick()
-        rule.onNodeWithText("Parcelada").performClick()
-        ui.type("forecast-amount", "60001")
+        ui.startForecast(Movement.EXPENSE, "Notebook fictício", "60001", ForecastFrequency.INSTALLMENTS)
         ui.type("forecast-installment-count", "6")
         rule.onNodeWithText("1 parcelas de ${Money.format(10001)} e 5 de ${Money.format(10000)}")
             .performScrollTo().assertIsDisplayed()
@@ -46,7 +42,7 @@ class CommitmentEntryUiTest {
         assertEquals((1..6).map { "installment:$it" }, parts.map { it.occurrenceKey })
         assertEquals(listOf(10001L, 10000L, 10000L, 10000L, 10000L, 10000L), parts.map { it.amountCents })
         assertEquals(60001L, parts.sumOf { it.amountCents })
-        assertEquals((0L..5L).map { ui.period().start.plusMonths(it) }, parts.map { it.date })
+        assertEquals((0L..5L).map { saved.startDate.plusMonths(it) }, parts.map { it.date })
         assertTrue(ui.report(cycle).lines.isEmpty())
         assertTrue(app.repository.exportRecords().isEmpty())
         rule.activityRule.scenario.recreate()

@@ -31,18 +31,17 @@ internal fun DisplayNameDialog(initial: String, dismiss: () -> Unit, save: (Stri
 }
 
 @Composable
-internal fun RendlyCategories(report: ForecastReport, hidden: Boolean) {
+internal fun RendlyCategories(summary: CentralFinancialSummary, hidden: Boolean) {
     Column(Modifier.testTag("forecast-categories"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Gastos por categoria", style = MaterialTheme.typography.titleMedium)
-        val grouped = report.lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE }
-            .groupBy { it.category }.mapValues { (_, lines) -> lines.sumOf { it.amountCents } }
+        val grouped = summary.expensesByCategory
         if (grouped.isEmpty()) Text("As categorias aparecem após cadastrar despesas.")
         grouped.entries.sortedByDescending { it.value }.forEach { (category, cents) ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(category.label, Modifier.weight(1f)); Amount(cents, hidden, size = 16)
             }
-            if (!hidden && grouped.values.all { it >= 0 } && report.totalExpensesCents > 0 && cents > 0) LinearProgressIndicator(
-                progress = { (cents.toDouble() / report.totalExpensesCents).toFloat().coerceIn(0f, 1f) },
+            if (!hidden && grouped.values.all { it >= 0 } && summary.projectedExpensesCents > 0 && cents > 0) LinearProgressIndicator(
+                progress = { (cents.toDouble() / summary.projectedExpensesCents).toFloat().coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth())
         }
     }
