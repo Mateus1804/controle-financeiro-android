@@ -60,7 +60,8 @@ internal fun ComposeContentTestRule.newRendlyForecast(
     androidx.test.espresso.Espresso.closeSoftKeyboard()
     if (category != null) {
         onNodeWithContentDescription("Categoria").performScrollTo().performClick()
-        onNodeWithText(category.label).performScrollTo().performClick()
+        onNode(hasText(category.label) and hasClickAction() and !hasTestTag("record-description"))
+            .performScrollTo().performClick()
     }
     onNodeWithContentDescription("Frequência").performScrollTo().performClick()
     onNodeWithText(if (frequency == com.mateuswilliam.financas.core.ForecastFrequency.INSTALLMENTS) "Parcelada" else "Mensal").performClick()
