@@ -30,7 +30,7 @@ import com.mateuswilliam.financas.data.Appearance
 fun SettingsScreen(
     settings: CaptureSettings, connected: Boolean, hasAccess: Boolean, canAlert: Boolean, captureError: Boolean,
     onToggle: (Boolean) -> Unit, onApps: () -> Unit, onAccess: () -> Unit,
-    onReconnect: () -> Unit, onAlerts: () -> Unit, onExport: () -> Unit,
+    onReconnect: () -> Unit, onAlerts: () -> Unit, onExport: (() -> Unit)?,
     onClear: () -> Unit, onSimulate: () -> Unit, onAppearance: (Appearance) -> Unit, busy: Boolean,
     onBackup: () -> Unit, onRestore: () -> Unit, onPlanning: () -> Unit,
     onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit, onReminders: (Boolean) -> Unit = {},
@@ -122,7 +122,10 @@ fun SettingsScreen(
                     ))
                 }
                 Text("Os registros ficam neste aparelho. O CSV é um relatório; o backup permite recuperar os dados do aplicativo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text(if (plannerMode) "Exportar previsões em CSV" else "Exportar lançamentos em CSV") }
+                OutlinedButton(onClick = { onExport?.invoke() }, enabled = !busy && onExport != null,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) {
+                    Text(if (plannerMode) "Exportar previsões em CSV" else "Exportar lançamentos em CSV")
+                }
             }
         }
         item {

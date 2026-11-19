@@ -15,7 +15,7 @@ import java.time.ZoneId
 @Composable
 internal fun ForecastEditorDialogs(
     editors: ForecastEditorsState, model: ForecastViewModel, snapshot: ForecastDataset?,
-    period: BudgetPeriod, report: ForecastReport?, today: LocalDate, zone: ZoneId,
+    period: BudgetPeriod, upcomingDue: List<ForecastLine>, zone: ZoneId,
     busy: Boolean, hidden: Boolean, onEdit: (ForecastLine) -> Unit,
 ) {
     val editingPeriod = if (editors.scopeStart != null && editors.scopeEnd != null) BudgetPeriod(LocalDate.parse(editors.scopeStart), LocalDate.parse(editors.scopeEnd)) else period
@@ -26,12 +26,11 @@ internal fun ForecastEditorDialogs(
         it.itemId == editors.editItem && it.occurrenceKey == editors.editKey &&
             it.reusedInstallmentStart?.toString() == editors.editInstallmentStart
     }
-    if (editors.dueDates && report != null) AlertDialog(onDismissRequest = { editors.dueDates = false },
+    if (editors.dueDates) AlertDialog(onDismissRequest = { editors.dueDates = false },
         title = { Text("Próximos vencimentos") }, text = {
             LazyColumn(Modifier.heightIn(max = 400.dp)) {
-                val upcoming = report.lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && !it.rule.cycleAnchored && it.date >= today }.sortedBy { it.date }
-                if (upcoming.isEmpty()) item { Text("Sem vencimentos previstos restantes neste ciclo.") }
-                upcoming.forEach { line -> item {
+                if (upcomingDue.isEmpty()) item { Text("Sem vencimentos previstos restantes neste ciclo.") }
+                upcomingDue.forEach { line -> item {
                     TextButton({ editors.dueDates = false; onEdit(line) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Column(Modifier.weight(1f)) { Text(privateDisplayText(line.title, hidden)); Text(line.date.toString()) }
                         Amount(line.amountCents, hidden, size = 16)

@@ -30,7 +30,7 @@ internal fun transferPreviewBalance(balance: AccountBalance, edited: Record, exi
 }
 
 @Composable
-internal fun TransferPreview(record: Record, existing: Record?, balances: List<AccountBalance>, hidden: Boolean) {
+internal fun TransferPreview(record: Record, existing: Record?, balances: List<AccountBalance>, hidden: Boolean, balancesAsOf: Long) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             val future = record.occurredAt > System.currentTimeMillis()
@@ -50,7 +50,7 @@ internal fun TransferPreview(record: Record, existing: Record?, balances: List<A
             affectedAccounts.forEach { (label, name) ->
                 val balance = balances.firstOrNull { it.account.key == AccountNames.key(name) }
                 Text("$label: ${privateDisplayText(name.ifBlank { "Escolha uma conta" }, hidden)}", style = MaterialTheme.typography.bodySmall)
-                val projected = balance?.let { transferPreviewBalance(it, record, existing, System.currentTimeMillis()) }
+                val projected = balance?.let { transferPreviewBalance(it, record, existing, balancesAsOf) }
                 if (projected == null) Text("Saldo desconhecido · configure uma referência", style = MaterialTheme.typography.bodySmall)
                 else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Amount(balance.balanceCents!!, hidden, size = 14)

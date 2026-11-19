@@ -9,7 +9,6 @@ import com.mateuswilliam.financas.core.AccountCatalog
 import com.mateuswilliam.financas.core.AccountNames
 import com.mateuswilliam.financas.core.Movement
 import com.mateuswilliam.financas.core.*
-import java.time.YearMonth
 import java.time.LocalDate
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
@@ -23,7 +22,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-data class LedgerRecords(val records: List<Record>, val manualRecords: List<Record>)
+internal data class AccountLedger(
+    val asOf: Long,
+    val records: List<Record>,
+    val manualRecords: List<Record>,
+    val balances: List<AccountBalance>,
+    val references: List<AccountBalanceReference>,
+)
 
 data class CaptureResult(val id: String, val isNew: Boolean)
 class DraftChangedException : IllegalStateException("A notificação mudou. Abra a pendência novamente para conferir os dados atuais.")
@@ -32,19 +37,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     private val dao = database.financeDao()
     private val writes = Mutex()
     val pending = dao.pending()
-    // Uma emissão mantém o extrato e os candidatos manuais na mesma revisão do banco.
-    val ledger = dao.records().map { rows ->
-        val records = ArrayList<Record>(rows.size)
-        val manual = ArrayList<Record>()
-        rows.forEach { row ->
-            val record = row.toRecord()
-            records.add(record)
-            if (row.sourceDraftId == null) manual.add(record)
-        }
-        LedgerRecords(records, manual)
-    }.flowOn(Dispatchers.Default)
-    val records = ledger.map { it.records }
-    val manualRecords = ledger.map { it.manualRecords }
+    val records = dao.records().map { rows -> rows.map { it.toRecord() } }.flowOn(Dispatchers.Default)
     val allAccounts = combine(dao.accounts(), dao.usedAccounts()) { saved, used ->
         AccountCatalog.merge(saved.map { it.toOption() }, used.map { AccountOption("", it.label, it.lastUsedAt) })
     }.flowOn(Dispatchers.Default)
@@ -52,18 +45,25 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         val archived = saved.filter { it.archived }.map { it.nameKey }.toSet()
         merged.filterNot { it.key in archived }
     }
-    val accountBalanceEvents = dao.accountBalanceEvents().map { rows -> rows.map { it.toReference() } }
-    fun observeAccountBalances(asOf: Long = System.currentTimeMillis()) = database.invalidationTracker.createFlow(
+    fun observeAccountBalances(asOf: Long = System.currentTimeMillis()) =
+        observeAccountLedger { asOf }.map { it.balances }.distinctUntilChanged()
+
+    // Extrato, referências e saldos usam a mesma leitura do banco e o mesmo horário.
+    internal fun observeAccountLedger(now: () -> Long = System::currentTimeMillis) = database.invalidationTracker.createFlow(
         "accounts", "account_balance_events", "records",
     ).conflate().map {
         database.withTransaction {
+            val asOf = now()
             val saved = dao.allAccounts()
-            val entries = dao.allRecords().map { it.toRecord() }
-            AccountBalances.calculate(AccountCatalog.options(saved.map { it.toOption() }, entries),
-                saved.filter { it.archived }.map { it.nameKey }.toSet(), dao.allAccountBalanceEvents().map { it.toReference() }, entries, asOf)
+            val rows = dao.allRecords()
+            val records = rows.map { it.toRecord() }
+            val manualRecords = records.filterIndexed { index, _ -> rows[index].sourceDraftId == null }
+            val references = dao.allAccountBalanceEvents().map { it.toReference() }
+            val balances = AccountBalances.calculate(AccountCatalog.options(saved.map { it.toOption() }, records),
+                saved.filter { it.archived }.map { it.nameKey }.toSet(), references, records, asOf)
+            AccountLedger(asOf, records, manualRecords, balances, references)
         }
     }.distinctUntilChanged().flowOn(Dispatchers.Default)
-    suspend fun accountBalanceHistory(key: String) = dao.allAccountBalanceEvents().filter { it.accountKey == key }.map { it.toReference() }
 
     suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) = writes.withLock {
         val label = AccountNames.clean(name)

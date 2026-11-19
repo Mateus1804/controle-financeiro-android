@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        financeModel.refreshBalances()
         resumeCount++
         synchronizeSystemBarIcons()
         if (::session.isInitialized) {

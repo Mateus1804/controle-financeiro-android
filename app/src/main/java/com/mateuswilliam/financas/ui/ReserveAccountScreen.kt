@@ -10,7 +10,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 /** A reserva é uma conta; o histórico legado continua consultável sem criar transferências fictícias. */
@@ -20,6 +19,7 @@ internal fun ReserveAccountScreen(
     hidden: Boolean, busy: Boolean, onSet: () -> Unit, onAdd: () -> Unit,
     onWithdraw: () -> Unit, onGoal: () -> Unit,
     currentReserve: AccountBalance? = balances.firstOrNull { it.account.key == AccountFunds.RESERVE_KEY },
+    asOf: Long = System.currentTimeMillis(),
 ) {
     val reserveKey = AccountFunds.RESERVE_KEY
     val balance = balances.firstOrNull { it.account.key == reserveKey }?.balanceCents
@@ -27,9 +27,9 @@ internal fun ReserveAccountScreen(
     val canTransfer = !busy && currentBalance != null && currentReserve.archived == false
     val legacyBalance = if (currentBalance == null) ForecastCalculator.reserveBalance(data.reserveEvents) else null
     val zone = ZoneId.systemDefault()
-    val now = System.currentTimeMillis()
+    val today = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
     val transfers = records.filter { record ->
-        record.movement == Movement.TRANSFER && record.occurredAt <= now &&
+        record.movement == Movement.TRANSFER && record.occurredAt <= asOf &&
             Instant.ofEpochMilli(record.occurredAt).atZone(zone).toLocalDate() in period &&
             (AccountNames.key(record.bank) == reserveKey || AccountNames.key(record.destination) == reserveKey)
     }.sortedByDescending { it.occurredAt }
@@ -46,7 +46,7 @@ internal fun ReserveAccountScreen(
                     Text("Saldo acumulado da reserva", style = MaterialTheme.typography.titleMedium)
                     if (balance == null) Text("Informe o saldo inicial da conta Reserva, inclusive se for zero.")
                     else Amount(balance, hidden, Modifier.testTag("reserve-balance"), size = 30)
-                    Text("Até ${minOf(period.endExclusive.minusDays(1), LocalDate.now()).format(financeDateFormat)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Até ${minOf(period.endExclusive.minusDays(1), today).format(financeDateFormat)}", style = MaterialTheme.typography.bodySmall)
                     if (legacyBalance != null) {
                         Text("Último saldo do controle anterior", style = MaterialTheme.typography.bodySmall)
                         Amount(legacyBalance, hidden, Modifier.testTag("reserve-legacy-balance"), size = 18)
