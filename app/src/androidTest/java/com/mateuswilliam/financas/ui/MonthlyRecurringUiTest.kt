@@ -90,10 +90,14 @@ class MonthlyRecurringUiTest {
         ui.assertNoRecords()
     }
 
-    @Test fun futureScopeLoadsTheRuleAmountAndReplacesLaterRulesWithoutLosingTheOccurrence() {
+    @Test fun futureScopeUpdatesTheSelectedOccurrenceAndPreservesLaterOverrides() {
         ui.seed(plan.copy(effectiveFrom = month.plusMonths(1).atDay(1), amountCents = 9000))
-        runBlocking { ui.app.forecasts.saveOverride(ForecastOverride(plan.itemId, "month:$month", 6250)) }
-        ui.waitData { it.overrides.singleOrNull()?.amountCents == 6250L }
+        val futureKey = "month:${month.plusMonths(2)}"
+        runBlocking {
+            ui.app.forecasts.saveOverride(ForecastOverride(plan.itemId, "month:$month", 6250))
+            ui.app.forecasts.saveOverride(ForecastOverride(plan.itemId, futureKey, 7100))
+        }
+        ui.waitData { it.overrides.size == 2 }
         ui.open(ui.report().lines.single())
         ui.clickText("Alterar só este mês"); ui.clickText("Aplicar deste mês em diante")
         val amount = rule.onNodeWithTag("forecast-amount").performScrollTo().fetchSemanticsNode()
@@ -101,11 +105,12 @@ class MonthlyRecurringUiTest {
         assertEquals(5000L, MoneyInput.normalize(amount)?.toLongOrNull())
         rule.onNodeWithTag("forecast-amount").performTextReplacement("8000")
         ui.saveEditor()
-        ui.waitData { it.rules.size == 1 && it.rules.single().amountCents == 8000L }
-        assertEquals(6250L, ui.report().totalExpensesCents)
+        ui.waitData { it.rules.size == 1 && it.rules.single().amountCents == 8000L && it.overrides.size == 1 }
+        assertEquals(8000L, ui.report().totalExpensesCents)
         assertEquals(8000L, ui.report(month.plusMonths(1)).totalExpensesCents)
-        assertEquals(8000L, ui.report(month.plusMonths(2)).totalExpensesCents)
-        assertEquals(6250L, ui.data().overrides.single().amountCents)
+        assertEquals(7100L, ui.report(month.plusMonths(2)).totalExpensesCents)
+        assertEquals(8000L, ui.report(month.plusMonths(3)).totalExpensesCents)
+        assertEquals(futureKey, ui.data().overrides.single().occurrenceKey)
         ui.assertNoRecords()
     }
 }
