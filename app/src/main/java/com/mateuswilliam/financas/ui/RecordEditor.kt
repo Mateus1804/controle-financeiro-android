@@ -47,8 +47,6 @@ fun RecordEditor(
     preset: Record? = null, initialMovement: Movement = Movement.EXPENSE,
     duplicateIndex: DuplicateCandidates? = null,
     hideAmounts: Boolean = false,
-    reviewProgress: String? = null,
-    newPendingCount: Int = 0,
     notificationChanged: Boolean = false,
     onAcceptUpdate: () -> Unit = {},
     initialDate: LocalDate? = null,
@@ -135,7 +133,6 @@ fun RecordEditor(
                     else -> "Valores, contas e categorias podem ser ajustados antes de salvar."
                 },
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                reviewProgress?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
             }
             val fields = if (compactHeight) Modifier else Modifier.weight(1f, fill = false).verticalScroll(fieldsScroll)
             Column(fields.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -149,7 +146,6 @@ fun RecordEditor(
                         }
                     }
                 }
-                if (newPendingCount > 0) Text("$newPendingCount nova(s) pendência(s) disponível(is). Os campos desta revisão foram mantidos.", style = MaterialTheme.typography.bodySmall)
                 if (notificationChanged) {
                     Text("A notificação foi atualizada. O texto de origem acima está atualizado; os campos editados foram preservados. Confira a atualização antes de confirmar.", color = MaterialTheme.colorScheme.error)
                     OutlinedButton(onClick = onAcceptUpdate, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Usar esta versão e manter a edição") }
@@ -214,7 +210,8 @@ fun RecordEditor(
                     if (!planning && forecastData != null && movement in setOf(Movement.EXPENSE, Movement.INCOME)) {
                         val forecastLines = remember(forecastData, date, movement) {
                             ForecastCalculator.report(forecastData, CycleCalendar.periodContaining(LocalDate.parse(date), forecastData.cycleRules)).lines
-                                .filter { !it.ignored && it.kind == if (movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE }
+                                .filter { !it.ignored && it.reusedInstallmentStart == null &&
+                                    it.kind == if (movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE }
                         }
                         val selectedLink = forecastItemId?.let { item -> item to forecastOccurrenceKey!! }
                         val options = (listOf<Pair<String,String>?>(null) + forecastLines.map { it.itemId to it.occurrenceKey } + listOfNotNull(selectedLink)).distinct()

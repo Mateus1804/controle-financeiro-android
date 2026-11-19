@@ -15,7 +15,8 @@ class PendingForecasts(dataset: ForecastDataset, records: List<Record>) {
             addAll(cycleLines(cycle).filter { it.date in period })
             cycle = CycleCalendar.periodContaining(cycle.endExclusive, data.cycleRules)
         }
-    }.distinctBy { it.itemId to it.occurrenceKey }.sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
+    }.distinctBy { Triple(it.itemId, it.occurrenceKey, it.reusedInstallmentStart) }
+        .sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
 
     private fun cycleLines(cycle: BudgetPeriod): List<ForecastLine> {
         val forecasts = ForecastCalculator.report(data, cycle).lines
@@ -23,11 +24,11 @@ class PendingForecasts(dataset: ForecastDataset, records: List<Record>) {
             it.kind == ForecastKind.EXPENSE && !it.statementTotal && it.statementKey.isNotBlank()
         }.groupBy { it.statementKey }.mapValues { (_, components) ->
             components.sumOf { component ->
-                linked[component.itemId to component.occurrenceKey].orEmpty().sumOf { it.expenseContribution() }
+                linkedRecords(component).sumOf { it.expenseContribution() }
             }
         }.toMutableMap()
         return forecasts.mapNotNull { line ->
-            if ((line.itemId to line.occurrenceKey) in linked) return@mapNotNull null
+            if (linkedRecords(line).isNotEmpty()) return@mapNotNull null
             if (!line.included || line.kind != ForecastKind.EXPENSE || !line.statementTotal) return@mapNotNull line
             val alreadyCovered = minOf(line.amountCents, covered[line.statementKey] ?: 0L)
             covered[line.statementKey] = (covered[line.statementKey] ?: 0L) - alreadyCovered
@@ -35,4 +36,7 @@ class PendingForecasts(dataset: ForecastDataset, records: List<Record>) {
             else line.copy(amountCents = line.amountCents - alreadyCovered, coveredCents = alreadyCovered)
         }
     }
+
+    private fun linkedRecords(line: ForecastLine): List<Record> =
+        if (line.reusedInstallmentStart == null) linked[line.itemId to line.occurrenceKey].orEmpty() else emptyList()
 }

@@ -37,11 +37,12 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
         val month = YearMonth.from(selected.start)
         List(6) { index -> FinancialPeriods.month(month.plusMonths(index.toLong()), data.cycleRules) }
     }
-    val projected = remember(data, simulation, periods, records, asOf, zone) {
-        val simulatedData = simulation?.let { data.copy(rules = data.rules + it) }
-        periods.map { period ->
-            val base = CentralFinance.summarize(records, data, period, zone, asOf).projectedReport
-            base to simulatedData?.let { CentralFinance.summarize(records, it, period, zone, asOf).projectedReport }
+    val baseline = remember(data, periods, records, asOf, zone) {
+        CentralFinance.summarizePeriods(records, data, periods, zone, asOf)
+    }
+    val simulationResults = remember(data, simulation, periods, records, asOf, zone) {
+        simulation?.let {
+            CentralFinance.summarizePeriods(records, data.copy(rules = data.rules + it), periods, zone, asOf)
         }
     }
     LazyColumn(Modifier.testTag("forecast-projections"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -59,21 +60,25 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
                 }
             }
         }
-        projected.forEach { (base, simulated) -> item(key = base.period.start.toString()) {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${base.period.start.format(financeDateFormat)} a ${base.period.endExclusive.minusDays(1).format(financeDateFormat)}", style = MaterialTheme.typography.titleMedium)
-                    Text(if (hidden) "Percentual oculto" else "Gastos totais: ${base.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}")
-                    Text("Margem estimada", style = MaterialTheme.typography.bodySmall)
-                    Amount(base.marginCents, hidden, Modifier.testTag("projection-margin-${base.period.start}"))
-                    if (simulated != null) {
-                        Text(if (hidden) "Simulação: valores ocultos" else "Com a simulação: ${simulated.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}", style = MaterialTheme.typography.bodySmall)
-                        Amount(simulated.marginCents, hidden)
+        baseline.forEachIndexed { index, summary ->
+            val base = summary.projectedReport
+            val simulated = simulationResults?.get(index)?.projectedReport
+            item(key = base.period.start.toString()) {
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("${base.period.start.format(financeDateFormat)} a ${base.period.endExclusive.minusDays(1).format(financeDateFormat)}", style = MaterialTheme.typography.titleMedium)
+                        Text(if (hidden) "Percentual oculto" else "Gastos totais: ${base.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}")
+                        Text("Margem estimada", style = MaterialTheme.typography.bodySmall)
+                        Amount(base.marginCents, hidden, Modifier.testTag("projection-margin-${base.period.start}"))
+                        if (simulated != null) {
+                            Text(if (hidden) "Simulação: valores ocultos" else "Com a simulação: ${simulated.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}", style = MaterialTheme.typography.bodySmall)
+                            Amount(simulated.marginCents, hidden)
+                        }
+                        TextButton({ onOpen(base.period) }) { Text("Abrir este ciclo") }
                     }
-                    TextButton({ onOpen(base.period) }) { Text("Abrir este ciclo") }
                 }
             }
-        } }
+        }
 
     }
 }

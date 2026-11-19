@@ -14,8 +14,11 @@ object ForecastCalculator {
         val lines = mutableListOf<ForecastLine>()
         dataset.rules.groupBy { it.itemId }.forEach { (itemId, versions) ->
             val ordered = versions.sortedBy { it.effectiveFrom }
-            val candidates = linkedMapOf<String, Pair<ForecastRule, Occurrence>>()
+            val candidates = linkedMapOf<Pair<LocalDate?, String>, Pair<ForecastRule, Occurrence>>()
+            var installmentStart: LocalDate? = null
             ordered.forEachIndexed { index, rule ->
+                if (rule.frequency != ForecastFrequency.INSTALLMENTS) installmentStart = null
+                else if (installmentStart == null) installmentStart = rule.effectiveFrom
                 val nextSchedule = ordered.subList(index + 1, ordered.size).firstOrNull {
                     it.frequency != rule.frequency || it.cycleAnchored != rule.cycleAnchored
                 }
@@ -39,14 +42,15 @@ object ForecastCalculator {
                 occurrences.forEach { occurrence ->
                     val eligibilityDate = if (rule.cycleAnchored) maxOf(period.start, rule.startDate) else occurrence.date
                     if (nextSchedule != null && eligibilityDate >= nextSchedule.effectiveFrom) return@forEach
-                    val existing = candidates[occurrence.key]
+                    val key = installmentStart to occurrence.key
+                    val existing = candidates[key]
                     val hasOverride = overrides.containsKey(itemId to occurrence.key)
                     val started = occurrence.date >= rule.startDate || rule.cycleAnchored || hasOverride ||
                         ((rule.frequency == ForecastFrequency.INSTALLMENTS || existing != null) &&
                             YearMonth.from(occurrence.date) >= YearMonth.from(rule.startDate))
                     if (started) {
                         if (existing == null) {
-                            if (rule.effectiveFrom <= eligibilityDate) candidates[occurrence.key] = rule to occurrence
+                            if (rule.effectiveFrom <= eligibilityDate) candidates[key] = rule to occurrence
                         } else {
                             val cutoffDate = if (rule.active) existing.second.date
                                 else overrides[itemId to occurrence.key]?.date ?: existing.second.date
@@ -54,21 +58,26 @@ object ForecastCalculator {
                             // A stable occurrence belongs to its previous schedule until the change boundary.
                             // Changes never move an already closed occurrence into a later cycle. If a new
                             // due day precedes the change boundary, its transition occurs at that boundary.
-                            candidates[occurrence.key] = rule to occurrence.copy(date = maxOf(occurrence.date, rule.effectiveFrom))
+                            candidates[key] = rule to occurrence.copy(date = maxOf(occurrence.date, rule.effectiveFrom))
                         }
                     }
                 }
             }
-            candidates.forEach { (key, pair) ->
+            // Older versions reused installment numbers within one item. The original occurrence
+            // owns its stored overrides and links even when later schedules reuse that number.
+            val originalKeys = mutableSetOf<String>()
+            candidates.forEach { (identity, pair) ->
+                val (seriesStart, key) = identity
                 val (rule, occurrence) = pair
-                val override = overrides[itemId to key]
+                val reusedStart = if (originalKeys.add(key)) null else seriesStart
+                val override = if (reusedStart == null) overrides[itemId to key] else null
                 val date = override?.date ?: occurrence.date
                 if (date in period && (override?.active ?: rule.active)) {
                     val ignored = override?.ignored == true
                     lines += ForecastLine(itemId, key, override?.title ?: rule.title, date,
                         override?.amountCents ?: occurrence.amount, rule.kind, override?.category ?: rule.category,
                         rule.group, rule.frequency, rule.estimated, ignored, !ignored,
-                        rule.statementKey, rule.statementTotal, rule)
+                        rule.statementKey, rule.statementTotal, rule, reusedInstallmentStart = reusedStart)
                 }
             }
         }
@@ -77,7 +86,8 @@ object ForecastCalculator {
         val finalLines = lines.map { line ->
             if (!line.statementTotal && line.statementKey.isNotBlank() && (line.statementKey to line.kind) in statements)
                 line.copy(included = false) else line
-        }.filterNot { (it.itemId to it.occurrenceKey) in excluded }.sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title }.thenBy { it.itemId })
+        }.filterNot { it.reusedInstallmentStart == null && (it.itemId to it.occurrenceKey) in excluded }
+            .sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title }.thenBy { it.itemId })
         val included = finalLines.filter { it.included }
         val income = included.filter { it.kind == ForecastKind.INCOME }.sumOf { it.amountCents }
         val expenses = included.filter { it.kind == ForecastKind.EXPENSE }

@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.mateuswilliam.financas.core.Ledger
 import com.mateuswilliam.financas.core.NotificationInput
 import com.mateuswilliam.financas.core.Record
 import com.mateuswilliam.financas.core.AccountOption
@@ -17,9 +16,6 @@ import com.mateuswilliam.financas.data.CaptureSettings
 import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.data.DraftChangedException
 import com.mateuswilliam.financas.notifications.ReviewNotifications
-import com.mateuswilliam.financas.notifications.RecurringReminders
-import java.time.ZoneId
-import java.time.YearMonth
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -205,6 +201,5 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    suspend fun exportCsv(): String = Ledger.csv(repository.exportRecords(), ZoneId.systemDefault())
     suspend fun addAccount(name: String): String = repository.addAccount(name)
 }

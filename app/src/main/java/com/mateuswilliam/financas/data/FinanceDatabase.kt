@@ -108,6 +108,8 @@ interface FinanceDao {
     @Upsert suspend fun upsertForecastMeta(row:ForecastMetaEntity)
     @Insert suspend fun insertReserveEvent(row:ReserveEventEntity):Long
     @Query("DELETE FROM forecast_rules WHERE itemId=:id AND effectiveFrom>:date") suspend fun deleteFutureForecastRules(id:String,date:String)
+    @Query("DELETE FROM forecast_overrides WHERE itemId = :id AND occurrenceKey = :key")
+    suspend fun deleteForecastOverride(id: String, key: String)
     @Query("DELETE FROM cycle_rules WHERE effectiveStart>=:date") suspend fun deleteFutureCycleRules(date:String)
     @Query("DELETE FROM forecast_rules") suspend fun clearForecastRules()
     @Query("DELETE FROM forecast_overrides") suspend fun clearForecastOverrides()

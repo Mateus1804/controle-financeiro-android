@@ -39,7 +39,7 @@ internal fun ForecastCyclePicker(period: BudgetPeriod, onPrevious: () -> Unit, o
 
 internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: Boolean, busy: Boolean,
     onEdit: (ForecastLine) -> Unit, onIgnore: (ForecastLine) -> Unit, onStop: (ForecastLine) -> Unit, onEditFuture: ((ForecastLine) -> Unit)? = null) {
-    items(lines, key = { "${it.itemId}:${it.occurrenceKey}" }) { line ->
+    items(lines, key = { "${it.itemId}:${it.occurrenceKey}:${it.reusedInstallmentStart}" }) { line ->
         val group = when {
             line.kind == ForecastKind.INCOME -> "Previsto · Receita"
             line.group == ForecastGroup.VARIABLE -> "Previsto · Gasto variável"
@@ -66,10 +66,13 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
                     Amount(line.amountCents, hidden, size = 14)
                     ContextualActions(privateDisplayText(line.title, hidden), "forecast-actions:${line.itemId}:${line.occurrenceKey}", !busy,
                         buildList {
-                            add(FinanceAction(if (line.frequency == ForecastFrequency.ONCE) "Editar" else "Alterar só este mês", { onEdit(line) }))
+                            if (line.reusedInstallmentStart == null) {
+                                add(FinanceAction(if (line.frequency == ForecastFrequency.ONCE) "Editar" else "Alterar só este mês", { onEdit(line) }))
+                            }
                             if (line.frequency != ForecastFrequency.ONCE && onEditFuture != null)
                                 add(FinanceAction("Aplicar deste mês em diante", { onEditFuture(line) }))
-                            add(FinanceAction(if (line.ignored) "Restaurar este mês" else "Pular este mês", { onIgnore(line) }))
+                            if (line.reusedInstallmentStart == null)
+                                add(FinanceAction(if (line.ignored) "Restaurar este mês" else "Pular este mês", { onIgnore(line) }))
                             if (line.frequency != ForecastFrequency.ONCE)
                                 add(FinanceAction("Interromper futuras", { onStop(line) }, destructive = true))
                         })

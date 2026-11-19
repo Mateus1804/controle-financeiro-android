@@ -33,6 +33,7 @@ internal fun ForecastEditor(
     initialAmountCents: Long? = null, initialStartDate: LocalDate? = null, initialAccount: String = "",
 ) {
     val source = rule ?: line?.rule
+    val canEditOccurrence = line != null && line.reusedInstallmentStart == null && source?.frequency != ForecastFrequency.ONCE
     val id = rememberSaveable { source?.itemId ?: UUID.randomUUID().toString() }
     var title by rememberSaveable { mutableStateOf(line?.title ?: source?.title ?: initialTitle) }
     var kind by rememberSaveable { mutableStateOf(source?.kind ?: initialKind) }
@@ -47,10 +48,10 @@ internal fun ForecastEditor(
     var account by rememberSaveable { mutableStateOf(source?.account ?: initialAccount) }
     var statement by rememberSaveable { mutableStateOf(source?.statementKey.orEmpty()) }
     var statementTotal by rememberSaveable { mutableStateOf(source?.statementTotal ?: false) }
-    var onlyOccurrence by rememberSaveable { mutableStateOf(initialOnlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE) }
+    var onlyOccurrence by rememberSaveable { mutableStateOf(initialOnlyOccurrence && canEditOccurrence) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var invalidMoney by rememberSaveable { mutableStateOf(false) }
-    val scoped = onlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE
+    val scoped = onlyOccurrence && canEditOccurrence
     val occurrenceAmount = rememberTextFieldState(initialText = (line?.amountCents ?: source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val ruleAmount = rememberTextFieldState(initialText = (source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val amount = if (scoped) occurrenceAmount else ruleAmount
@@ -77,12 +78,16 @@ internal fun ForecastEditor(
         title = { DialogSystemBars(); Text(if (source == null) "Nova previsão" else "Editar previsão") },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Planeje o que espera receber ou gastar. Nenhum pagamento ou recebimento será registrado.")
-            if (line != null && source?.frequency != ForecastFrequency.ONCE) {
+            if (canEditOccurrence) {
                 ChoiceField("Aplicar alteração", onlyOccurrence, listOf(true, false), { if (it) "Alterar só este mês" else "Aplicar deste mês em diante" }) { if (!busy) onlyOccurrence = it }
             }
+            if (line?.reusedInstallmentStart != null) Text(
+                "Para preservar a parcela antiga que usa o mesmo vínculo, as alterações aqui valem deste mês em diante.",
+                style = MaterialTheme.typography.bodySmall,
+            )
             if (line != null && source?.frequency != ForecastFrequency.ONCE) Text(
                 if (scoped) "Só esta ocorrência será alterada; os outros meses serão preservados."
-                else "Esta ocorrência e as futuras serão alteradas; o histórico anterior será preservado.", style = MaterialTheme.typography.bodySmall)
+                else "A nova regra vale a partir desta ocorrência. Os ajustes individuais feitos nos meses seguintes e o histórico anterior são preservados.", style = MaterialTheme.typography.bodySmall)
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição da previsão para edição") {
                 OutlinedTextField(title, { title = it.take(200) }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
             }

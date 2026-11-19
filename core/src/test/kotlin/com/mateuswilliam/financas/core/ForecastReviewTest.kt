@@ -38,6 +38,37 @@ class ForecastReviewTest {
         assertTrue(ForecastCalculator.report(data, future).lines.isEmpty())
     }
 
+    @Test fun olderRuleVersionsDoNotMaskInstallmentsFromARestartedSchedule() {
+        val first = rent.copy(effectiveFrom = period.start, frequency = ForecastFrequency.INSTALLMENTS, installmentCount = 3)
+        val nextMonth = period.endExclusive
+        val monthly = rent.copy(effectiveFrom = nextMonth, startDate = day.plusMonths(1))
+        val restarted = first.copy(effectiveFrom = nextMonth.plusMonths(1), startDate = day.plusMonths(2))
+        val data = ForecastDataset(rules = listOf(first, monthly, restarted),
+            overrides = listOf(ForecastOverride(first.itemId, "installment:1", amountCents = 12000)))
+        val december = BudgetPeriod(nextMonth, nextMonth.plusMonths(1))
+        val january = BudgetPeriod(december.endExclusive, december.endExclusive.plusMonths(1))
+        assertEquals(12000L, ForecastCalculator.report(data, period).totalExpensesCents)
+        assertEquals(30000L, ForecastCalculator.report(data, december).totalExpensesCents)
+        assertEquals(10000L, ForecastCalculator.report(data, january).totalExpensesCents)
+        val paid = Record("paid", 12000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+            "Conta", "Parcela antiga", at(day), forecastItemId = first.itemId, forecastOccurrenceKey = "installment:1")
+        val pending = PendingForecasts(data, listOf(paid))
+        assertTrue(pending.lines(period).isEmpty())
+        assertEquals(10000L, pending.lines(january).single().amountCents)
+    }
+
+    @Test fun differentScheduledRecordsReplaceTheSameForecastWithoutCollapsingIntoOneExpense() {
+        val first = Record("first", 10000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+            "Conta", "Parte A", at(day), forecastItemId = rent.itemId, forecastOccurrenceKey = "month:2026-11")
+        val second = first.copy(id = "second", description = "Parte B", amountCents = 20000)
+        val data = ForecastDataset(rules = listOf(rent))
+        val records = listOf(first, second)
+        val today = day.minusDays(1)
+        val upcoming = PaydayBudgets.upcomingLines(data, records, zone, at(today))
+        assertEquals(30000L, PaydayBudgets.pendingCommitments(upcoming, today, day.plusDays(1)))
+        assertEquals(30000L, CentralFinance.summarize(records, data, period, zone, at(today)).projectedExpensesCents)
+    }
+
     @Test fun invoiceForecastOnlyCountsTheAmountStillPendingAfterAComponentIsRecorded() {
         val due = day.plusDays(15)
         val bill = rent.copy(itemId = "bill", amountCents = 100000, startDate = due, dayOfMonth = due.dayOfMonth,
