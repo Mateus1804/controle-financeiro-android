@@ -1,25 +1,18 @@
 package com.mateuswilliam.financas.data
 
 import androidx.room.withTransaction
-import androidx.room.InvalidationTracker
 import com.mateuswilliam.financas.core.*
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.UUID
 
-/** Every emission and validation reads the five tables in a single Room transaction. */
+/** Cada emissão reúne os dados de planejamento em uma transação. */
 class ForecastRepository(private val database:FinanceDatabase) {
     private val dao = database.financeDao()
-    val dataset:Flow<ForecastDataset> = callbackFlow {
-        val observer = object:InvalidationTracker.Observer("forecast_rules","forecast_overrides","cycle_rules","reserve_events","forecast_meta","records") {
-            override fun onInvalidated(tables:Set<String>) { trySend(Unit) }
-        }
-        database.invalidationTracker.addObserver(observer)
-        trySend(Unit)
-        awaitClose { database.invalidationTracker.removeObserver(observer) }
-    }.conflate().map { database.withTransaction { readDataset() } }.distinctUntilChanged()
+    val dataset: Flow<ForecastDataset> = database.invalidationTracker.createFlow(
+        "forecast_rules", "forecast_overrides", "cycle_rules", "reserve_events", "forecast_meta",
+    ).conflate().map { database.withTransaction { readDataset() } }.distinctUntilChanged()
 
     private suspend fun readDataset() = ForecastDataset(dao.allForecastRules().map { it.model() },
         dao.allForecastOverrides().map { it.model() },dao.allCycleRules().map { it.model() },

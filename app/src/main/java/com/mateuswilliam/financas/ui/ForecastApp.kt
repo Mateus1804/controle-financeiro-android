@@ -31,9 +31,6 @@ import com.mateuswilliam.financas.ForecastViewModel
 import com.mateuswilliam.financas.R
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.core.Record
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -47,6 +44,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val busyForecast by model.busy.collectAsStateWithLifecycle()
     val busyFinance by finance.busy.collectAsStateWithLifecycle()
     val forecastMessage by model.message.collectAsStateWithLifecycle()
+    val csvDestination by model.csvDestination.collectAsStateWithLifecycle()
     val financeMessage by finance.message.collectAsStateWithLifecycle()
     val loadError by model.loadError.collectAsStateWithLifecycle()
     val financeState by finance.state.collectAsStateWithLifecycle()
@@ -57,7 +55,6 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val destination = navigation.destination
     val editors = ui.editors
     val review = ui.review
-    var today by remember { mutableStateOf(LocalDate.now()) }
     var permissionVersion by remember { mutableIntStateOf(0) }
     val connected by finance.connected.collectAsStateWithLifecycle()
     val captureError by finance.captureError.collectAsStateWithLifecycle()
@@ -71,11 +68,12 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val captureActive = settings.consented && settings.enabled && settings.packages.isNotEmpty() && hasAccess && connected
     val snapshot = data
     val cycleRules = snapshot?.cycleRules.orEmpty()
+    val zone = ZoneId.systemDefault()
+    val asOf = financeState.asOf
+    val today = remember(asOf, zone) { Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate() }
     val currentMonth = YearMonth.from(CycleCalendar.periodContaining(today, cycleRules).start)
     val month = if (navigation.followingCurrent) currentMonth else YearMonth.parse(navigation.monthText)
     val period = remember(month, cycleRules) { FinancialPeriods.month(month, cycleRules) }
-    val zone = ZoneId.systemDefault()
-    val asOf = remember(resumeCount, financeState.records) { System.currentTimeMillis() }
     val realized = remember(financeState.records, asOf) { financeState.records.filter { it.occurredAt <= asOf } }
     val duplicateIndex = remember(financeState.manualRecords) { DuplicateCandidates(financeState.manualRecords) }
     val periodBalances = if (destination == RendlyDestination.MONTH || destination == RendlyDestination.RESERVE) {
@@ -87,12 +85,11 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     } else emptyList()
     val currentFunds = remember(financeState.accountBalances) { AccountFunds.of(financeState.accountBalances) }
-    val paydayBudget = if (destination == RendlyDestination.PLANNER) remember(snapshot, financeState.records, currentFunds.operating, asOf, zone) {
+    val paydayBudget = if (destination == RendlyDestination.PLANNER) remember(snapshot, financeState.records, currentFunds.operating, asOf, zone, today) {
         runCatching {
-            val todayDate = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
             val lines = PaydayBudgets.upcomingLines(snapshot ?: ForecastDataset(), financeState.records, zone, asOf)
-            PaydayBudgets.nextPayday(lines, emptyList(), todayDate)?.let { payday ->
-                PaydayBudgets.compute(currentFunds.operating.cents, lines, todayDate, payday)
+            PaydayBudgets.nextPayday(lines, emptyList(), today)?.let { payday ->
+                PaydayBudgets.compute(currentFunds.operating.cents, lines, today, payday)
             }
         }.getOrNull()
     } else null
@@ -132,10 +129,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             consumeDraft()
         }
     }
-    val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(resumeCount) {
-        today = LocalDate.now()
         model.refresh()
     }
     LaunchedEffect(incomingPlanning) { if (incomingPlanning) {
@@ -156,6 +151,11 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         else -> null
     }
     val report = central?.forecast
+    val upcomingDue = if (destination == RendlyDestination.PLANNER || editors.dueDates) remember(report, today) {
+        report?.lines.orEmpty().filter {
+            it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && !it.rule.cycleAnchored && it.date >= today
+        }.sortedBy { it.date }
+    } else emptyList()
     val closed = period.endExclusive <= today
     val alerts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
     fun requestCaptureAccess() {
@@ -169,12 +169,13 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             .onFailure { finance.message.value = "Abra as configurações de notificações do aplicativo no Android." }
     }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null && report != null) scope.launch {
-            runCatching { withContext(Dispatchers.IO) {
-                val out = context.contentResolver.openOutputStream(uri) ?: error("Destino indisponível")
-                out.use { it.write(forecastCsv(report).toByteArray(Charsets.UTF_8)) }
-            } }.onSuccess { model.message.value = "Previsões do ciclo exportadas." }
-                .onFailure { model.message.value = "Não foi possível exportar. Escolha outro destino." }
+        model.writeCsv(uri)
+    }
+    LaunchedEffect(csvDestination) {
+        val name = model.takeCsvDestination() ?: return@LaunchedEffect
+        runCatching { export.launch(name) }.onFailure {
+            model.writeCsv(null)
+            model.message.value = "Não foi possível abrir o seletor de arquivos."
         }
     }
     val backupExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { finance.writeBackup(it) }
@@ -262,7 +263,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         }, forecastLines = report?.lines.orEmpty(), onForecast = { edit(it) }, onCycle = { editors.cycleEditor = true },
                         onIgnoreForecast = model::ignore, onStopForecast = model::stop, onEditFutureForecast = { edit(it, false) }, busy = busy,
                         scheduledRecords = central?.scheduled?.records.orEmpty(),
-                        reserveNeedsReference = snapshot?.reserveEvents?.isNotEmpty() == true && !currentFunds.reserve.hasBalance)
+                        reserveNeedsReference = snapshot?.reserveEvents?.isNotEmpty() == true && !currentFunds.reserve.hasBalance,
+                        today = today)
                     navigation.destination == RendlyDestination.GRAPHS -> {
                         val monthComparison = remember(realized, period, cycleRules, today, zone) {
                             MonthComparisons.compare(realized, period, FinancialPeriods.previous(period, cycleRules), today, zone)
@@ -278,7 +280,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onAccess = ::requestCaptureAccess,
                         onReconnect = { NotificationListenerService.requestRebind(ComponentName(context, BankNotificationListener::class.java)) },
                         onAlerts = ::requestAlerts,
-                        onExport = { export.launch("previsoes-${period.start}.csv") }, onClear = { editors.clearing = true }, onSimulate = finance::simulate,
+                        onExport = report?.takeIf { financeState.loaded }?.let { selected -> { model.prepareCsv(selected) } },
+                        onClear = { editors.clearing = true }, onSimulate = finance::simulate,
                         onAppearance = finance.preferences::setAppearance, busy = busy,
                         onBackup = { editors.backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { navigation.destination = RendlyDestination.PROJECTION },
                         onLockChange = onLockChange, onSecureScreen = finance.preferences::setSecureScreen,
@@ -291,7 +294,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     navigation.destination == RendlyDestination.RESERVE -> ReserveAccountScreen(snapshot, periodBalances, realized, period, hidden, busy,
                         onSet = { editors.balanceEditorName = AccountFunds.RESERVE_NAME; editors.balanceEditorDate = null },
                         onAdd = { reserveTransfer(false) }, onWithdraw = { reserveTransfer(true) }, onGoal = { editors.goalEditor = true },
-                        currentReserve = financeState.accountBalances.firstOrNull { it.account.key == AccountFunds.RESERVE_KEY })
+                        currentReserve = financeState.accountBalances.firstOrNull { it.account.key == AccountFunds.RESERVE_KEY },
+                        asOf = asOf)
                     navigation.destination == RendlyDestination.PROJECTION -> ForecastProjectionScreen(snapshot, period, editors.simulation, hidden, busy,
                         onSimulate = { editors.simulationEditor = true }, onDiscard = { editors.simulation = null },
                         onAdopt = { editors.simulation?.let { value -> model.saveRule(value) { editors.simulation = null } } },
@@ -315,7 +319,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         item { Text(if (closed) "Ciclo encerrado · valores estimados" else "Planejamento do ciclo · valores estimados", style = MaterialTheme.typography.labelMedium) }
                         item { TextButton({ navigation.destination = RendlyDestination.PROJECTION }, Modifier.fillMaxWidth()) { Text("Projetar próximos ciclos") } }
                         item { TextButton({ editors.dueDates = true },
-                            enabled = report.lines.any { it.included && !it.ignored && it.date >= today }, modifier = Modifier.fillMaxWidth()) {
+                            enabled = upcomingDue.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
                             AppIcon(R.drawable.ic_chevron_right); Spacer(Modifier.width(8.dp)); Text("Próximos vencimentos · consultar previsão")
                         } }
                         item { CentralProjectionCard(central, hidden) }
@@ -358,7 +362,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             initialMovement = review.actualKind, initialFrequency = review.initialFrequency,
             initialCategory = review.initialCategory, initialDescription = review.initialDescription,
             hideAmounts = hidden, duplicateIndex = duplicateIndex,
-            balances = financeState.accountBalances, history = financeState.records, forecastData = snapshot,
+            balances = financeState.accountBalances, balancesAsOf = asOf, history = financeState.records, forecastData = snapshot,
             rememberedCategory = merchant?.let { merchantStore.get(it.key) }, merchantLabel = merchant?.label,
             notificationChanged = draft != null && draft.revision != review.draftRevision,
             onAcceptUpdate = { review.draftRevision = draft?.revision },
@@ -387,7 +391,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     if (editors.appPicker) AppPickerDialog(apps, loadingApps, settings.packages, { editors.appPicker = false }) {
         finance.preferences.selectPackages(it); editors.appPicker = false
     }
-    ForecastEditorDialogs(editors, model, snapshot, period, report, today, zone, busy, hidden) { edit(it) }
+    ForecastEditorDialogs(editors, model, snapshot, period, upcomingDue, zone, busy, hidden) { edit(it) }
     if (editors.templates) AlertDialog(onDismissRequest = { editors.templates = false }, title = { DialogSystemBars(); Text("Modelos opcionais") },
         text = { Column { fixedExpenseTemplates.forEach { item -> TextButton({
             editors.templates = false

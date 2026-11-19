@@ -1,4 +1,4 @@
-package com.mateuswilliam.financas.ui
+package com.mateuswilliam.financas.data
 
 import com.mateuswilliam.financas.core.*
 

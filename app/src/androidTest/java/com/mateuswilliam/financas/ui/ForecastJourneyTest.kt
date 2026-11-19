@@ -1,10 +1,14 @@
 package com.mateuswilliam.financas.ui
 
+import android.net.Uri
+import android.os.SystemClock
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import com.mateuswilliam.financas.FinanceApplication
+import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.ForecastViewModel
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
@@ -14,7 +18,9 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import java.time.LocalDate
+import java.time.ZoneId
 
 /** These journeys launch the real primary planner, without the retained ledger regression host. */
 class ForecastJourneyTest {
@@ -55,6 +61,88 @@ class ForecastJourneyTest {
             Category.OTHER, ForecastFrequency.INSTALLMENTS, date, installmentCount = 2))
         app.forecasts.saveRule(ForecastRule("food", date, "Consumo estimado", ForecastKind.EXPENSE, 60000,
             Category.FOOD, ForecastFrequency.MONTHLY, date, cycleAnchored = true, group = ForecastGroup.VARIABLE, estimated = true))
+    }
+
+    @Test fun resumingUpdatesTheAvailableBalanceForNewlyEffectiveRecords() {
+        val finance = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
+        val bank = "Conta principal"
+        val zone = ZoneId.systemDefault()
+        runBlocking {
+            app.repository.configureAccountBalance(bank, 100000,
+                today.minusDays(2).atStartOfDay(zone).toInstant().toEpochMilli(), "Saldo inicial")
+            val salaryDate = today.plusDays(10)
+            app.forecasts.saveRule(ForecastRule("salary", salaryDate, "Salário", ForecastKind.INCOME,
+                300000, Category.SALARY, ForecastFrequency.ONCE, salaryDate))
+        }
+        waitRules(1)
+        rule.waitUntil(10000) { finance.state.value.accountBalances.singleOrNull()?.balanceCents == 100000L }
+        rule.onNodeWithTag("payday-total").assertTextContains(Money.format(100000))
+        val effectiveAt = System.currentTimeMillis() + 3000
+        runBlocking {
+            app.repository.save(Record("expense-after-opening", 20000, Movement.EXPENSE, PaymentMethod.PIX,
+                Category.OTHER, bank, "Conta agendada", effectiveAt), null)
+        }
+        rule.waitUntil(10000) { finance.state.value.records.any { it.id == "expense-after-opening" } }
+        assertEquals(100000L, finance.state.value.accountBalances.single().balanceCents)
+        rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        SystemClock.sleep((effectiveAt - System.currentTimeMillis()).coerceAtLeast(0))
+        rule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        rule.waitUntil(10000) {
+            finance.state.value.accountBalances.singleOrNull()?.balanceCents == 80000L
+        }
+        rule.onNodeWithTag("payday-total").assertTextContains(Money.format(80000))
+    }
+
+    @Test fun dueDatesOnlyOpenWhenThereIsAnUpcomingExpenseWithADueDate() {
+        runBlocking {
+            app.forecasts.saveRule(ForecastRule("salary", today, "Salário", ForecastKind.INCOME,
+                300000, Category.SALARY, ForecastFrequency.ONCE, today))
+        }
+        waitRules(1)
+        val label = "Próximos vencimentos · consultar previsão"
+        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText(label))
+        rule.onNodeWithText(label).assertIsNotEnabled()
+        runBlocking {
+            app.forecasts.saveRule(ForecastRule("bill", today, "Conta a vencer", ForecastKind.EXPENSE,
+                5000, Category.HOME, ForecastFrequency.ONCE, today))
+        }
+        waitRules(2)
+        rule.onNodeWithText(label).assertIsEnabled().performClick()
+        rule.onNodeWithText("Conta a vencer").assertIsDisplayed()
+        rule.onNodeWithText("Salário").assertDoesNotExist()
+    }
+
+    @Test fun csvRequiresAReportAndKeepsThePreparedContentAcrossRecreation() {
+        val report = ForecastCalculator.report(ForecastDataset(rules = listOf(
+            ForecastRule("csv-bill", today, "Conta original do CSV", ForecastKind.EXPENSE, 5000,
+                Category.HOME, ForecastFrequency.ONCE, today)
+        )), period())
+        val label = "Exportar previsões em CSV"
+        rule.openRendlySettings()
+        rule.onNodeWithTag("settings-list").performScrollToNode(hasText(label))
+        rule.onNodeWithText(label).assertIsEnabled()
+        val loaded = model.dataset.value
+        rule.runOnIdle { model.dataset.value = null }
+        rule.onNodeWithText(label).assertIsNotEnabled()
+        val exportKey = "csv-test-export"
+        rule.runOnIdle {
+            model.dataset.value = loaded
+            ViewModelProvider(rule.activity)[exportKey, ForecastViewModel::class.java].prepareCsv(report)
+        }
+        val exporter = ViewModelProvider(rule.activity)[exportKey, ForecastViewModel::class.java]
+        rule.waitUntil(10000) { exporter.csvDestination.value != null && !exporter.busy.value }
+        rule.activityRule.scenario.recreate()
+        val file = File.createTempFile("previsoes-teste", ".csv", app.cacheDir)
+        try {
+            rule.runOnIdle {
+                val retained = ViewModelProvider(rule.activity)[exportKey, ForecastViewModel::class.java]
+                assertEquals("previsoes-${report.period.start}.csv", retained.takeCsvDestination())
+                retained.busy.value = true
+                retained.writeCsv(Uri.fromFile(file))
+            }
+            rule.waitUntil(10000) { exporter.message.value == "Previsões do ciclo exportadas." }
+            assertTrue(file.readText().contains("Conta original do CSV"))
+        } finally { file.delete() }
     }
 
     @Test fun salaryRegisteredOnceFeedsAllExpensesAndOneCycleEditPreservesFuture() {

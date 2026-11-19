@@ -117,7 +117,6 @@ interface FinanceDao {
     @Query("DELETE FROM reserve_events") suspend fun clearReserveEvents()
     @Query("DELETE FROM forecast_meta") suspend fun clearForecastMeta()
 
-    @Query("SELECT * FROM account_balance_events ORDER BY effectiveAt, createdAt, id") fun accountBalanceEvents(): Flow<List<AccountBalanceEventEntity>>
     @Query("SELECT * FROM account_balance_events ORDER BY effectiveAt, createdAt, id") suspend fun allAccountBalanceEvents(): List<AccountBalanceEventEntity>
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertAccountBalanceEvent(event: AccountBalanceEventEntity): Long
     @Query("DELETE FROM account_balance_events") suspend fun clearAccountBalanceEvents()

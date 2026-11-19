@@ -1,13 +1,18 @@
 package com.mateuswilliam.financas
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mateuswilliam.financas.core.*
+import com.mateuswilliam.financas.data.forecastCsv
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 /** Planning edits forecast rules, cycle settings and the reserve goal. */
@@ -19,6 +24,9 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
     val message = MutableStateFlow<String?>(null)
     val loadError = MutableStateFlow<String?>(null)
     private var observing: Job? = null
+    private var preparedCsv: String? = null
+    private val csvDestinationRequest = MutableStateFlow<String?>(null)
+    val csvDestination = csvDestinationRequest.asStateFlow()
     init { observe() }
     private fun observe() {
         observing = viewModelScope.launch {
@@ -60,7 +68,40 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
         onSaved()
         "Meta da reserva salva."
     }
-    private fun action(block: suspend () -> String) {
+
+    fun prepareCsv(report: ForecastReport) = action {
+        if (preparedCsv != null) return@action "Conclua a exportação que já está aberta."
+        preparedCsv = withContext(Dispatchers.Default) { forecastCsv(report) }
+        csvDestinationRequest.value = "previsoes-${report.period.start}.csv"
+        null
+    }
+
+    fun takeCsvDestination(): String? = csvDestinationRequest.value.also { csvDestinationRequest.value = null }
+
+    fun writeCsv(uri: Uri?) {
+        val content = preparedCsv
+        preparedCsv = null
+        if (uri == null) return
+        if (content == null) {
+            message.value = "O CSV preparado não está mais disponível. Exporte novamente."
+            return
+        }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val output = app.contentResolver.openOutputStream(uri, "wt") ?: error("Destino indisponível")
+                    output.writer(Charsets.UTF_8).use { it.write(content) }
+                }
+                message.value = "Previsões do ciclo exportadas."
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                message.value = "Não foi possível exportar. Escolha outro destino."
+            }
+        }
+    }
+
+    private fun action(block: suspend () -> String?) {
         if (busy.value) return
         busy.value = true
         viewModelScope.launch {

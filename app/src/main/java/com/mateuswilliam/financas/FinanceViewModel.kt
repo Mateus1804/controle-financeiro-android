@@ -18,14 +18,12 @@ import com.mateuswilliam.financas.data.DraftChangedException
 import com.mateuswilliam.financas.notifications.ReviewNotifications
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -38,6 +36,7 @@ data class FinanceState(
     val manualRecords: List<Record> = emptyList(),
     val accountBalances: List<AccountBalance> = emptyList(),
     val balanceReferences: List<AccountBalanceReference> = emptyList(),
+    val asOf: Long = System.currentTimeMillis(),
 )
 
 data class SelectableApp(val packageName: String, val label: String)
@@ -53,14 +52,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val message = MutableStateFlow<String?>(null)
     val apps = MutableStateFlow<List<SelectableApp>>(emptyList())
     val loadingApps = MutableStateFlow(false)
-    private val balanceClock = MutableStateFlow(System.currentTimeMillis())
+    private val balanceRefresh = MutableStateFlow(0L)
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private val balances = balanceClock.flatMapLatest { repository.observeAccountBalances(it) }
-    private val baseState = combine(repository.ledger, repository.pending, preferences.state, repository.accounts) { ledger, drafts, settings, accounts ->
-        FinanceState(ledger.records, drafts, settings, loaded = true, accounts = accounts, manualRecords = ledger.manualRecords)
-    }
-    val state = combine(baseState, balances, repository.accountBalanceEvents) { base, balances, references ->
-        base.copy(accountBalances = balances, balanceReferences = references)
+    private val ledger = balanceRefresh.flatMapLatest { repository.observeAccountLedger() }
+    val state = combine(ledger, repository.pending, preferences.state, repository.accounts) { snapshot, drafts, settings, accounts ->
+        FinanceState(snapshot.records, drafts, settings, loaded = true, accounts = accounts, manualRecords = snapshot.manualRecords,
+            accountBalances = snapshot.balances, balanceReferences = snapshot.references, asOf = snapshot.asOf)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
     val stagedRestore = MutableStateFlow<StagedRestore?>(null)
     private var encryptedBackup: ByteArray? = null
@@ -81,10 +78,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun delete(id: String) = action { repository.deleteRecord(id); "Lançamento removido." }
-    fun refreshBalances() { balanceClock.value = System.currentTimeMillis() }
+    fun refreshBalances() { balanceRefresh.update { it + 1 } }
     fun configureAccountBalance(name: String, cents: Long, effectiveAt: Long, reason: String, onSaved: () -> Unit) = action {
         repository.configureAccountBalance(name, cents, effectiveAt, reason)
-        refreshBalances()
         onSaved()
         "Saldo de referência salvo. Nenhuma receita ou despesa foi criada."
     }
@@ -163,7 +159,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             try { message.value = block() }
             catch (exception: IllegalArgumentException) { message.value = exception.message ?: "Confira os campos." }
             catch (_: Exception) { message.value = "Não foi possível concluir. Seus dados não foram descartados. Tente novamente." }
-            finally { refreshBalances(); busy.value = false }
+            finally { busy.value = false }
         }
     }
 

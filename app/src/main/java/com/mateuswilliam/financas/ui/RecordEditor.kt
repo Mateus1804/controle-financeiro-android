@@ -60,6 +60,7 @@ fun RecordEditor(
     merchantLabel: String? = null,
     onOpenForecast: ((Record, ForecastFrequency) -> Unit)? = null,
     initialFrequency: ForecastFrequency = ForecastFrequency.ONCE,
+    balancesAsOf: Long = System.currentTimeMillis(),
 ) {
     val initial = existing ?: preset
     val originalAt = rememberSaveable { initial?.occurredAt ?: draft?.occurredAt ?: initialDate?.atTime(java.time.LocalTime.now())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: System.currentTimeMillis() }
@@ -259,7 +260,7 @@ fun RecordEditor(
                 AccountPickerField("Conta ou banco de origem", bank, activeAccounts, { bank = it; accountEdited = true }, onAddAccount, hidden = hideAmounts)
                 if (movement == Movement.TRANSFER) {
                     AccountPickerField("Conta de destino", destination, activeAccounts.filter { AccountNames.key(it.label) != AccountNames.key(bank) }, { destination = it }, onAddAccount, hidden = hideAmounts)
-                    TransferPreview(record, existing, balances, hideAmounts)
+                    TransferPreview(record, existing, balances, hideAmounts, balancesAsOf)
                 }
                 run {
                     ChoiceField("Meio de pagamento", method, PaymentMethod.entries.toList(), { it.label }, icon = R.drawable.ic_card) { method = it }

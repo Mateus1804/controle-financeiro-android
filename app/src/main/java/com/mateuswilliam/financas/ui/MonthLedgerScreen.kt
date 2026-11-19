@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import java.time.Instant
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -32,7 +33,7 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
     forecastLines: List<ForecastLine> = emptyList(), onForecast: (ForecastLine) -> Unit = {}, onCycle: () -> Unit = {},
     onIgnoreForecast: (ForecastLine) -> Unit = {}, onStopForecast: (ForecastLine) -> Unit = {},
     onEditFutureForecast: (ForecastLine) -> Unit = {}, busy: Boolean = false, scheduledRecords: List<Record> = emptyList(),
-    reserveNeedsReference: Boolean = false) {
+    reserveNeedsReference: Boolean = false, today: LocalDate = LocalDate.now()) {
     val zone = ZoneId.systemDefault()
     val selected = remember(records, month, period, category, accountKey, expenseFilter, zone) {
         val filtered = records.filter { record ->
@@ -72,7 +73,7 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
                 TextButton(onCycle, Modifier.testTag("month-cycle-settings")) { Text("Início do mês financeiro") }
             }
         } }
-        accountTotal?.let { total -> item { AccountTotalCard(total, hidden, onAccounts, accountBalances, period, reserveNeedsReference) } }
+        accountTotal?.let { total -> item { AccountTotalCard(total, hidden, onAccounts, accountBalances, period, reserveNeedsReference, today) } }
         item {
             Column(Modifier.testTag("month-totals"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (category != null || accountKey != null || expenseFilter != null) Text("Totais dos lançamentos filtrados", style = MaterialTheme.typography.labelMedium)
@@ -151,7 +152,7 @@ internal fun FinancialPeriodLabel(period: BudgetPeriod) {
 
 @Composable
 private fun AccountTotalCard(total: AccountTotal, hidden: Boolean, onAccounts: () -> Unit,
-    balances: List<AccountBalance>?, period: BudgetPeriod?, reserveNeedsReference: Boolean) {
+    balances: List<AccountBalance>?, period: BudgetPeriod?, reserveNeedsReference: Boolean, today: LocalDate) {
     Surface(onClick = onAccounts, modifier = Modifier.fillMaxWidth().testTag("account-total"), shape = MaterialTheme.shapes.extraLarge,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -171,7 +172,7 @@ private fun AccountTotalCard(total: AccountTotal, hidden: Boolean, onAccounts: (
             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (reserveNeedsReference) Text("Configure o saldo da reserva em Mais para incluí-la no patrimônio.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (period != null) Text("Acumulado até ${minOf(period.endExclusive.minusDays(1), java.time.LocalDate.now()).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}",
+            if (period != null) Text("Acumulado até ${minOf(period.endExclusive.minusDays(1), today).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}",
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
