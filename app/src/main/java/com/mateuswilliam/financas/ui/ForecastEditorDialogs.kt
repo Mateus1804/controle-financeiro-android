@@ -46,8 +46,8 @@ internal fun ForecastEditorDialogs(
             onDismiss = { editors.editor = false; editors.forecastSeed = null },
             onSaveRule = { updated ->
                 val selectedKey = selectedLine?.takeIf { selected ->
-                    selected.reusedInstallmentStart == null && selected.rule.frequency == updated.frequency &&
-                        selected.rule.cycleAnchored == updated.cycleAnchored
+                    selected.reusedInstallmentStart == null && updated.frequency != ForecastFrequency.ONCE &&
+                        selected.rule.frequency == updated.frequency && selected.rule.cycleAnchored == updated.cycleAnchored
                 }?.occurrenceKey
                 model.saveRule(updated, selectedKey) { editors.editor = false; editors.forecastSeed = null }
             },

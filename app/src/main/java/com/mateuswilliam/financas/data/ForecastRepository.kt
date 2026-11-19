@@ -55,7 +55,7 @@ class ForecastRepository(private val database:FinanceDatabase) {
         replaceOccurrenceKey?.let { key ->
             val override = overrides.firstOrNull { it.occurrenceKey == key }
             if (override != null) {
-                val date = override.date?.let(LocalDate::parse)?.takeUnless { updated.frequency == ForecastFrequency.ONCE }
+                val date = override.date?.let(LocalDate::parse)
                 val due = if (date != null && previous?.dayOfMonth != updated.dayOfMonth) {
                     val cycle = CycleCalendar.periodContaining(date, dao.allCycleRules().map { it.model() })
                     sequenceOf(YearMonth.from(date), YearMonth.from(cycle.start), YearMonth.from(cycle.endExclusive.minusDays(1)))
