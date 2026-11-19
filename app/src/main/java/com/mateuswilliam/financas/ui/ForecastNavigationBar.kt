@@ -16,17 +16,21 @@ import com.mateuswilliam.financas.R
 
 /** Textos ampliados usam a largura da tela, sem reduzir a fonte escolhida no Android. */
 @Composable
-internal fun ForecastNavigationBar(tab: Int, onSelect: (Int) -> Unit) {
-    val destinations = listOf("Mês" to R.drawable.ic_records, "Gráficos" to R.drawable.ic_overview,
-        "Fixas e parcelas" to R.drawable.ic_calendar, "Mais" to R.drawable.ic_more)
+internal fun ForecastNavigationBar(tab: RendlyDestination, onSelect: (RendlyDestination) -> Unit) {
+    val destinations = listOf(
+        Triple(RendlyDestination.MONTH, "Mês", R.drawable.ic_records),
+        Triple(RendlyDestination.GRAPHS, "Gráficos", R.drawable.ic_overview),
+        Triple(RendlyDestination.FIXED, "Fixas e parcelas", R.drawable.ic_calendar),
+        Triple(RendlyDestination.MORE, "Mais", R.drawable.ic_more),
+    )
     if (LocalDensity.current.fontScale > 1.25f) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).navigationBarsPadding().selectableGroup()) {
-            destinations.forEachIndexed { index, (label, icon) ->
-                Surface(color = if (tab == index) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest) {
-                    Row(Modifier.selectable(selected = tab == index, role = Role.Tab, onClick = { onSelect(index) })
+            destinations.forEach { (destination, label, icon) ->
+                Surface(color = if (tab == destination) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest) {
+                    Row(Modifier.selectable(selected = tab == destination, role = Role.Tab, onClick = { onSelect(destination) })
                         .heightIn(min = 48.dp).padding(horizontal = 24.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        AppIcon(selectedIcon(icon, tab == index))
+                        AppIcon(selectedIcon(icon, tab == destination))
                         Text(label, style = MaterialTheme.typography.labelLarge)
                     }
                 }
@@ -34,9 +38,9 @@ internal fun ForecastNavigationBar(tab: Int, onSelect: (Int) -> Unit) {
         }
     } else {
         NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-            destinations.forEachIndexed { index, (label, icon) ->
-                NavigationBarItem(selected = tab == index, onClick = { onSelect(index) },
-                    icon = { AppIcon(selectedIcon(icon, tab == index)) }, label = { Text(label) })
+            destinations.forEach { (destination, label, icon) ->
+                NavigationBarItem(selected = tab == destination, onClick = { onSelect(destination) },
+                    icon = { AppIcon(selectedIcon(icon, tab == destination)) }, label = { Text(label) })
             }
         }
     }

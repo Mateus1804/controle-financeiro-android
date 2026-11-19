@@ -48,24 +48,6 @@ class ForecastRepository(private val database:FinanceDatabase) {
         dao.clearCycleRules()
         proposed.forEach { dao.upsertCycleRule(CycleRuleEntity(it.effectiveStart.toString(),it.day)) }
     }
-    suspend fun addReserveEvent(kind:ReserveEventKind,cents:Long,reason:String,cycleStart:LocalDate?=null) = database.withTransaction {
-        require(cents in 0..Money.MAX_CENTS && (kind==ReserveEventKind.SET || cents>0) && reason.isNotBlank() && reason.length<=200 && '\u0000' !in reason)
-        val current=readDataset()
-        val balance=ForecastCalculator.reserveBalance(current.reserveEvents)
-        if(kind!=ReserveEventKind.SET) require(balance!=null) { "Informe primeiro o saldo da reserva." }
-        if(kind==ReserveEventKind.WITHDRAW) require(cents <= (balance ?: 0)) { "Saldo insuficiente na reserva." }
-        if(kind==ReserveEventKind.ADD) {
-            require(Math.addExact(balance ?: 0,cents)<=Money.MAX_CENTS)
-            if(cycleStart!=null) {
-                val period=CycleCalendar.periodContaining(cycleStart,current.cycleRules)
-                require(period.start==cycleStart) { "Ciclo inválido." }
-                require(cents<=ForecastCalculator.report(current,period).unallocatedCents.coerceAtLeast(0)) { "A destinação supera a sobra disponível." }
-            }
-        }
-        require(cycleStart==null || kind==ReserveEventKind.ADD)
-        dao.insertReserveEvent(ReserveEventEntity(kind=kind.name,amountCents=cents,createdAt=System.currentTimeMillis(),reason=reason.trim(),cycleStart=cycleStart?.toString()))
-        Unit
-    }
     suspend fun setReserveGoal(cents:Long?) = database.withTransaction {
         require(cents==null || cents in 0..Money.MAX_CENTS)
         // Preserve import provenance while removing only the optional goal.

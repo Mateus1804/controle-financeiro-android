@@ -50,7 +50,6 @@ internal fun ForecastEditor(
     var onlyOccurrence by rememberSaveable { mutableStateOf(initialOnlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE) }
     var attempted by rememberSaveable { mutableStateOf(false) }
     var invalidMoney by rememberSaveable { mutableStateOf(false) }
-    val signedRefund = false
     val scoped = onlyOccurrence && line != null && source?.frequency != ForecastFrequency.ONCE
     val occurrenceAmount = rememberTextFieldState(initialText = (line?.amountCents ?: source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val ruleAmount = rememberTextFieldState(initialText = (source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
@@ -58,8 +57,8 @@ internal fun ForecastEditor(
     val cents = if (invalidMoney) null else MoneyInput.cents(amount.text.toString())
     val start = if (undated && frequency == ForecastFrequency.MONTHLY) period.start else LocalDate.parse(date)
     val candidate = ForecastRule(id, if (line != null) period.start else start, title.trim(), kind,
-        (cents ?: 0) * if (signedRefund) -1 else 1, category, frequency,
-        if (source != null && line != null) source.startDate else start, day,
+        cents ?: 0, category, frequency,
+        if (source != null && line != null) source!!.startDate else start, day,
         count.toIntOrNull() ?: 1, undated && frequency == ForecastFrequency.MONTHLY,
         group, estimated, source?.active ?: true, if (kind == ForecastKind.EXPENSE) statement.trim() else "",
         kind == ForecastKind.EXPENSE && statementTotal, account.trim())
@@ -87,7 +86,7 @@ internal fun ForecastEditor(
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição da previsão para edição") {
                 OutlinedTextField(title, { title = it.take(200) }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
             }
-            if (!scoped && !signedRefund) ChoiceField("Tipo", kind, ForecastKind.entries, { if (it == ForecastKind.INCOME) "Receita" else "Despesa" }) {
+            if (!scoped) ChoiceField("Tipo", kind, ForecastKind.entries, { if (it == ForecastKind.INCOME) "Receita" else "Despesa" }) {
                 if (!busy) { kind = it; category = if (it == ForecastKind.INCOME) Category.SALARY else Category.OTHER }
             }
             ChoiceField("Categoria", category, categoriesFor(if (kind == ForecastKind.INCOME) Movement.INCOME else Movement.EXPENSE), { it.label }) { if (!busy) category = it }
@@ -137,8 +136,14 @@ internal fun ForecastEditor(
                 if (scoped && line != null) onSaveOverride(existingOverride?.copy(
                     amountCents = candidate.amountCents, date = start, ignored = line.ignored, title = title.trim(), category = category,
                 ) ?: ForecastOverride(id, line.occurrenceKey, candidate.amountCents, start, line.ignored, title = title.trim(), category = category))
-                else onSaveRule(candidate.copy(startDate = if (source != null && line != null && frequency != ForecastFrequency.ONCE) source.startDate else start,
-                    effectiveFrom = if (source?.frequency == ForecastFrequency.ONCE) source.effectiveFrom else candidate.effectiveFrom))
+                else {
+                    val sameSchedule = source != null && frequency == source.frequency &&
+                        candidate.cycleAnchored == source.cycleAnchored
+                    val newStart = if (sameSchedule && line != null && frequency != ForecastFrequency.ONCE)
+                        source?.startDate ?: start else start
+                    onSaveRule(candidate.copy(startDate = newStart,
+                        effectiveFrom = if (source?.frequency == ForecastFrequency.ONCE) source.effectiveFrom else candidate.effectiveFrom))
+                }
             }
         }, enabled = !busy, modifier = Modifier.testTag("forecast-save")) { Text("Salvar previsão") } },
         dismissButton = { TextButton(onDismiss, enabled = !busy) { Text("Cancelar") } })

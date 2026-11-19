@@ -18,10 +18,12 @@ class ForecastLinkIntegrityTest {
     @Test fun monthlyListPreservesConfiguredCycleKeysAndSkipAffectsPlanner() {
         val rule=expense("consumo",30000).copy(cycleAnchored=true)
         val data=ForecastDataset(rules=listOf(rule),cycleRules=listOf(CycleRule(LocalDate.parse("2026-01-15"),15)))
-        val line=MonthlyForecasts.lines(data,YearMonth.of(2026,11)).single()
+        val month = YearMonth.of(2026, 11)
+        val period = BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1))
+        val line = PendingForecasts(data, emptyList()).lines(period).single()
         assertEquals("cycle:2026-11-15",line.occurrenceKey)
         val edited=data.copy(overrides=listOf(ForecastOverride(line.itemId,line.occurrenceKey,ignored=true)))
         assertEquals(0L,ForecastCalculator.report(edited,CycleCalendar.periodContaining(line.date,data.cycleRules)).totalExpensesCents)
-        assertTrue(MonthlyForecasts.lines(edited,YearMonth.of(2026,11)).single().ignored)
+        assertTrue(PendingForecasts(edited, emptyList()).lines(period).single().ignored)
     }
 }

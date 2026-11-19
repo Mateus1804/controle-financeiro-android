@@ -15,7 +15,10 @@ object ForecastCalculator {
         dataset.rules.groupBy { it.itemId }.forEach { (itemId, versions) ->
             val ordered = versions.sortedBy { it.effectiveFrom }
             val candidates = linkedMapOf<String, Pair<ForecastRule, Occurrence>>()
-            ordered.forEach { rule ->
+            ordered.forEachIndexed { index, rule ->
+                val nextSchedule = ordered.subList(index + 1, ordered.size).firstOrNull {
+                    it.frequency != rule.frequency || it.cycleAnchored != rule.cycleAnchored
+                }
                 val occurrences = when (rule.frequency) {
                     ForecastFrequency.ONCE -> listOf(Occurrence("once", rule.startDate, rule.amountCents))
                     ForecastFrequency.INSTALLMENTS -> Installments.fromTotal(rule.amountCents, rule.installmentCount,
@@ -34,6 +37,8 @@ object ForecastCalculator {
                     }
                 }
                 occurrences.forEach { occurrence ->
+                    val eligibilityDate = if (rule.cycleAnchored) maxOf(period.start, rule.startDate) else occurrence.date
+                    if (nextSchedule != null && eligibilityDate >= nextSchedule.effectiveFrom) return@forEach
                     val existing = candidates[occurrence.key]
                     val hasOverride = overrides.containsKey(itemId to occurrence.key)
                     val started = occurrence.date >= rule.startDate || rule.cycleAnchored || hasOverride ||
@@ -41,9 +46,11 @@ object ForecastCalculator {
                             YearMonth.from(occurrence.date) >= YearMonth.from(rule.startDate))
                     if (started) {
                         if (existing == null) {
-                            val eligibilityDate = if (rule.cycleAnchored) maxOf(period.start, rule.startDate) else occurrence.date
                             if (rule.effectiveFrom <= eligibilityDate) candidates[occurrence.key] = rule to occurrence
-                        } else if (existing.second.date >= rule.effectiveFrom) {
+                        } else {
+                            val cutoffDate = if (rule.active) existing.second.date
+                                else overrides[itemId to occurrence.key]?.date ?: existing.second.date
+                            if (cutoffDate < rule.effectiveFrom) return@forEach
                             // A stable occurrence belongs to its previous schedule until the change boundary.
                             // Changes never move an already closed occurrence into a later cycle. If a new
                             // due day precedes the change boundary, its transition occurs at that boundary.

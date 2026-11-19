@@ -3,7 +3,7 @@ package com.mateuswilliam.financas.notifications
 import android.content.Context
 import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.core.CycleCalendar
-import com.mateuswilliam.financas.core.ForecastCalculator
+import com.mateuswilliam.financas.core.PendingForecasts
 import com.mateuswilliam.financas.core.ForecastKind
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -19,7 +19,7 @@ object ForecastReminders {
             if (!app.settings.snapshot().remindersEnabled) return
             val dataset = app.forecasts.dataset.first()
             val period = CycleCalendar.periodContaining(today, dataset.cycleRules)
-            val lines = ForecastCalculator.report(dataset, period).lines.filter {
+            val lines = PendingForecasts(dataset, app.repository.exportRecords()).lines(period).filter {
                 it.included && !it.ignored && it.date == today && !it.rule.cycleAnchored
             }
             // Device-local delivery history must not be exported with financial backups.
