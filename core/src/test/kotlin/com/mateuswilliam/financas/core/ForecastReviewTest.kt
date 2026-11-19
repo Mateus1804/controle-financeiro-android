@@ -44,7 +44,7 @@ class ForecastReviewTest {
         val monthly = rent.copy(effectiveFrom = nextMonth, startDate = day.plusMonths(1))
         val restarted = first.copy(effectiveFrom = nextMonth.plusMonths(1), startDate = day.plusMonths(2))
         val data = ForecastDataset(rules = listOf(first, monthly, restarted),
-            overrides = listOf(ForecastOverride(first.itemId, "installment:1", amountCents = 12000)))
+            overrides = listOf(ForecastOverride(first.itemId, "installment:1", amountCents = 12000, date = day.plusDays(1))))
         val december = BudgetPeriod(nextMonth, nextMonth.plusMonths(1))
         val january = BudgetPeriod(december.endExclusive, december.endExclusive.plusMonths(1))
         assertEquals(12000L, ForecastCalculator.report(data, period).totalExpensesCents)
@@ -52,9 +52,16 @@ class ForecastReviewTest {
         assertEquals(10000L, ForecastCalculator.report(data, january).totalExpensesCents)
         val paid = Record("paid", 12000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
             "Conta", "Parcela antiga", at(day), forecastItemId = first.itemId, forecastOccurrenceKey = "installment:1")
-        val pending = PendingForecasts(data, listOf(paid))
+        val oldSecond = paid.copy(id = "old-second", forecastOccurrenceKey = "installment:2", occurredAt = at(day.plusMonths(1)))
+        val pending = PendingForecasts(data, listOf(paid, oldSecond))
         assertTrue(pending.lines(period).isEmpty())
         assertEquals(10000L, pending.lines(january).single().amountCents)
+        val february = BudgetPeriod(january.endExclusive, january.endExclusive.plusMonths(1))
+        assertEquals(10000L, pending.lines(february).single().amountCents)
+
+        val stopped = restarted.copy(effectiveFrom = restarted.startDate, active = false)
+        val interrupted = data.copy(rules = data.rules + stopped)
+        assertTrue(ForecastCalculator.report(interrupted, january).lines.isEmpty())
     }
 
     @Test fun differentScheduledRecordsReplaceTheSameForecastWithoutCollapsingIntoOneExpense() {
@@ -67,6 +74,17 @@ class ForecastReviewTest {
         val upcoming = PaydayBudgets.upcomingLines(data, records, zone, at(today))
         assertEquals(30000L, PaydayBudgets.pendingCommitments(upcoming, today, day.plusDays(1)))
         assertEquals(30000L, CentralFinance.summarize(records, data, period, zone, at(today)).projectedExpensesCents)
+    }
+
+    @Test fun seriesChangeUsesTheCycleOfAnOccurrenceWithAnAdjustedDueDate() {
+        val changedCycle = BudgetPeriod(day.plusDays(10), day.plusDays(10).plusMonths(1))
+        val moved = day.plusDays(15)
+        val updated = rent.copy(effectiveFrom = changedCycle.start, amountCents = 50000)
+        val data = ForecastDataset(rules = listOf(rent, updated),
+            overrides = listOf(ForecastOverride(rent.itemId, "month:2026-11", date = moved)))
+        val selected = ForecastCalculator.report(data, changedCycle).lines.single { it.occurrenceKey == "month:2026-11" }
+        assertEquals(moved, selected.date)
+        assertEquals(50000L, selected.amountCents)
     }
 
     @Test fun invoiceForecastOnlyCountsTheAmountStillPendingAfterAComponentIsRecorded() {

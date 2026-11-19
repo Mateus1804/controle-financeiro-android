@@ -193,6 +193,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         editors.initialKind = if (seed.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
         editors.editItem = null
         editors.editKey = null
+        editors.editInstallmentStart = null
         editors.editor = true
     }
     fun edit(line: ForecastLine, onlyOccurrence: Boolean = true) {
@@ -201,6 +202,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         editors.onlyOccurrence = onlyOccurrence
         editors.editItem = line.itemId
         editors.editKey = line.occurrenceKey
+        editors.editInstallmentStart = line.reusedInstallmentStart?.toString()
         editors.editor = true
     }
     fun selectMonth(value: YearMonth) {

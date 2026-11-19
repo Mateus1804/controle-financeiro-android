@@ -88,6 +88,10 @@ internal fun ForecastEditor(
             if (line != null && source?.frequency != ForecastFrequency.ONCE) Text(
                 if (scoped) "Só esta ocorrência será alterada; os outros meses serão preservados."
                 else "A nova regra vale a partir desta ocorrência. Os ajustes individuais feitos nos meses seguintes e o histórico anterior são preservados.", style = MaterialTheme.typography.bodySmall)
+            if (!scoped && existingOverride?.date != null) Text(
+                "O vencimento ajustado desta ocorrência será mantido. O dia habitual vale para as próximas.",
+                style = MaterialTheme.typography.bodySmall,
+            )
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição da previsão para edição") {
                 OutlinedTextField(title, { title = it.take(200) }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
             }

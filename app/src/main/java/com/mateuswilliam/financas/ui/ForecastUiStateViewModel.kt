@@ -50,6 +50,7 @@ internal class ForecastEditorsState(handle: SavedStateHandle) {
     var editor: Boolean by SavedUiProperty(handle, "editors.editor", false)
     var editItem: String? by SavedUiProperty(handle, "editors.editItem", null)
     var editKey: String? by SavedUiProperty(handle, "editors.editKey", null)
+    var editInstallmentStart: String? by SavedUiProperty(handle, "editors.editInstallmentStart", null)
     var scopeStart: String? by SavedUiProperty(handle, "editors.scopeStart", null)
     var scopeEnd: String? by SavedUiProperty(handle, "editors.scopeEnd", null)
     var onlyOccurrence: Boolean by SavedUiProperty(handle, "editors.onlyOccurrence", true)

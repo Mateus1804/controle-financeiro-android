@@ -15,6 +15,7 @@ object ForecastCalculator {
         dataset.rules.groupBy { it.itemId }.forEach { (itemId, versions) ->
             val ordered = versions.sortedBy { it.effectiveFrom }
             val candidates = linkedMapOf<Pair<LocalDate?, String>, Pair<ForecastRule, Occurrence>>()
+            val firstInstallmentSeries = mutableMapOf<String, LocalDate>()
             var installmentStart: LocalDate? = null
             ordered.forEachIndexed { index, rule ->
                 if (rule.frequency != ForecastFrequency.INSTALLMENTS) installmentStart = null
@@ -40,20 +41,23 @@ object ForecastCalculator {
                     }
                 }
                 occurrences.forEach { occurrence ->
+                    val series = installmentStart
+                    // An old link can survive cancellation of its occurrence. Keep its ownership
+                    // with the first schedule that issued that installment number.
+                    val original = series == null || firstInstallmentSeries.getOrPut(occurrence.key) { series } == series
+                    val adjustment = if (original) overrides[itemId to occurrence.key] else null
                     val eligibilityDate = if (rule.cycleAnchored) maxOf(period.start, rule.startDate) else occurrence.date
-                    if (nextSchedule != null && eligibilityDate >= nextSchedule.effectiveFrom) return@forEach
-                    val key = installmentStart to occurrence.key
+                    if (nextSchedule != null && (adjustment?.date ?: eligibilityDate) >= nextSchedule.effectiveFrom) return@forEach
+                    val key = series to occurrence.key
                     val existing = candidates[key]
-                    val hasOverride = overrides.containsKey(itemId to occurrence.key)
-                    val started = occurrence.date >= rule.startDate || rule.cycleAnchored || hasOverride ||
+                    val started = occurrence.date >= rule.startDate || rule.cycleAnchored || adjustment != null ||
                         ((rule.frequency == ForecastFrequency.INSTALLMENTS || existing != null) &&
                             YearMonth.from(occurrence.date) >= YearMonth.from(rule.startDate))
                     if (started) {
                         if (existing == null) {
                             if (rule.effectiveFrom <= eligibilityDate) candidates[key] = rule to occurrence
                         } else {
-                            val cutoffDate = if (rule.active) existing.second.date
-                                else overrides[itemId to occurrence.key]?.date ?: existing.second.date
+                            val cutoffDate = adjustment?.date ?: existing.second.date
                             if (cutoffDate < rule.effectiveFrom) return@forEach
                             // A stable occurrence belongs to its previous schedule until the change boundary.
                             // Changes never move an already closed occurrence into a later cycle. If a new
@@ -65,11 +69,10 @@ object ForecastCalculator {
             }
             // Older versions reused installment numbers within one item. The original occurrence
             // owns its stored overrides and links even when later schedules reuse that number.
-            val originalKeys = mutableSetOf<String>()
             candidates.forEach { (identity, pair) ->
                 val (seriesStart, key) = identity
                 val (rule, occurrence) = pair
-                val reusedStart = if (originalKeys.add(key)) null else seriesStart
+                val reusedStart = seriesStart?.takeIf { firstInstallmentSeries[key] != it }
                 val override = if (reusedStart == null) overrides[itemId to key] else null
                 val date = override?.date ?: occurrence.date
                 if (date in period && (override?.active ?: rule.active)) {

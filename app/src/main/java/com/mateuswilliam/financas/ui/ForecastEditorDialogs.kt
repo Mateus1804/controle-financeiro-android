@@ -22,7 +22,10 @@ internal fun ForecastEditorDialogs(
     val editorReport = remember(snapshot, editingPeriod, editors.editor) {
         if (editors.editor) snapshot?.let { ForecastCalculator.report(it, editingPeriod) } else null
     }
-    val selectedLine = editorReport?.lines?.firstOrNull { it.itemId == editors.editItem && it.occurrenceKey == editors.editKey }
+    val selectedLine = editorReport?.lines?.firstOrNull {
+        it.itemId == editors.editItem && it.occurrenceKey == editors.editKey &&
+            it.reusedInstallmentStart?.toString() == editors.editInstallmentStart
+    }
     if (editors.dueDates && report != null) AlertDialog(onDismissRequest = { editors.dueDates = false },
         title = { Text("Próximos vencimentos") }, text = {
             LazyColumn(Modifier.heightIn(max = 400.dp)) {
@@ -37,7 +40,8 @@ internal fun ForecastEditorDialogs(
             }
         }, confirmButton = { TextButton({ editors.dueDates = false }) { Text("Fechar") } })
     val selectedRule = snapshot?.rules?.filter { it.itemId == editors.editItem }?.maxByOrNull { it.effectiveFrom }
-    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.initialKind, editors.onlyOccurrence, editors.scopeStart) {
+    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.editInstallmentStart,
+        editors.initialKind, editors.onlyOccurrence, editors.scopeStart) {
         ForecastEditor(rule = selectedLine?.rule ?: selectedRule, line = selectedLine, period = editingPeriod, busy = busy, hidden = hidden,
             onDismiss = { editors.editor = false; editors.forecastSeed = null },
             onSaveRule = { updated ->

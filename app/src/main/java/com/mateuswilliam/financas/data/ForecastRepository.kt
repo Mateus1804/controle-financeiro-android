@@ -33,10 +33,13 @@ class ForecastRepository(private val database:FinanceDatabase) {
             "Há lançamentos vinculados. Crie outra previsão para mudar entre receita e despesa."
         }
         val history = dao.allForecastRules().filter { it.itemId == rule.itemId }.map { it.model() }
+        val overrides = dao.allForecastOverrides().filter { it.itemId == rule.itemId }
         val previous = history.filter { it.effectiveFrom <= rule.effectiveFrom }.maxByOrNull { it.effectiveFrom }
+        val hadInstallments = history.any { it.frequency == ForecastFrequency.INSTALLMENTS && it.effectiveFrom < rule.effectiveFrom } ||
+            overrides.any { it.occurrenceKey.startsWith("installment:") } ||
+            linked.any { it.forecastOccurrenceKey?.startsWith("installment:") == true }
         val restartInstallments = replaceFuture && previous != null && previous.frequency != ForecastFrequency.INSTALLMENTS &&
-            rule.active && rule.frequency == ForecastFrequency.INSTALLMENTS &&
-            history.any { it.frequency == ForecastFrequency.INSTALLMENTS && it.effectiveFrom < rule.effectiveFrom }
+            rule.active && rule.frequency == ForecastFrequency.INSTALLMENTS && hadInstallments
         val stop = history.filter { !it.active && it.effectiveFrom > rule.effectiveFrom }.minByOrNull { it.effectiveFrom }
         if (replaceFuture) dao.deleteFutureForecastRules(rule.itemId, rule.effectiveFrom.toString())
         val updated = if (restartInstallments) {
@@ -49,10 +52,10 @@ class ForecastRepository(private val database:FinanceDatabase) {
             dao.upsertForecastRule(ForecastRuleEntity.from(updated.copy(effectiveFrom = stop.effectiveFrom, active = false)))
         }
         replaceOccurrenceKey?.let { key ->
-            val override = dao.allForecastOverrides().firstOrNull { it.itemId == rule.itemId && it.occurrenceKey == key }
+            val override = overrides.firstOrNull { it.occurrenceKey == key }
             if (override != null) {
-                if (override.ignored || override.active != null) {
-                    dao.upsertForecastOverride(override.copy(amountCents = null, date = null, title = null, category = null))
+                if (override.date != null || override.ignored || override.active != null) {
+                    dao.upsertForecastOverride(override.copy(amountCents = null, title = null, category = null))
                 } else dao.deleteForecastOverride(rule.itemId, key)
             }
         }
