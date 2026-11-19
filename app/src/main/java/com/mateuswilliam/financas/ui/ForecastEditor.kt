@@ -52,6 +52,8 @@ internal fun ForecastEditor(
     var attempted by rememberSaveable { mutableStateOf(false) }
     var invalidMoney by rememberSaveable { mutableStateOf(false) }
     val scoped = onlyOccurrence && canEditOccurrence
+    val showAdjustedDueDate = !scoped && source != null && existingOverride?.date != null &&
+        frequency != ForecastFrequency.ONCE && frequency == source.frequency && undated == source.cycleAnchored
     val occurrenceAmount = rememberTextFieldState(initialText = (line?.amountCents ?: source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val ruleAmount = rememberTextFieldState(initialText = (source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val amount = if (scoped) occurrenceAmount else ruleAmount
@@ -88,10 +90,6 @@ internal fun ForecastEditor(
             if (line != null && source?.frequency != ForecastFrequency.ONCE) Text(
                 if (scoped) "Só esta ocorrência será alterada; os outros meses serão preservados."
                 else "A nova regra vale a partir desta ocorrência. Os ajustes individuais feitos nos meses seguintes e o histórico anterior são preservados.", style = MaterialTheme.typography.bodySmall)
-            if (!scoped && existingOverride?.date != null) Text(
-                "O vencimento ajustado desta ocorrência será mantido. O dia habitual vale para as próximas.",
-                style = MaterialTheme.typography.bodySmall,
-            )
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição da previsão para edição") {
                 OutlinedTextField(title, { title = it.take(200) }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
             }
@@ -121,7 +119,11 @@ internal fun ForecastEditor(
             }
             if (!scoped) ForecastToggle("Valor estimado", estimated, !busy) { estimated = it }
             if (!undated || frequency != ForecastFrequency.MONTHLY) {
-                OutlinedButton(onClick = { showFinanceDatePicker(context, datePickerTheme, LocalDate.parse(date)) { date = it.toString(); day = it.dayOfMonth } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(financeDateFormat)}") }
+                if (showAdjustedDueDate) {
+                    Text("Vencimento atual: ${LocalDate.parse(date).format(financeDateFormat)}")
+                } else {
+                    OutlinedButton(onClick = { showFinanceDatePicker(context, datePickerTheme, LocalDate.parse(date)) { date = it.toString(); day = it.dayOfMonth } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(financeDateFormat)}") }
+                }
                 if (!scoped && frequency != ForecastFrequency.ONCE) ChoiceField("Dia habitual", day, (1..31).toList(), { "Dia $it" }) { if (!busy) day = it }
             }
             if (!scoped) FinanceDisclosure("Mais detalhes", "forecast-details") {

@@ -93,6 +93,12 @@ class ForecastRepositoryDataTest {
             assertEquals(listOf(31000L, 50000L, 40000L, 50000L), amounts)
             val february = BudgetPeriod(start.plusMonths(1), start.plusMonths(2))
             assertEquals(movedDate, ForecastCalculator.report(data, february).lines.single().date)
+
+            forecasts.saveRule(rule.copy(effectiveFrom = february.start, amountCents = 50000, dayOfMonth = 20),
+                replaceOccurrenceKey = "month:2026-02")
+            val revised = ForecastCalculator.report(forecasts.dataset.first(), february).lines.single()
+            assertEquals(february.start.withDayOfMonth(20), revised.date)
+            assertEquals(50000L, revised.amountCents)
         } finally { db.close() }
     }
 
