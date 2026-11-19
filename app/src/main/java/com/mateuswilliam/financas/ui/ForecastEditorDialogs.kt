@@ -19,8 +19,13 @@ internal fun ForecastEditorDialogs(
     busy: Boolean, hidden: Boolean, onEdit: (ForecastLine) -> Unit,
 ) {
     val editingPeriod = if (editors.scopeStart != null && editors.scopeEnd != null) BudgetPeriod(LocalDate.parse(editors.scopeStart), LocalDate.parse(editors.scopeEnd)) else period
-    val editorReport = remember(snapshot, editingPeriod) { snapshot?.let { ForecastCalculator.report(it, editingPeriod) } }
-    val selectedLine = editorReport?.lines?.firstOrNull { it.itemId == editors.editItem && it.occurrenceKey == editors.editKey }
+    val editorReport = remember(snapshot, editingPeriod, editors.editor) {
+        if (editors.editor) snapshot?.let { ForecastCalculator.report(it, editingPeriod) } else null
+    }
+    val selectedLine = editorReport?.lines?.firstOrNull {
+        it.itemId == editors.editItem && it.occurrenceKey == editors.editKey &&
+            it.reusedInstallmentStart?.toString() == editors.editInstallmentStart
+    }
     if (editors.dueDates && report != null) AlertDialog(onDismissRequest = { editors.dueDates = false },
         title = { Text("Próximos vencimentos") }, text = {
             LazyColumn(Modifier.heightIn(max = 400.dp)) {
@@ -35,10 +40,17 @@ internal fun ForecastEditorDialogs(
             }
         }, confirmButton = { TextButton({ editors.dueDates = false }) { Text("Fechar") } })
     val selectedRule = snapshot?.rules?.filter { it.itemId == editors.editItem }?.maxByOrNull { it.effectiveFrom }
-    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.initialKind, editors.onlyOccurrence, editors.scopeStart) {
+    if (editors.editor && snapshot != null) key(editors.editItem, editors.editKey, editors.editInstallmentStart,
+        editors.initialKind, editors.onlyOccurrence, editors.scopeStart) {
         ForecastEditor(rule = selectedLine?.rule ?: selectedRule, line = selectedLine, period = editingPeriod, busy = busy, hidden = hidden,
             onDismiss = { editors.editor = false; editors.forecastSeed = null },
-            onSaveRule = { model.saveRule(it) { editors.editor = false; editors.forecastSeed = null } },
+            onSaveRule = { updated ->
+                val selectedKey = selectedLine?.takeIf { selected ->
+                    selected.reusedInstallmentStart == null && updated.frequency != ForecastFrequency.ONCE &&
+                        selected.rule.frequency == updated.frequency && selected.rule.cycleAnchored == updated.cycleAnchored
+                }?.occurrenceKey
+                model.saveRule(updated, selectedKey) { editors.editor = false; editors.forecastSeed = null }
+            },
             onSaveOverride = { model.saveOverride(it) { editors.editor = false } },
             initialKind = editors.initialKind, initialFrequency = editors.initialFrequency, initialOnlyOccurrence = editors.onlyOccurrence,
             initialTitle = editors.forecastSeed?.description.orEmpty(), initialCategory = editors.forecastSeed?.category,
@@ -46,7 +58,9 @@ internal fun ForecastEditorDialogs(
             initialStartDate = editors.forecastSeed?.let { Instant.ofEpochMilli(it.occurredAt).atZone(zone).toLocalDate() },
             initialAccount = editors.forecastSeed?.bank.orEmpty(),
             knownStatements = snapshot.rules.map { it.statementKey }.filter { it.isNotBlank() }.distinct(),
-            existingOverride = snapshot.overrides.firstOrNull { it.itemId == selectedLine?.itemId && it.occurrenceKey == selectedLine?.occurrenceKey })
+            existingOverride = selectedLine?.takeIf { it.reusedInstallmentStart == null }?.let { selected ->
+                snapshot.overrides.firstOrNull { it.itemId == selected.itemId && it.occurrenceKey == selected.occurrenceKey }
+            })
     }
     if (editors.simulationEditor) ForecastEditor(editors.simulation, null, period, busy, hidden, { editors.simulationEditor = false },
         { editors.simulation = it; editors.simulationEditor = false }, {}, initialFrequency = ForecastFrequency.INSTALLMENTS,

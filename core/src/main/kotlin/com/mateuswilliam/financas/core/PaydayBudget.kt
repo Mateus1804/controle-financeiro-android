@@ -50,7 +50,8 @@ object PaydayBudgets {
                 val rule = linked ?: ForecastRule(id, date, record.description, kind, record.amountCents,
                     record.category, ForecastFrequency.ONCE, date, group = ForecastGroup.VARIABLE, account = record.bank)
                 ForecastLine(id, key, record.description, date, record.amountCents, kind, record.category,
-                    rule.group, rule.frequency, false, false, true, rule.statementKey, rule.statementTotal, rule)
+                    rule.group, rule.frequency, false, false, true, rule.statementKey, rule.statementTotal, rule,
+                    scheduledRecordId = record.id)
             }
         return (forecast + scheduled).sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
     }
@@ -61,7 +62,8 @@ object PaydayBudgets {
 
     private fun pending(lines: List<ForecastLine>, today: LocalDate, payday: LocalDate, group: ForecastGroup): Long =
         lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && it.group == group && it.date >= today && it.date < payday }
-            .distinctBy { it.itemId to it.occurrenceKey }.sumOf { it.amountCents }
+            .distinctBy { Triple(it.itemId, it.occurrenceKey, it.scheduledRecordId to it.reusedInstallmentStart) }
+            .sumOf { it.amountCents }
 
     fun compute(availableCents: Long, lines: List<ForecastLine>, today: LocalDate, payday: LocalDate): PaydayBudget {
         require(payday >= today) { "O pagamento precisa ser hoje ou depois." }

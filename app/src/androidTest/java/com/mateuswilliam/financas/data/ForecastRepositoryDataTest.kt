@@ -70,4 +70,86 @@ class ForecastRepositoryDataTest {
             assertTrue(repo.exportRecords().isEmpty())
         } finally { db.close() }
     }
+
+    @Test fun overridingTheSeriesUpdatesTheSelectedMonthAndKeepsOtherExceptions() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val forecasts = ForecastRepository(db)
+            val start = LocalDate.of(2026, 1, 1)
+            val rule = ForecastRule("aluguel", start, "Aluguel", ForecastKind.EXPENSE, 30000,
+                Category.HOME, ForecastFrequency.MONTHLY, start.plusDays(4))
+            forecasts.saveRule(rule)
+            forecasts.saveOverride(ForecastOverride(rule.itemId, "month:2026-01", amountCents = 31000))
+            val movedDate = start.plusMonths(1).plusDays(10)
+            forecasts.saveOverride(ForecastOverride(rule.itemId, "month:2026-02", amountCents = 35000, date = movedDate))
+            forecasts.saveOverride(ForecastOverride(rule.itemId, "month:2026-03", amountCents = 40000))
+            forecasts.saveRule(rule.copy(effectiveFrom = start.plusMonths(1), amountCents = 50000),
+                replaceOccurrenceKey = "month:2026-02")
+            val data = forecasts.dataset.first()
+            val amounts = (0L..3L).map { offset ->
+                val from = start.plusMonths(offset)
+                ForecastCalculator.report(data, BudgetPeriod(from, from.plusMonths(1))).totalExpensesCents
+            }
+            assertEquals(listOf(31000L, 50000L, 40000L, 50000L), amounts)
+            val february = BudgetPeriod(start.plusMonths(1), start.plusMonths(2))
+            assertEquals(movedDate, ForecastCalculator.report(data, february).lines.single().date)
+
+            forecasts.saveRule(rule.copy(effectiveFrom = february.start, amountCents = 50000, dayOfMonth = 20),
+                replaceOccurrenceKey = "month:2026-02")
+            val revised = ForecastCalculator.report(forecasts.dataset.first(), february).lines.single()
+            assertEquals(february.start.withDayOfMonth(20), revised.date)
+            assertEquals(50000L, revised.amountCents)
+        } finally { db.close() }
+    }
+
+    @Test fun restartingInstallmentsKeepsOldLinksAndOverridesWithTheirOriginalPurchase() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val repository = FinanceRepository(db, CapturePreferences(context))
+            val forecasts = ForecastRepository(db)
+            val january = LocalDate.of(2026, 1, 1)
+            val february = january.plusMonths(1)
+            val march = february.plusMonths(1)
+            val first = ForecastRule("compra", january, "Compra", ForecastKind.EXPENSE, 30000,
+                Category.OTHER, ForecastFrequency.INSTALLMENTS, january.plusDays(4), installmentCount = 3)
+            forecasts.saveRule(first)
+            forecasts.saveOverride(ForecastOverride(first.itemId, "installment:1", amountCents = 12000))
+            val purchase = Record("paga", 12000, Movement.EXPENSE, PaymentMethod.PIX, Category.OTHER,
+                "Conta", "Primeira parcela", first.startDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                forecastItemId = first.itemId, forecastOccurrenceKey = "installment:1")
+            repository.save(purchase, null)
+            forecasts.saveRule(first.copy(effectiveFrom = february, startDate = february.plusDays(4), frequency = ForecastFrequency.MONTHLY))
+            forecasts.saveRule(first.copy(effectiveFrom = march, startDate = march.plusDays(4)))
+            val data = forecasts.dataset.first()
+            val firstCycle = BudgetPeriod(january, february)
+            val restartCycle = BudgetPeriod(march, march.plusMonths(1))
+            assertEquals(12000L, ForecastCalculator.report(data, firstCycle).totalExpensesCents)
+            assertTrue(PendingForecasts(data, listOf(purchase)).lines(firstCycle).isEmpty())
+            val restarted = PendingForecasts(data, listOf(purchase)).lines(restartCycle).single()
+            assertNotEquals(first.itemId, restarted.itemId)
+            assertEquals(10000L, restarted.amountCents)
+            BackupSnapshot.validate(repository.snapshot())
+        } finally { db.close() }
+    }
+
+    @Test fun anOldOverrideSurvivesASeriesReplacementWithoutMovingTheNewInstallment() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val forecasts = ForecastRepository(db)
+            val january = LocalDate.of(2026, 1, 1)
+            val february = january.plusMonths(1)
+            val due = january.plusDays(4)
+            val purchase = ForecastRule("compra", due, "Compra", ForecastKind.EXPENSE, 30000,
+                Category.OTHER, ForecastFrequency.INSTALLMENTS, due, installmentCount = 3)
+            forecasts.saveRule(purchase)
+            forecasts.saveOverride(ForecastOverride(purchase.itemId, "installment:1", date = due.plusDays(1)))
+            forecasts.saveRule(purchase.copy(effectiveFrom = january, frequency = ForecastFrequency.MONTHLY))
+            forecasts.saveRule(purchase.copy(effectiveFrom = february, startDate = due.plusMonths(1)))
+            val data = forecasts.dataset.first()
+            assertEquals(due.plusDays(1), data.overrides.single().date)
+            val pending = ForecastCalculator.report(data, BudgetPeriod(february, february.plusMonths(1))).lines.single()
+            assertEquals(due.plusMonths(1), pending.date)
+            assertEquals(10000L, pending.amountCents)
+        } finally { db.close() }
+    }
 }

@@ -31,8 +31,8 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun refresh() { if (observing?.isActive != true) observe() }
-    fun saveRule(rule: ForecastRule, onSaved: () -> Unit) = action {
-        repository.saveRule(rule)
+    fun saveRule(rule: ForecastRule, replaceOccurrenceKey: String? = null, onSaved: () -> Unit) = action {
+        repository.saveRule(rule, replaceOccurrenceKey = replaceOccurrenceKey)
         onSaved()
         "Previsão salva. O orçamento e as projeções foram atualizados."
     }
