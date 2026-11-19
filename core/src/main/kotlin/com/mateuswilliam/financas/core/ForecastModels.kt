@@ -41,6 +41,7 @@ data class ForecastLine(
     val amountCents: Long, val kind: ForecastKind, val category: Category, val group: ForecastGroup,
     val frequency: ForecastFrequency, val estimated: Boolean, val ignored: Boolean,
     val included: Boolean, val statementKey: String, val statementTotal: Boolean, val rule: ForecastRule,
+    val coveredCents: Long = 0,
 )
 data class ForecastReport(
     val period: BudgetPeriod, val lines: List<ForecastLine>, val incomeCents: Long,

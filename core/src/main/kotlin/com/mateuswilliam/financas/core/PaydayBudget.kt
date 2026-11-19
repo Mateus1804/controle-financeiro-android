@@ -32,26 +32,12 @@ object PaydayBudgets {
         (lines.filter { it.included && !it.ignored && it.kind == ForecastKind.INCOME && it.category == Category.SALARY }.map { it.date } + extraDates)
             .filter { it >= today }.minOrNull()
 
-    /** Linhas previstas de [today] até [horizonDays] dias à frente, atravessando ciclos; exclui o que já foi lançado. */
-    fun upcomingLines(dataset: ForecastDataset, excluded: Set<Pair<String, String>>, today: LocalDate, horizonDays: Long = 62): List<ForecastLine> {
-        val end = today.plusDays(horizonDays)
-        val lines = mutableListOf<ForecastLine>()
-        var cycle = CycleCalendar.periodContaining(today, dataset.cycleRules)
-        while (cycle.start < end) {
-            lines += ForecastCalculator.report(dataset, cycle, excluded).lines.filter { it.date >= today && it.date < end }
-            cycle = CycleCalendar.periodContaining(cycle.endExclusive, dataset.cycleRules)
-        }
-        return lines.distinctBy { it.itemId to it.occurrenceKey }
-    }
-
     /** Scheduled entries replace linked forecasts immediately; received salary never remains a future payday. */
     fun upcomingLines(dataset: ForecastDataset, records: List<Record>, zone: ZoneId, asOf: Long, horizonDays: Long = 62): List<ForecastLine> {
         require(horizonDays > 0)
         val today = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
         val end = today.plusDays(horizonDays)
-        val represented = records.filter { it.forecastItemId != null && it.forecastOccurrenceKey != null }
-            .mapTo(hashSetOf()) { it.forecastItemId!! to it.forecastOccurrenceKey!! }
-        val forecast = upcomingLines(dataset.copy(reserveEvents = emptyList()), represented, today, horizonDays)
+        val forecast = PendingForecasts(dataset, records).lines(BudgetPeriod(today, end))
         val scheduled = records.filter { it.occurredAt > asOf && it.movement in setOf(Movement.INCOME, Movement.EXPENSE) }
             .mapNotNull { record ->
                 val date = Instant.ofEpochMilli(record.occurredAt).atZone(zone).toLocalDate()

@@ -32,18 +32,7 @@ object CentralFinance {
     fun summarize(records: List<Record>, data: ForecastDataset, period: BudgetPeriod, zone: ZoneId, asOf: Long): CentralFinancialSummary {
         val recorded = Ledger.period(records.filter { it.occurredAt <= asOf }, period, zone)
         val scheduled = Ledger.period(records.filter { it.occurredAt > asOf }, period, zone)
-        // Even scheduled linked records replace their occurrence in the projection, but not in actual cash.
-        val represented = records.filter { it.forecastItemId != null && it.forecastOccurrenceKey != null }
-            .mapTo(hashSetOf()) { it.forecastItemId!! to it.forecastOccurrenceKey!! }
-        // Old reserve events lack a source account and must not create new cash or allocations.
-        val clean = data.copy(reserveEvents = emptyList())
-        val lines = buildList {
-            var cycle = CycleCalendar.periodContaining(period.start, data.cycleRules)
-            while (cycle.start < period.endExclusive) {
-                addAll(ForecastCalculator.report(clean, cycle, represented).lines.filter { it.date in period })
-                cycle = CycleCalendar.periodContaining(cycle.endExclusive, data.cycleRules)
-            }
-        }.distinctBy { it.itemId to it.occurrenceKey }.sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
+        val lines = PendingForecasts(data, records).lines(period)
         val forecast = report(period, lines, 0, 0, 0, 0)
         val all = recorded.records + scheduled.records
         fun group(record: Record): ForecastGroup {

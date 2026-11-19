@@ -76,9 +76,17 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         val cleanReason = reason.trim()
         require(cleanReason.isNotBlank() && cleanReason.length <= 200 && '\u0000' !in cleanReason) { "Informe um motivo com até 200 caracteres." }
         database.withTransaction {
+            val oldReferences = if (AccountFunds.isReserve(label)) dao.allAccountBalanceEvents().map { it.toReference() } else null
             rememberAccount(label)
             dao.insertAccountBalanceEvent(AccountBalanceEventEntity(accountKey = AccountNames.key(label), balanceCents = balanceCents,
                 effectiveAt = effectiveAt, createdAt = System.currentTimeMillis(), reason = cleanReason))
+            if (oldReferences != null) {
+                val records = dao.allRecords().map { it.toRecord() }
+                require(!AccountBalances.worsensReserveDeficit(records, records, oldReferences,
+                    dao.allAccountBalanceEvents().map { it.toReference() })) {
+                    "Este saldo de referência deixaria a reserva negativa em uma data posterior."
+                }
+            }
         }
     }
     suspend fun setAccountArchived(key: String, archived: Boolean) = writes.withLock {
@@ -141,8 +149,8 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val original = record.originalRecordId?.let { dao.recordById(it)?.toRecord() }
             val record = if (original != null) Refunds.applyOriginal(record, original) else record
             RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
+            val previous = if (editing) dao.recordById(record.id) ?: return@withTransaction false else null
             if (record.movement == Movement.TRANSFER) {
-                val previous = if (editing) dao.recordById(record.id) else null
                 val unchangedLegacy = previous?.movement == Movement.TRANSFER &&
                     AccountNames.key(previous.bank) == AccountNames.key(record.bank) && AccountNames.key(previous.destination) == AccountNames.key(record.destination)
                 require(AccountNames.key(record.bank) != AccountNames.key(record.destination)) { "Escolha contas diferentes para a transferência." }
@@ -158,14 +166,15 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
                     require(record.amountCents <= available) { "Saldo insuficiente na reserva na data do resgate." }
                 }
             }
-            if (editing) {
-                val previous = dao.recordById(record.id) ?: return@withTransaction false
+            if (previous != null) {
+                val refunds = dao.refundsForRecord(record.id).map { row ->
+                    RecordEntity.from(Refunds.applyOriginal(row.toRecord(), record), row.sourceDraftId)
+                }
+                validateReserveChange(listOf(previous.toRecord(), record) + refunds.map { it.toRecord() },
+                    listOf(record) + refunds.map { it.toRecord() }, setOf(record.id) + refunds.map { it.id })
                 val updated = dao.updateRecord(RecordEntity.from(record, previous.sourceDraftId)) == 1
                 if (updated) {
-                    dao.refundsForRecord(record.id).forEach { refund ->
-                        val normalized = Refunds.applyOriginal(refund.toRecord(), record)
-                        check(dao.updateRecord(RecordEntity.from(normalized, refund.sourceDraftId)) == 1)
-                    }
+                    refunds.forEach { check(dao.updateRecord(it) == 1) }
                     rememberAccount(record.bank); rememberAccount(record.destination)
                 }
                 return@withTransaction updated
@@ -175,6 +184,7 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
                 if (draft.status != "PENDING") return@withTransaction false
                 if (expectedRevision != null && expectedRevision != draft.revision) throw DraftChangedException()
             }
+            validateReserveChange(listOf(record), listOf(record), emptySet())
             dao.insertRecord(RecordEntity.from(record, draftId))
             rememberAccount(record.bank)
             rememberAccount(record.destination)
@@ -186,7 +196,25 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     }
 
     suspend fun dismiss(id: String) = writes.withLock { dao.reviewDraft(id, "DISMISSED") }
-    suspend fun deleteRecord(id: String) = writes.withLock { dao.deleteRecord(id) }
+    suspend fun deleteRecord(id: String) = writes.withLock {
+        database.withTransaction {
+            dao.recordById(id)?.let {
+                validateReserveChange(listOf(it.toRecord()), emptyList(), setOf(id))
+                dao.deleteRecord(id)
+            }
+            Unit
+        }
+    }
+
+    private suspend fun validateReserveChange(affected: List<Record>, replacements: List<Record>, removedIds: Set<String>) {
+        if (affected.none(AccountBalances::touchesReserve)) return
+        val before = dao.allRecords().map { it.toRecord() }
+        val after = before.filterNot { it.id in removedIds } + replacements
+        val references = dao.allAccountBalanceEvents().map { it.toReference() }
+        require(!AccountBalances.worsensReserveDeficit(before, after, references)) {
+            "Esta alteração deixaria a reserva negativa. Confira os resgates e aportes afetados."
+        }
+    }
     suspend fun exportRecords(): List<Record> = dao.allRecords().map { it.toRecord() }
 
     suspend fun snapshot(): FinanceSnapshot = writes.withLock {

@@ -9,9 +9,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.YearMonth
 
-/** The planner writes forecasts/reserve events only; it never records receipts or payments. */
+/** Planning edits forecast rules, cycle settings and the reserve goal. */
 class ForecastViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as FinanceApplication
     private val repository = app.forecasts

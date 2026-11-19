@@ -48,6 +48,7 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
         val status = when {
             line.ignored -> "Ignorada neste ciclo"
             !line.included -> "Já incluído na fatura"
+            line.coveredCents > 0 -> "Valor restante da fatura"
             else -> null
         }
         Surface(modifier = Modifier.fillMaxWidth().clickable(enabled = !busy, onClickLabel = "Editar previsão") { onEdit(line) },

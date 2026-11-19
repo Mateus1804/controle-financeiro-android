@@ -29,7 +29,10 @@ private class SavedUiProperty<T>(private val handle: SavedStateHandle, private v
 
 internal class ForecastNavigationState(handle: SavedStateHandle) {
     var accountFilterKey: String? by SavedUiProperty(handle, "navigation.accountFilterKey", null)
-    var tab: Int by SavedUiProperty(handle, "navigation.tab.v2", 0)
+    private var destinationId: Int by SavedUiProperty(handle, "navigation.tab.v2", RendlyDestination.MONTH.id)
+    var destination: RendlyDestination
+        get() = RendlyDestination.entries.firstOrNull { it.id == destinationId } ?: RendlyDestination.MONTH
+        set(value) { destinationId = value.id }
     var followingCurrent: Boolean by SavedUiProperty(handle, "navigation.followingCurrent", true)
     var monthText: String by SavedUiProperty(handle, "navigation.monthText", YearMonth.now().toString())
     var expenseDimension: ExpenseDimension? by SavedUiProperty(handle, "navigation.expenseDimension", null)

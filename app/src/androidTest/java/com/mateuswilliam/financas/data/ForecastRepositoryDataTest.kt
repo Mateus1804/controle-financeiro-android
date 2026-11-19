@@ -23,7 +23,8 @@ class ForecastRepositoryDataTest {
             val day=LocalDate.parse("2026-11-05")
             forecasts.saveRule(ForecastRule("aluguel",day,"Aluguel",ForecastKind.EXPENSE,30000,Category.HOME,ForecastFrequency.MONTHLY,day))
             forecasts.saveOverride(ForecastOverride("aluguel","month:2026-12",35000))
-            forecasts.addReserveEvent(ReserveEventKind.SET,50000,"Reserva informada")
+            db.financeDao().insertReserveEvent(ReserveEventEntity(kind = ReserveEventKind.SET.name,
+                amountCents = 50000, createdAt = System.currentTimeMillis(), reason = "Reserva informada", cycleStart = null))
             repo.configureAccountBalance("Carteira",100000,day.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),"Saldo inicial")
             repo.save(Record("gasto",30000,Movement.EXPENSE,PaymentMethod.PIX,Category.HOME,"Carteira","Aluguel",day.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
                 forecastItemId="aluguel",forecastOccurrenceKey="month:2026-11"),null)
@@ -37,8 +38,12 @@ class ForecastRepositoryDataTest {
             assertEquals(expected.forecastOverrides,restored.forecastOverrides)
             assertEquals(expected.accountBalanceEvents,restored.accountBalanceEvents)
             assertEquals(expected.reserveEvents,restored.reserveEvents)
-            val summary=SalarySummaries.month(restored.records.map { it.toRecord() },forecasts.dataset.first(),YearMonth.of(2026,11),ZoneOffset.UTC,Long.MAX_VALUE)
-            assertEquals(0L,summary.pendingExpensesCents)
+            val month = YearMonth.of(2026, 11)
+            val period = BudgetPeriod(month.atDay(1), month.plusMonths(1).atDay(1))
+            val summary = CentralFinance.summarize(restored.records.map { it.toRecord() }, forecasts.dataset.first(),
+                period, ZoneOffset.UTC, Long.MAX_VALUE)
+            assertEquals(0L, summary.forecast.totalExpensesCents)
+            assertEquals(30000L, summary.recorded.expenses)
         } finally { settings.reset(); db.close() }
     }
     @Test fun linkedForecastCannotChangeItsNatureAndBackupRemainsValid() = runBlocking {
