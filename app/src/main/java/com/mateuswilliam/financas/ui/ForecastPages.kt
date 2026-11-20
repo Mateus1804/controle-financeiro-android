@@ -92,11 +92,16 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
 @Composable
 private fun projectionReports(
     data: ForecastDataset, periods: List<BudgetPeriod>, records: List<Record>, asOf: Long, zone: ZoneId,
-): State<Result<List<ForecastReport>>?> = key(data, periods, records, asOf, zone) {
-    produceState<Result<List<ForecastReport>>?>(null) {
+): State<Result<List<ForecastReport>>?> = calculateInBackground(listOf(data, periods, records, asOf, zone)) {
+    CentralFinance.summarizePeriods(records, data, periods, zone, asOf).map { it.projectedReport }
+}
+
+@Composable
+internal fun <T> calculateInBackground(inputs: List<Any?>, calculate: () -> T): State<Result<T>?> = key(inputs) {
+    produceState<Result<T>?>(null) {
         value = withContext(Dispatchers.Default) {
             try {
-                Result.success(CentralFinance.summarizePeriods(records, data, periods, zone, asOf).map { it.projectedReport })
+                Result.success(calculate())
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

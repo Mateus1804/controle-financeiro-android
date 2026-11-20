@@ -46,7 +46,10 @@ internal fun LazyListScope.forecastLineItems(lines: List<ForecastLine>, hidden: 
             else -> "Previsto · Compromisso"
         }
         val status = when {
+            line.hasLinkedRecord && line.ignored -> "Vinculada a lançamento · previsão ignorada neste ciclo"
+            line.hasLinkedRecord -> "Vinculada a lançamento"
             line.ignored -> "Ignorada neste ciclo"
+            !line.included && line.coveredCents > 0 -> "Coberta pelos lançamentos da fatura"
             !line.included -> "Já incluído na fatura"
             line.coveredCents > 0 -> "Valor restante da fatura"
             else -> null

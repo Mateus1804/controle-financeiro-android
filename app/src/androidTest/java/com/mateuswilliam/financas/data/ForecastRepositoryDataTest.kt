@@ -60,6 +60,29 @@ class ForecastRepositoryDataTest {
             BackupSnapshot.validate(repo.snapshot())
         } finally { db.close() }
     }
+
+    @Test fun anOccurrenceRejectsANewLinkAndKeepsEditableHistory() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val repo = FinanceRepository(db, CapturePreferences(context))
+            val start = LocalDate.of(2026, 11, 5)
+            ForecastRepository(db).saveRule(ForecastRule("rent", start, "Aluguel", ForecastKind.EXPENSE,
+                10000, Category.HOME, ForecastFrequency.MONTHLY, start))
+            val record = Record("first", 10000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+                "Carteira", "Aluguel", start.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                forecastItemId = "rent", forecastOccurrenceKey = "month:2026-11")
+            assertTrue(repo.save(record, null))
+            val duplicate = record.copy(id = "duplicate")
+            assertTrue(runCatching { repo.save(duplicate, null) }.exceptionOrNull() is IllegalArgumentException)
+            assertTrue(repo.save(record.copy(id = "next", forecastOccurrenceKey = "month:2026-12"), null))
+
+            // Old installations could have several links for the same occurrence.
+            db.financeDao().insertRecord(RecordEntity.from(duplicate, null))
+            assertTrue(repo.save(record.copy(description = "Aluguel da casa"), null, editing = true))
+            assertEquals(setOf("first", "next", "duplicate"), repo.exportRecords().map { it.id }.toSet())
+            BackupSnapshot.validate(repo.snapshot())
+        } finally { db.close() }
+    }
     @Test fun oldPayloadIsRejectedBeforeReplacingLocalData() = runBlocking {
         val db=Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
         try {
@@ -99,6 +122,27 @@ class ForecastRepositoryDataTest {
             val revised = ForecastCalculator.report(forecasts.dataset.first(), february).lines.single()
             assertEquals(february.start.withDayOfMonth(20), revised.date)
             assertEquals(50000L, revised.amountCents)
+        } finally { db.close() }
+    }
+
+    @Test fun editingTheFirstMonthlyOccurrenceKeepsItsKeyAndSavesTheEarlierDueDate() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val forecasts = ForecastRepository(db)
+            val cycleStart = LocalDate.of(2026, 11, 5)
+            val due = cycleStart.withDayOfMonth(20)
+            val cycle = BudgetPeriod(cycleStart, cycleStart.plusMonths(1))
+            val first = ForecastRule("aluguel", due, "Aluguel", ForecastKind.EXPENSE, 10000,
+                Category.HOME, ForecastFrequency.MONTHLY, due)
+            val key = "month:2026-11"
+            forecasts.saveRule(first)
+            forecasts.saveRule(first.copy(effectiveFrom = cycleStart, dayOfMonth = 10), replaceOccurrenceKey = key)
+            assertEquals(cycleStart.withDayOfMonth(10), ForecastCalculator.report(forecasts.dataset.first(), cycle).lines.single().date)
+
+            forecasts.saveRule(first.copy(effectiveFrom = cycleStart, dayOfMonth = 2), replaceOccurrenceKey = key)
+            val line = ForecastCalculator.report(forecasts.dataset.first(), cycle).lines.single { it.occurrenceKey == key }
+            assertEquals(cycleStart, line.date)
+            assertEquals(10000L, line.amountCents)
         } finally { db.close() }
     }
 

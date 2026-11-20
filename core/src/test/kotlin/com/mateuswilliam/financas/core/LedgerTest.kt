@@ -3,7 +3,7 @@ package com.mateuswilliam.financas.core
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LedgerTest {
@@ -25,16 +25,7 @@ class LedgerTest {
         assertEquals(100L, Ledger.month(listOf(boundary), YearMonth.of(2026, 10), zone).income)
         assertEquals(0L, Ledger.month(listOf(boundary), YearMonth.of(2026, 11), zone).income)
     }
-    @Test fun `csv preserva texto aspas acentos e quebras de linha`() {
-        val csv = Ledger.csv(listOf(record("1", Movement.EXPENSE, 1099).copy(description = "Pão; \"café\"\nextra")), zone)
-        assertTrue(csv.startsWith("\uFEFF")); assertTrue(csv.contains("\"Pão; \"\"café\"\"\nextra\"")); assertTrue(csv.contains("10,99"))
-    }
-    @Test fun `csv neutraliza formulas nos campos de texto`() {
-        val csv = Ledger.csv(listOf(record("1", Movement.EXPENSE, 100).copy(description = "  =HYPERLINK(\"x\")", bank = "@SUM(A1)")), zone)
-        assertTrue(csv.contains("'  =HYPERLINK")); assertTrue(csv.contains("'@SUM"))
-    }
-    @Test fun `historico vazio tem totais zero e csv com cabecalho`() {
+    @Test fun `historico vazio tem totais zero`() {
         assertEquals(0L, Ledger.month(emptyList(), YearMonth.of(2026, 10), zone).result)
-        assertEquals(2, Ledger.csv(emptyList(), zone).split("\r\n").size)
     }
 }

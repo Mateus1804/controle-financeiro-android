@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import java.util.UUID
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -48,21 +49,29 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     fun observeAccountBalances(asOf: Long = System.currentTimeMillis()) =
         observeAccountLedger { asOf }.map { it.balances }.distinctUntilChanged()
 
+    private data class AccountLedgerRows(
+        val asOf: Long,
+        val accounts: List<AccountEntity>,
+        val records: List<RecordEntity>,
+        val references: List<AccountBalanceEventEntity>,
+    )
+
     // Extrato, referências e saldos usam a mesma leitura do banco e o mesmo horário.
     internal fun observeAccountLedger(now: () -> Long = System::currentTimeMillis) = database.invalidationTracker.createFlow(
         "accounts", "account_balance_events", "records",
     ).conflate().map {
-        database.withTransaction {
-            val asOf = now()
-            val saved = dao.allAccounts()
-            val rows = dao.allRecords()
-            val records = rows.map { it.toRecord() }
-            val manualRecords = records.filterIndexed { index, _ -> rows[index].sourceDraftId == null }
-            val references = dao.allAccountBalanceEvents().map { it.toReference() }
-            val balances = AccountBalances.calculate(AccountCatalog.options(saved.map { it.toOption() }, records),
-                saved.filter { it.archived }.map { it.nameKey }.toSet(), references, records, asOf)
-            AccountLedger(asOf, records, manualRecords, balances, references)
+        val (asOf, saved, rows, referenceRows) = database.withTransaction {
+            AccountLedgerRows(now(), dao.allAccounts(), dao.allRecords(), dao.allAccountBalanceEvents())
         }
+        val records = rows.map(RecordEntity::toRecord)
+        val manualRecords = records.filterIndexed { index, _ -> rows[index].sourceDraftId == null }
+        val references = referenceRows.map(AccountBalanceEventEntity::toReference)
+        val balances = AccountBalances.calculate(
+            AccountCatalog.options(saved.map(AccountEntity::toOption), records),
+            saved.filter { it.archived }.map { it.nameKey }.toSet(),
+            references, records, asOf,
+        )
+        AccountLedger(asOf, records, manualRecords, balances, references)
     }.distinctUntilChanged().flowOn(Dispatchers.Default)
 
     suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) = writes.withLock {
@@ -142,14 +151,20 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     suspend fun save(record: Record, draftId: String?, editing: Boolean = false, expectedRevision: Int? = null): Boolean = writes.withLock {
         RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
         val saved = database.withTransaction {
+            val previous = if (editing) dao.recordById(record.id) ?: return@withTransaction false else null
             record.forecastItemId?.let { id ->
-                require(ForecastSnapshots.validOccurrenceKey(record.forecastOccurrenceKey!!))
-                require(dao.allForecastRules().any { it.itemId == id && it.kind == if (record.movement == Movement.INCOME) "INCOME" else "EXPENSE" }) { "Previsão vinculada não encontrada." }
+                val key = requireNotNull(record.forecastOccurrenceKey)
+                require(ForecastSnapshots.validOccurrenceKey(key)) { "Vínculo de previsão inválido." }
+                val kind = if (record.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
+                require(dao.hasForecastRule(id, kind.name)) { "Previsão vinculada não encontrada." }
+                val keepsLink = previous?.forecastItemId == id && previous.forecastOccurrenceKey == key
+                if (!keepsLink) require(!dao.hasForecastOccurrenceLink(id, key)) {
+                    "Esta ocorrência já está vinculada a outro lançamento."
+                }
             }
             val original = record.originalRecordId?.let { dao.recordById(it)?.toRecord() }
             val record = if (original != null) Refunds.applyOriginal(record, original) else record
             RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
-            val previous = if (editing) dao.recordById(record.id) ?: return@withTransaction false else null
             if (record.movement == Movement.TRANSFER) {
                 val unchangedLegacy = previous?.movement == Movement.TRANSFER &&
                     AccountNames.key(previous.bank) == AccountNames.key(record.bank) && AccountNames.key(previous.destination) == AccountNames.key(record.destination)
@@ -222,7 +237,8 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         database.withTransaction { readSnapshot(dao, System.currentTimeMillis(), display) }
     }
 
-    suspend fun restore(original: FinanceSnapshot) = writes.withLock {
+    /** Retorna se as preferências de exibição foram salvas após restaurar os dados financeiros. */
+    suspend fun restore(original: FinanceSnapshot): Boolean = writes.withLock {
         val snapshot = original
         BackupSnapshot.validate(snapshot)
         val previousSettings = settings.snapshot()
@@ -236,7 +252,13 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             }
             throw exception
         }
-        withContext(Dispatchers.IO) { settings.restoreDisplay(snapshot.display) }
+        try {
+            withContext(Dispatchers.IO) { settings.restoreDisplay(snapshot.display) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private suspend fun clearTables() {

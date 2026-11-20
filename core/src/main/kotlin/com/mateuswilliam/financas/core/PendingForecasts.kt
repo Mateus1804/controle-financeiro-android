@@ -9,16 +9,16 @@ class PendingForecasts(dataset: ForecastDataset, records: List<Record>) {
         (item to occurrence) to record
     }.groupBy({ it.first }, { it.second })
 
-    fun lines(period: BudgetPeriod): List<ForecastLine> = buildList {
+    fun lines(period: BudgetPeriod, includeCovered: Boolean = false): List<ForecastLine> = buildList {
         var cycle = CycleCalendar.periodContaining(period.start, data.cycleRules)
         while (cycle.start < period.endExclusive) {
-            addAll(cycleLines(cycle).filter { it.date in period })
+            addAll(cycleLines(cycle, includeCovered).filter { it.date in period })
             cycle = CycleCalendar.periodContaining(cycle.endExclusive, data.cycleRules)
         }
     }.distinctBy { Triple(it.itemId, it.occurrenceKey, it.reusedInstallmentStart) }
         .sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
 
-    private fun cycleLines(cycle: BudgetPeriod): List<ForecastLine> {
+    private fun cycleLines(cycle: BudgetPeriod, includeCovered: Boolean): List<ForecastLine> {
         val forecasts = ForecastCalculator.report(data, cycle).lines
         val covered = forecasts.asSequence().filter {
             it.kind == ForecastKind.EXPENSE && !it.statementTotal && it.statementKey.isNotBlank()
@@ -28,12 +28,15 @@ class PendingForecasts(dataset: ForecastDataset, records: List<Record>) {
             }
         }.toMutableMap()
         return forecasts.mapNotNull { line ->
-            if (linkedRecords(line).isNotEmpty()) return@mapNotNull null
+            if (linkedRecords(line).isNotEmpty()) {
+                return@mapNotNull if (includeCovered) line.copy(included = false, hasLinkedRecord = true) else null
+            }
             if (!line.included || line.kind != ForecastKind.EXPENSE || !line.statementTotal) return@mapNotNull line
             val alreadyCovered = minOf(line.amountCents, covered[line.statementKey] ?: 0L)
             covered[line.statementKey] = (covered[line.statementKey] ?: 0L) - alreadyCovered
-            if (alreadyCovered == line.amountCents) null
-            else line.copy(amountCents = line.amountCents - alreadyCovered, coveredCents = alreadyCovered)
+            if (alreadyCovered == line.amountCents) {
+                if (includeCovered) line.copy(included = false, coveredCents = alreadyCovered) else null
+            } else line.copy(amountCents = line.amountCents - alreadyCovered, coveredCents = alreadyCovered)
         }
     }
 

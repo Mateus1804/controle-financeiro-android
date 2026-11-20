@@ -33,7 +33,8 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
     forecastLines: List<ForecastLine> = emptyList(), onForecast: (ForecastLine) -> Unit = {}, onCycle: () -> Unit = {},
     onIgnoreForecast: (ForecastLine) -> Unit = {}, onStopForecast: (ForecastLine) -> Unit = {},
     onEditFutureForecast: (ForecastLine) -> Unit = {}, busy: Boolean = false, scheduledRecords: List<Record> = emptyList(),
-    reserveNeedsReference: Boolean = false, today: LocalDate = LocalDate.now()) {
+    reserveNeedsReference: Boolean = false, today: LocalDate = LocalDate.now(),
+    forecastStatus: String? = null, onRetryForecast: (() -> Unit)? = null, balanceStatus: String? = null) {
     val zone = ZoneId.systemDefault()
     val selected = remember(records, month, period, category, accountKey, expenseFilter, zone) {
         val filtered = records.filter { record ->
@@ -74,6 +75,7 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
             }
         } }
         accountTotal?.let { total -> item { AccountTotalCard(total, hidden, onAccounts, accountBalances, period, reserveNeedsReference, today) } }
+        balanceStatus?.let { status -> item { Text(status, style = MaterialTheme.typography.bodySmall) } }
         item {
             Column(Modifier.testTag("month-totals"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (category != null || accountKey != null || expenseFilter != null) Text("Totais dos lançamentos filtrados", style = MaterialTheme.typography.labelMedium)
@@ -103,7 +105,11 @@ internal fun MonthLedgerScreen(records: List<Record>, month: YearMonth, onMonth:
         if (category != null) item { InputChip(selected = true, onClick = { onCategory(null) }, label = { Text("${category.label} · Limpar filtro") }) }
         if (expenseFilter != null) item { InputChip(selected = true, onClick = onClearExpenseFilter,
             label = { Text("${privateDisplayText(expenseFilter.label, hidden)} · Limpar filtro") }) }
-        if (days.isEmpty()) item { Text("Nenhum lançamento neste período. Use + para acrescentar.") }
+        forecastStatus?.let { status -> item {
+            Text(status, style = MaterialTheme.typography.bodyMedium)
+            if (onRetryForecast != null) TextButton(onRetryForecast) { Text("Tentar novamente") }
+        } }
+        if (days.isEmpty() && forecastStatus == null) item { Text("Nenhum lançamento neste período. Use + para acrescentar.") }
         days.forEach { day ->
             item(key = "day:$day") { Text(day.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
                 Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall) }

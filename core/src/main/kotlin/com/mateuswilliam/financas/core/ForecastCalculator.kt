@@ -50,6 +50,10 @@ object ForecastCalculator {
                         rule.cycleAnchored -> maxOf(period.start, rule.startDate)
                         // A one-time entry can be rescheduled before its rule took effect.
                         rule.frequency == ForecastFrequency.ONCE -> maxOf(occurrence.date, rule.effectiveFrom)
+                        // The first occurrence can carry an explicit date due to a series edit.
+                        rule.frequency == ForecastFrequency.MONTHLY && adjustment?.date != null &&
+                            occurrence.date < rule.startDate && YearMonth.from(occurrence.date) == YearMonth.from(rule.startDate) ->
+                            maxOf(occurrence.date, adjustment.date)
                         else -> occurrence.date
                     }
                     if (nextSchedule != null && (adjustment?.date ?: eligibilityDate) >= nextSchedule.effectiveFrom) return@forEach

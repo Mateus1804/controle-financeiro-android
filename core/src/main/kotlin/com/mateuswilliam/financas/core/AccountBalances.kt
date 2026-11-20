@@ -10,17 +10,57 @@ data class AccountBalance(
 )
 
 object AccountBalances {
-    fun calculate(accounts: List<AccountOption>, archivedKeys: Set<String>, references: List<AccountBalanceReference>, records: List<Record>, asOf: Long): List<AccountBalance> =
-        accounts.map { account ->
-            val reference = references.filter { it.accountKey == account.key && it.effectiveAt <= asOf }
-                .maxWithOrNull(compareBy<AccountBalanceReference> { it.effectiveAt }.thenBy { it.createdAt }.thenBy { it.id })
-            val balance = reference?.let { start ->
-                records.asSequence().filter { it.occurredAt in start.effectiveAt..asOf }.fold(start.balanceCents) { total, record ->
-                    Math.addExact(total, contribution(record, account.key))
+    fun calculate(
+        accounts: List<AccountOption>,
+        archivedKeys: Set<String>,
+        references: List<AccountBalanceReference>,
+        records: List<Record>,
+        asOf: Long,
+    ): List<AccountBalance> {
+        if (accounts.isEmpty()) return emptyList()
+
+        val accountKeys = accounts.mapTo(HashSet()) { it.key }
+        val referenceOrder = compareBy<AccountBalanceReference> { it.effectiveAt }
+            .thenBy { it.createdAt }.thenBy { it.id }
+        val balances = HashMap<String, RunningBalance>()
+        for (reference in references) {
+            if (reference.effectiveAt > asOf || reference.accountKey !in accountKeys) continue
+            val current = balances[reference.accountKey]
+            if (current == null || referenceOrder.compare(reference, current.reference) > 0) {
+                balances[reference.accountKey] = RunningBalance(reference)
+            }
+        }
+
+        val earliestReference = balances.values.minOfOrNull { it.reference.effectiveAt }
+        if (earliestReference != null) {
+            for (record in records) {
+                if (record.occurredAt !in earliestReference..asOf) continue
+                val source = AccountNames.key(record.bank)
+                if (record.movement == Movement.TRANSFER) {
+                    val destination = AccountNames.key(record.destination)
+                    if (source == destination) continue
+                    balances[source]?.add(record.occurredAt, -record.amountCents)
+                    balances[destination]?.add(record.occurredAt, record.amountCents)
+                } else {
+                    balances[source]?.add(record.occurredAt, record.cashContribution())
                 }
             }
-            AccountBalance(account, account.key in archivedKeys, balance, reference)
         }
+
+        return accounts.map { account ->
+            val balance = balances[account.key]
+            AccountBalance(account, account.key in archivedKeys, balance?.cents, balance?.reference)
+        }
+    }
+
+    private class RunningBalance(val reference: AccountBalanceReference) {
+        var cents = reference.balanceCents
+            private set
+
+        fun add(occurredAt: Long, delta: Long) {
+            if (occurredAt >= reference.effectiveAt) cents = Math.addExact(cents, delta)
+        }
+    }
 
     fun touchesReserve(record: Record): Boolean = AccountFunds.isReserve(record.bank) ||
         (record.movement == Movement.TRANSFER && AccountFunds.isReserve(record.destination))

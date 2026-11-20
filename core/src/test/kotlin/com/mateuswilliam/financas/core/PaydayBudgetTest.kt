@@ -65,6 +65,22 @@ class PaydayBudgetTest {
 
     private val zone = ZoneOffset.UTC
     private fun at(date: LocalDate) = date.atStartOfDay(zone).toInstant().toEpochMilli()
+
+    @Test fun ongoingUndatedExpenseRemainsInTheVariableScenario() {
+        val start = LocalDate.of(2026, 11, 5)
+        val payday = start.plusMonths(1)
+        val groceries = ForecastRule("groceries", start, "Mercado", ForecastKind.EXPENSE, 9000,
+            Category.FOOD, ForecastFrequency.MONTHLY, start, cycleAnchored = true, group = ForecastGroup.VARIABLE)
+        val pastBill = groceries.copy(itemId = "past", title = "Conta vencida", amountCents = 12000,
+            frequency = ForecastFrequency.ONCE, cycleAnchored = false, group = ForecastGroup.COMMITMENT)
+        val commitment = groceries.copy(itemId = "fixed", title = "Compromisso sem data", group = ForecastGroup.COMMITMENT)
+        val data = ForecastDataset(rules = listOf(groceries, pastBill, commitment), cycleRules = listOf(CycleRule(start, 5)))
+        val lines = PaydayBudgets.upcomingLines(data, emptyList(), zone, at(today))
+        val budget = PaydayBudgets.compute(100000, lines, today, payday)
+        assertEquals(100000L, budget.spendableCents)
+        assertEquals(91000L, budget.withVariablesCents)
+        assertFalse(lines.any { it.itemId == "past" })
+    }
     private fun scheduled(id: String, date: LocalDate, cents: Long, movement: Movement, category: Category) =
         Record(id, cents, movement, PaymentMethod.PIX, category, "Principal", id, at(date))
 

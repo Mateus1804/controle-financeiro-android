@@ -78,14 +78,29 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val period = remember(month, cycleRules) { FinancialPeriods.month(month, cycleRules) }
     val realized = remember(financeState.records, asOf) { financeState.records.filter { it.occurredAt <= asOf } }
     val duplicateIndex = remember(financeState.manualRecords) { DuplicateCandidates(financeState.manualRecords) }
-    val periodBalances = if (destination == RendlyDestination.MONTH || destination == RendlyDestination.RESERVE) {
-        remember(financeState.accountBalances, financeState.balanceReferences, realized, period, asOf, zone) {
-            AccountBalances.calculate(financeState.accountBalances.map { it.account },
-                financeState.accountBalances.filter { it.archived }.map { it.account.key }.toSet(),
-                financeState.balanceReferences, realized,
-                minOf(asOf, period.endExclusive.atStartOfDay(zone).toInstant().toEpochMilli() - 1))
-        }
-    } else emptyList()
+    val balanceCutoff = minOf(asOf, period.endExclusive.atStartOfDay(zone).toInstant().toEpochMilli() - 1)
+    val historicBalance = balanceCutoff < asOf
+    val snapshotBalances = financeState.accountBalances
+    val historicalBalances = if (historicBalance && financeState.loaded &&
+        (destination == RendlyDestination.MONTH || destination == RendlyDestination.RESERVE)) {
+        val references = financeState.balanceReferences
+        val records = financeState.records
+        calculateInBackground(listOf(snapshotBalances, references, records, balanceCutoff)) {
+            val options = snapshotBalances.map { it.account }
+            val archived = snapshotBalances.filter { it.archived }.map { it.account.key }.toSet()
+            AccountBalances.calculate(options, archived, references, records, balanceCutoff)
+        }.value
+    } else null
+    val periodBalances = when {
+        !financeState.loaded -> null
+        historicBalance -> historicalBalances?.getOrNull()
+        else -> snapshotBalances
+    }
+    val balancesStatus = when {
+        historicalBalances?.isFailure == true -> "Não foi possível calcular os saldos do período."
+        periodBalances == null -> "Consultando os saldos do período…"
+        else -> null
+    }
     val currentFunds = remember(financeState.accountBalances) { AccountFunds.of(financeState.accountBalances) }
     val paydayBudget = if (destination == RendlyDestination.PLANNER) remember(snapshot, financeState.records, currentFunds.operating, asOf, zone, today) {
         runCatching {
@@ -144,14 +159,21 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     } }
     if (!settings.namePromptSeen) DisplayNameDialog(settings.displayName,
         finance.preferences::dismissNamePrompt, finance.preferences::setDisplayName, firstRun = true)
-    val central = when (destination) {
-        RendlyDestination.MONTH, RendlyDestination.FIXED, RendlyDestination.PLANNER,
+    val centralResult = when (destination) {
+        RendlyDestination.MONTH, RendlyDestination.PLANNER,
         RendlyDestination.COMMITMENT, RendlyDestination.SETTINGS -> remember(snapshot, period, financeState.records, asOf, zone) {
-            snapshot?.let { runCatching { CentralFinance.summarize(financeState.records, it, period, zone, asOf) }.getOrNull() }
+            snapshot?.let { runCatching { CentralFinance.summarize(financeState.records, it, period, zone, asOf) } }
         }
         else -> null
     }
+    val central = centralResult?.getOrNull()
     val report = central?.forecast
+    val monthForecastStatus = when {
+        loadError != null -> loadError
+        centralResult?.isFailure == true -> "Não foi possível calcular as previsões e os agendamentos deste período."
+        report == null || !financeState.loaded -> "Carregando previsões e agendamentos…"
+        else -> null
+    }
     val upcomingDue = if (destination == RendlyDestination.PLANNER || editors.dueDates) remember(report, today) {
         report?.lines.orEmpty().filter {
             it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && !it.rule.cycleAnchored && it.date >= today
@@ -263,7 +285,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         navigation.recordCategory, { navigation.recordCategory = it; navigation.expenseDimension = null },
                         financeState.accountBalances.map { it.account }, navigation.accountFilterKey, { navigation.accountFilterKey = it },
                         { openActual(recordId = it.id) }, navigation.expenseDimension?.let { ExpenseFilter(it, navigation.expenseKey, navigation.expenseLabel) },
-                        { navigation.expenseDimension = null }, accountTotal = AccountFunds.of(periodBalances).wealth, onAccounts = { editors.accountsOpen = true },
+                        { navigation.expenseDimension = null }, accountTotal = periodBalances?.let { AccountFunds.of(it).wealth }, onAccounts = { editors.accountsOpen = true },
                         period = period, accountBalances = periodBalances, balanceReferences = financeState.balanceReferences,
                         onBalanceReference = { ref ->
                             editors.balanceEditorName = financeState.accountBalances.firstOrNull { it.account.key == ref.accountKey }?.account?.label
@@ -272,7 +294,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onIgnoreForecast = model::ignore, onStopForecast = model::stop, onEditFutureForecast = { edit(it, false) }, busy = busy,
                         scheduledRecords = central?.scheduled?.records.orEmpty(),
                         reserveNeedsReference = snapshot?.reserveEvents?.isNotEmpty() == true && !currentFunds.reserve.hasBalance,
-                        today = today)
+                        today = today, forecastStatus = monthForecastStatus, balanceStatus = balancesStatus,
+                        onRetryForecast = if (loadError != null) model::refresh else null)
                     navigation.destination == RendlyDestination.GRAPHS -> {
                         val monthComparison = remember(realized, period, cycleRules, today, zone) {
                             MonthComparisons.compare(realized, period, FinancialPeriods.previous(period, cycleRules), today, zone)
@@ -299,22 +322,31 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onAccounts = { editors.accountsOpen = true }, onReview = { navigation.destination = RendlyDestination.REVIEW })
                     loadError != null -> { Text(loadError!!, Modifier.padding(FinanceSpacing.page)); Button({ model.refresh() }) { Text("Tentar novamente") } }
                     snapshot == null -> Text("Abrindo seu planejamento…", Modifier.padding(FinanceSpacing.page))
-                    navigation.destination == RendlyDestination.RESERVE -> ReserveAccountScreen(snapshot, periodBalances, realized, period, hidden, busy,
-                        onSet = { editors.balanceEditorName = AccountFunds.RESERVE_NAME; editors.balanceEditorDate = null },
-                        onAdd = { reserveTransfer(false) }, onWithdraw = { reserveTransfer(true) }, onGoal = { editors.goalEditor = true },
-                        currentReserve = financeState.accountBalances.firstOrNull { it.account.key == AccountFunds.RESERVE_KEY },
-                        asOf = asOf)
+                    navigation.destination == RendlyDestination.RESERVE -> {
+                        if (periodBalances == null) Text(balancesStatus.orEmpty(), Modifier.padding(FinanceSpacing.page))
+                        else ReserveAccountScreen(snapshot, periodBalances, realized, period, hidden, busy,
+                            onSet = { editors.balanceEditorName = AccountFunds.RESERVE_NAME; editors.balanceEditorDate = null },
+                            onAdd = { reserveTransfer(false) }, onWithdraw = { reserveTransfer(true) }, onGoal = { editors.goalEditor = true },
+                            currentReserve = snapshotBalances.firstOrNull { it.account.key == AccountFunds.RESERVE_KEY },
+                            asOf = asOf)
+                    }
                     navigation.destination == RendlyDestination.PROJECTION -> ForecastProjectionScreen(snapshot, period, editors.simulation, hidden, busy,
                         onSimulate = { editors.simulationEditor = true }, onDiscard = { editors.simulation = null },
                         onAdopt = { editors.simulation?.let { value -> model.saveRule(value) { editors.simulation = null } } },
                         onOpen = { selectMonth(YearMonth.from(it.start)); navigation.destination = RendlyDestination.PLANNER },
                         records = financeState.records, asOf = asOf)
+                    navigation.destination == RendlyDestination.FIXED -> {
+                        val lines = remember(snapshot, financeState.records, period) {
+                            runCatching { PendingForecasts(snapshot, financeState.records).lines(period, includeCovered = true) }.getOrNull()
+                        }
+                        if (lines == null) Text("Não foi possível calcular as previsões deste período.", Modifier.padding(FinanceSpacing.page))
+                        else FixedForecastScreen(lines, month, ::selectMonth, hidden, busy,
+                            { edit(it) }, { edit(it, false) }, model::ignore, model::stop,
+                            { navigation.destination = RendlyDestination.MONTH; openActual(Movement.EXPENSE, frequency = ForecastFrequency.MONTHLY) },
+                            { editors.templates = true }, period)
+                    }
                     central == null || report == null -> Text("Não foi possível calcular este ciclo. Confira as previsões em seus dados e tente novamente.", Modifier.padding(FinanceSpacing.page))
                     navigation.destination == RendlyDestination.COMMITMENT -> CommitmentScreen(central, hidden)
-                    navigation.destination == RendlyDestination.FIXED -> FixedForecastScreen(report.lines, month, ::selectMonth, hidden, busy,
-                        { edit(it) }, { edit(it, false) }, model::ignore, model::stop,
-                        { navigation.destination = RendlyDestination.MONTH; openActual(Movement.EXPENSE, frequency = ForecastFrequency.MONTHLY) },
-                        { editors.templates = true }, period)
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
                         item { SectionTitle("Planejamento", "Registrado e previsto no mesmo controle, sem contar duas vezes.") }
                         item { PaydayBudgetCard(paydayBudget, currentFunds.operating.hasBalance, hidden, partialBalance = currentFunds.operating.partial,
