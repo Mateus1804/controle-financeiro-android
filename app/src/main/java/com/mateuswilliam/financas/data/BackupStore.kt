@@ -58,7 +58,8 @@ class BackupStore(private val context: Context, private val repository: FinanceR
         } finally { database?.close(); password.fill('\u0000') }
     }
 
-    suspend fun restore(staged: StagedRestore) = withContext(Dispatchers.IO) {
+    /** Retorna se as preferências de exibição foram salvas após restaurar os dados financeiros. */
+    suspend fun restore(staged: StagedRestore): Boolean = withContext(Dispatchers.IO) {
         require(staged.databaseName.startsWith("restore-stage-") && context.getDatabasePath(staged.databaseName).exists()) { "A prévia expirou. Selecione o backup novamente." }
         val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).build()
         try {

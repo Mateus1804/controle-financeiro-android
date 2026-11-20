@@ -51,6 +51,7 @@ data class ForecastLine(
     val coveredCents: Long = 0,
     val scheduledRecordId: String? = null,
     val reusedInstallmentStart: LocalDate? = null,
+    val hasLinkedRecord: Boolean = false,
 )
 data class ForecastReport(
     val period: BudgetPeriod, val lines: List<ForecastLine>, val incomeCents: Long,

@@ -73,7 +73,8 @@ fun RecordEditor(
         ?: activeAccounts.firstOrNull()?.label
         ?: "Carteira".takeUnless { balances.any { account -> account.archived && account.account.key == AccountNames.key("Carteira") } }.orEmpty()
     var bank by rememberSaveable { mutableStateOf(initial?.bank ?: draft?.bank ?: defaultBank) }
-    var description by rememberSaveable { mutableStateOf(initial?.description ?: draft?.sourceBody?.take(200) ?: initialDescription) }
+    val suggestedDescription = draft?.let { "Movimentação de ${it.bank}" }
+    var description by rememberSaveable { mutableStateOf(initial?.description ?: suggestedDescription ?: initialDescription) }
     var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: initialMovement) }
     var method by rememberSaveable { mutableStateOf(initial?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
     var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.let { source -> (rememberedCategory ?: source.category).takeIf { it in categoriesFor(source.movement) } }
@@ -109,7 +110,13 @@ fun RecordEditor(
         movement in setOf(Movement.INCOME, Movement.EXPENSE)
     val planning = canPlan && (frequency != ForecastFrequency.ONCE || LocalDate.parse(date) > LocalDate.now())
     val error = if (realizedOnly && !planning && LocalDate.parse(date) > LocalDate.now()) "Use uma data até hoje. Para gastos futuros, crie uma previsão." else RecordValidation.error(record)
-    val duplicates = remember(duplicateIndex, record, draft?.id) { if (draft != null) duplicateIndex?.find(record).orEmpty() else emptyList() }
+    val duplicates = remember(duplicateIndex, record, draft) {
+        if (draft == null) emptyList() else {
+            // Preserve text matching without storing the notification body in the new record.
+            val compared = if (description == suggestedDescription) record.copy(description = draft.sourceBody.take(200)) else record
+            duplicateIndex?.find(compared).orEmpty()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -209,10 +216,12 @@ fun RecordEditor(
                 }
                 FinanceDisclosure("Mais detalhes", "record-payment-details", initiallyExpanded = movement == Movement.TRANSFER) {
                     if (!planning && forecastData != null && movement in setOf(Movement.EXPENSE, Movement.INCOME)) {
-                        val forecastLines = remember(forecastData, date, movement) {
-                            ForecastCalculator.report(forecastData, CycleCalendar.periodContaining(LocalDate.parse(date), forecastData.cycleRules)).lines
-                                .filter { !it.ignored && it.reusedInstallmentStart == null &&
-                                    it.kind == if (movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE }
+                        val forecastLines = remember(forecastData, date, movement, history, existing?.id) {
+                            val cycle = CycleCalendar.periodContaining(LocalDate.parse(date), forecastData.cycleRules)
+                            val otherRecords = history.filterNot { it.id == existing?.id }
+                            val kind = if (movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
+                            PendingForecasts(forecastData, otherRecords).lines(cycle)
+                                .filter { !it.ignored && it.reusedInstallmentStart == null && it.kind == kind }
                         }
                         val selectedLink = forecastItemId?.let { item -> item to forecastOccurrenceKey!! }
                         val options = (listOf<Pair<String,String>?>(null) + forecastLines.map { it.itemId to it.occurrenceKey } + listOfNotNull(selectedLink)).distinct()

@@ -93,13 +93,18 @@ class CapturePreferences(context: Context) {
         check(editor.commit()) { "A pausa da captura e dos lembretes não pôde ser salva. Nenhum dado foi substituído." }
         mutable.value = read()
     }
-    fun restoreDisplay(display: BackupDisplay) {
-        preferences.edit(commit = true) {
-            putString("appearance", display.appearance.name); putBoolean("hide_amounts", display.hideAmounts)
-            putString("last_origin", display.lastOrigin); putBoolean("enabled", false)
-            putBoolean("reminders_enabled", false); remove("capture_condition"); remove("dismissed_condition")
-        }
+    fun restoreDisplay(display: BackupDisplay): Boolean {
+        val editor = preferences.edit()
+        editor.putString("appearance", display.appearance.name)
+        editor.putBoolean("hide_amounts", display.hideAmounts)
+        editor.putString("last_origin", display.lastOrigin)
+        editor.putBoolean("enabled", false)
+        editor.putBoolean("reminders_enabled", false)
+        editor.remove("capture_condition")
+        editor.remove("dismissed_condition")
+        val saved = editor.commit()
         mutable.value = read()
+        return saved
     }
     fun permits(packageName: String): Boolean = read().let { it.consented && it.enabled && packageName in it.packages }
     // Persiste a revogação antes de concluir a exclusão. O repositório chama esta operação em IO.

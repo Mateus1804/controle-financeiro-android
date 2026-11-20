@@ -127,6 +127,31 @@ class ForecastCalculatorTest {
             BudgetPeriod(date("2027-02-01"),date("2027-03-01"))).lines.single().date)
     }
 
+    @Test fun advancingTheFirstMonthlyDueDayKeepsTheOccurrenceInTheCycle() {
+        val start = date("2026-11-20")
+        val original = rule("rent", 120000, start = start.toString()).copy(effectiveFrom = start)
+        val edited = original.copy(effectiveFrom = november.start, dayOfMonth = 10)
+        val adjustment = ForecastOverride("rent", "month:2026-11", date = date("2026-11-10"))
+        val updated = ForecastDataset(rules = listOf(edited), overrides = listOf(adjustment), cycleRules = listOf(CycleRule(november.start, 5)))
+        val first = ForecastCalculator.report(updated, november).lines.single()
+        assertEquals("month:2026-11", first.occurrenceKey)
+        assertEquals(date("2026-11-10"), first.date)
+        assertEquals(120000L, first.amountCents)
+        val december = BudgetPeriod(november.endExclusive, date("2027-01-05"))
+        assertEquals(date("2026-12-10"), ForecastCalculator.report(updated, december).lines.single().date)
+
+        val tooEarly = updated.copy(rules = listOf(edited.copy(dayOfMonth = 2)), overrides = listOf(adjustment.copy(date = november.start)))
+        val clamped = ForecastCalculator.report(tooEarly, november).lines.single { it.occurrenceKey == "month:2026-11" }
+        assertEquals(november.start, clamped.date)
+
+        val notYetStarted = updated.copy(rules = listOf(edited), overrides = emptyList())
+        assertTrue(ForecastCalculator.report(notYetStarted, november).lines.isEmpty())
+
+        val editingInCalendarMonth = updated.copy(rules = listOf(edited.copy(effectiveFrom = date("2026-11-01"))))
+        val afterCycleChange = ForecastCalculator.report(editingInCalendarMonth, november).lines.single()
+        assertEquals(date("2026-11-10"), afterCycleChange.date)
+    }
+
     @Test fun statementTextBoundsRemainStrict() {
         val valid=rule("bill",100).copy(statementKey="s".repeat(200),statementTotal=true)
         assertNull(ForecastValidation.error(valid))

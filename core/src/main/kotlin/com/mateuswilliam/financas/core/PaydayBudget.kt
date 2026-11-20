@@ -37,7 +37,15 @@ object PaydayBudgets {
         require(horizonDays > 0)
         val today = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
         val end = today.plusDays(horizonDays)
-        val forecast = PendingForecasts(dataset, records).lines(BudgetPeriod(today, end))
+        val currentCycle = CycleCalendar.periodContaining(today, dataset.cycleRules)
+        val forecast = PendingForecasts(dataset, records).lines(BudgetPeriod(currentCycle.start, end)).mapNotNull { line ->
+            when {
+                line.date >= today -> line
+                line.rule.cycleAnchored && line.kind == ForecastKind.EXPENSE && line.group == ForecastGroup.VARIABLE ->
+                    line.copy(date = today)
+                else -> null
+            }
+        }
         val rulesByItem = dataset.rules.groupBy { it.itemId }
         val scheduled = records.filter { it.occurredAt > asOf && it.movement in setOf(Movement.INCOME, Movement.EXPENSE) }
             .mapNotNull { record ->

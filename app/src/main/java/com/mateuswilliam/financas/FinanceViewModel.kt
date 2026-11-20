@@ -166,13 +166,17 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun restoreBackup() = action {
         val staged = stagedRestore.value ?: throw IllegalArgumentException("Selecione um backup para conferir.")
         try {
-            app.backups.restore(staged)
+            val displayPreferencesSaved = app.backups.restore(staged)
             dataRevision.update { it + 1 }
             ReviewNotifications.cancelAll(app)
+            if (displayPreferencesSaved) {
+                "Dados restaurados. A captura e os lembretes ficaram pausados. As autorizações do Android são específicas deste aparelho."
+            } else {
+                "Dados financeiros restaurados. Falha ao salvar as preferências de exibição. A captura e os lembretes ficaram pausados."
+            }
         } finally {
             stagedRestore.value = null
         }
-        "Dados restaurados. A captura e os lembretes ficaram pausados; as autorizações do Android não são transferidas."
     }
 
     override fun onCleared() {

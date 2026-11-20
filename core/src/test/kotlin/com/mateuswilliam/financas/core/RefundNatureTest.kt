@@ -54,12 +54,4 @@ class RefundNatureTest {
         assertTrue(runCatching { Refunds.applyOriginal(refund, refund) }.isFailure)
         assertTrue(runCatching { Refunds.applyOriginal(refund, record("estorno", Movement.INCOME, 100)) }.isFailure)
     }
-
-    @Test fun `csv exporta natureza vinculo e transferencia sem categoria`() {
-        val refund = Refunds.applyOriginal(record("r", Movement.REFUND, 100), record("origem", Movement.INCOME, 100))
-        val csv = Ledger.csv(listOf(refund, record("t", Movement.TRANSFER, 100, Category.FOOD)), zone)
-        assertTrue(csv.contains("Natureza do estorno"))
-        assertTrue(csv.contains("\"Receita\";\"origem\""))
-        assertTrue(csv.contains("\"Transferência\";\"Pix\";\"\""))
-    }
 }

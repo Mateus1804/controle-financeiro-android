@@ -2,6 +2,8 @@ package com.mateuswilliam.financas.ui
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.lifecycle.ViewModelProvider
+import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.data.DraftEntity
@@ -10,6 +12,7 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.ZoneId
 
 /** Forecast entry and actual notification review use the current primary Activity. */
 class CommitmentEntryUiTest {
@@ -79,6 +82,43 @@ class CommitmentEntryUiTest {
         assertEquals("", dao.draftById(draft.id)?.sourceBody)
         assertTrue(ui.current().rules.isEmpty())
         assertFalse(app.settings.snapshot().consented)
+    }
+
+    @Test fun confirmingANotificationDoesNotUseItsRawBodyAsTheDescription() = runBlocking<Unit> {
+        val timestamp = System.currentTimeMillis()
+        val privateText = "Compra aprovada. Informação privada fictícia."
+        val draft = DraftEntity("private-draft", "fixture:private", "fixture.local", "Banco fictício",
+            "Notificação fictícia", privateText, 12990, Movement.EXPENSE, PaymentMethod.CARD,
+            Category.OTHER, "Dados fictícios", timestamp, timestamp)
+        dao.insertDraft(draft)
+        rule.openRendlyReview()
+        rule.waitUntil(10000) { rule.onAllNodesWithTag("review-${draft.id}").fetchSemanticsNodes().isNotEmpty() }
+        ui.clickTag("review-${draft.id}")
+        ui.clickText("Confirmar lançamento")
+        rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().size == 1 } }
+        val saved = app.repository.exportRecords().single()
+        assertEquals(12990L, saved.amountCents)
+        assertFalse(saved.description.contains("Informação privada fictícia"))
+        assertEquals("", dao.draftById(draft.id)?.sourceBody)
+    }
+
+    @Test fun aLinkedExpenseStillHasSeriesActionsInFixedExpenses() = runBlocking<Unit> {
+        ui.seed("linked-rent", "Aluguel vinculado", 65000, frequency = ForecastFrequency.MONTHLY, category = Category.HOME)
+        val line = ui.report().lines.single()
+        val occurredAt = line.date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        assertTrue(app.repository.save(Record("linked-rent-record", 65000, Movement.EXPENSE, PaymentMethod.PIX,
+            Category.HOME, "Carteira", "Aluguel lançado", occurredAt, forecastItemId = line.itemId,
+            forecastOccurrenceKey = line.occurrenceKey), null))
+        val finance = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
+        rule.waitUntil(10000) { finance.state.value.records.any { it.id == "linked-rent-record" } }
+        ui.waitRules(1)
+        ui.clickText("Fixas e parcelas")
+        val actions = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
+        rule.onNodeWithTag("fixed-screen").performScrollToNode(hasTestTag(actions))
+        rule.onNodeWithText("Vinculada a lançamento").assertIsDisplayed()
+        ui.clickTag(actions)
+        rule.onNodeWithText("Aplicar deste mês em diante").assertIsDisplayed()
+        rule.onNodeWithText("Interromper futuras").assertIsDisplayed()
     }
 
     @Test fun incomeOccurrenceEditKeepsExactCentsAndPreservesTheFollowingCycle() = runBlocking<Unit> {

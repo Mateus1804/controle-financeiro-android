@@ -18,13 +18,13 @@ A seleção mostra nomes de aplicativos com ícone de abertura disponíveis no p
 
 ## Finalidade e retenção
 
-As notificações geram sugestões pendentes de confirmação. Mensagens identificadas como senha, código ou autenticação são descartadas. Após a confirmação ou o descarte da pendência, o título e o texto originais são apagados. Identificadores locais e o estado da revisão são mantidos para evitar o reprocessamento do evento.
+As notificações geram sugestões pendentes de confirmação. Mensagens identificadas como senha, código ou autenticação são descartadas. O lançamento guarda a descrição confirmada pelo usuário, preenchida inicialmente com o nome do banco. Após a confirmação ou o descarte da pendência, o título e o texto originais são apagados da pendência. Identificadores locais e o estado da revisão são mantidos para evitar o reprocessamento do evento. Descrições já salvas permanecem no histórico.
 
 Lançamentos confirmados permanecem armazenados até sua exclusão. A caixa pode conter informações financeiras e pessoais presentes em notificações pendentes; desligar a captura interrompe novas leituras, mas preserva o histórico já salvo. A opção de apagar todos os dados remove registros, pendências, contas, orçamentos, recorrências, vencimentos tratados e preferências e desativa a captura local. Arquivos já exportados permanecem no destino escolhido.
 
 ## Compartilhamento e exportação
 
-O aplicativo não envia dados bancários, inventário de aplicativos ou credenciais para serviços externos. A exportação CSV é iniciada pelo usuário para um destino escolhido por ele e contém os lançamentos confirmados. Esse arquivo fica sob o controle do destino escolhido.
+O aplicativo não envia dados bancários, inventário de aplicativos ou credenciais para serviços externos. A exportação CSV é iniciada pelo usuário para um destino escolhido por ele e contém as previsões de receitas e gastos do ciclo selecionado. Esse arquivo fica sob o controle do destino escolhido.
 
 O backup também depende de uma ação explícita e é entregue já criptografado ao seletor de arquivos. Inclui pendências, que podem conter texto bancário ainda não revisado, além de lançamentos e planejamento. O provedor de arquivos escolhido pode oferecer armazenamento local ou externo. A senha e a segurança desse destino ficam sob responsabilidade do usuário; o aplicativo não guarda uma cópia da senha.
 

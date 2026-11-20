@@ -8,6 +8,8 @@ O arquivo contém lançamentos, sugestões locais, contas e referências de sald
 
 Para restaurar, use **Mais → Ajustes → Restaurar backup**, escolha o arquivo e informe a senha. O aplicativo confere formato, valores inteiros, limites, identificadores, vínculos e integridade em banco temporário. A prévia informa a quantidade de lançamentos, sugestões, contas e previsões. A substituição dos dados locais exige confirmação e ocorre em uma transação. Erros antes dessa substituição preservam a base atual. Captura e lembretes ficam pausados após restaurar.
 
+Se a gravação das preferências de exibição falhar após a substituição, o aplicativo informa que os dados financeiros foram restaurados e avisa sobre a falha nas preferências.
+
 A proteção usa AES-256-GCM, salt e nonce aleatórios e PBKDF2-HMAC-SHA256 com 600 mil iterações. O cabeçalho é autenticado. A senha incorreta e arquivos adulterados não fornecem dados em texto claro. Há limite de 16 MiB e de 50 mil itens.
 
 Backups exportados não são apagados pelo aplicativo. Um CSV é um relatório e não substitui um backup. A perda da senha, a exclusão do arquivo ou um backup feito antes de registros recentes impedem recuperar esses registros. A versão antiga do banco é descartada na primeira abertura desta versão, conforme autorização registrada.

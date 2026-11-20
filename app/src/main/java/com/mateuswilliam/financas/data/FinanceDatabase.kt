@@ -98,6 +98,8 @@ data class UsedAccount(val label: String, val lastUsedAt: Long)
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM forecast_rules ORDER BY itemId,effectiveFrom") suspend fun allForecastRules(): List<ForecastRuleEntity>
+    @Query("SELECT EXISTS(SELECT 1 FROM forecast_rules WHERE itemId = :id AND kind = :kind)")
+    suspend fun hasForecastRule(id: String, kind: String): Boolean
     @Query("SELECT * FROM forecast_overrides ORDER BY itemId,occurrenceKey") suspend fun allForecastOverrides(): List<ForecastOverrideEntity>
     @Query("SELECT * FROM cycle_rules ORDER BY effectiveStart") suspend fun allCycleRules(): List<CycleRuleEntity>
     @Query("SELECT * FROM reserve_events ORDER BY createdAt,id") suspend fun allReserveEvents(): List<ReserveEventEntity>
@@ -157,6 +159,8 @@ interface FinanceDao {
     @Query("SELECT * FROM records WHERE id IN (:ids)") suspend fun recordsByIds(ids: List<String>): List<RecordEntity>
     @Query("SELECT * FROM records WHERE originalRecordId = :id") suspend fun refundsForRecord(id: String): List<RecordEntity>
     @Query("SELECT * FROM records WHERE id = :id LIMIT 1") suspend fun recordById(id: String): RecordEntity?
+    @Query("SELECT EXISTS(SELECT 1 FROM records WHERE forecastItemId = :itemId AND forecastOccurrenceKey = :key)")
+    suspend fun hasForecastOccurrenceLink(itemId: String, key: String): Boolean
     @Query("UPDATE drafts SET status = :status, sourceTitle = '', sourceBody = '' WHERE id = :id AND status = 'PENDING'")
     suspend fun reviewDraft(id: String, status: String)
     @Query("DELETE FROM records WHERE id = :id") suspend fun deleteRecord(id: String)

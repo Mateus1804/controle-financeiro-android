@@ -112,6 +112,19 @@ class ForecastJourneyTest {
         rule.onNodeWithText("Salário").assertDoesNotExist()
     }
 
+    @Test fun monthKeepsRecordedTotalsAndShowsForecastLoadFailure() {
+        rule.openRendlyMonth()
+        val loadError = "Não foi possível abrir o planejamento. Tente novamente."
+        rule.runOnIdle {
+            model.dataset.value = null
+            model.loadError.value = loadError
+        }
+        rule.onNodeWithTag("month-net").assertExists()
+        rule.onNodeWithTag("records-list").performScrollToNode(hasText(loadError))
+        rule.onNodeWithText(loadError).assertIsDisplayed()
+        rule.onNodeWithText("Nenhum lançamento neste período.", substring = true).assertDoesNotExist()
+    }
+
     @Test fun csvRequiresAReportAndKeepsThePreparedContentAcrossRecreation() {
         val report = ForecastCalculator.report(ForecastDataset(rules = listOf(
             ForecastRule("csv-bill", today, "Conta original do CSV", ForecastKind.EXPENSE, 5000,

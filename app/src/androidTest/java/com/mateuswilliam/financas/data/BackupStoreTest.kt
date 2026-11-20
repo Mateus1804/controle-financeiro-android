@@ -51,7 +51,7 @@ class BackupStoreTest {
         val preview = store.stage(ByteArrayInputStream(file), password())
         assertEquals("local-antes-da-restauracao", repository.exportRecords().single().id)
         assertEquals(2, preview.records); assertEquals(1, preview.pending)
-        store.restore(preview)
+        assertTrue(store.restore(preview))
         val restored = repository.snapshot()
         assertEquals(expected.records.toSet(), restored.records.toSet())
         assertEquals(expected.drafts.toSet(), restored.drafts.toSet())
@@ -158,6 +158,28 @@ class BackupStoreTest {
             assertTrue(runCatching { failing.restore(snapshot) }.exceptionOrNull() is IllegalStateException)
             assertTrue(runCatching { failing.clear() }.exceptionOrNull() is IllegalStateException)
             assertEquals("base-preservada", repository.exportRecords().single().id)
+        } finally { isolated.edit().clear().commit() }
+    }
+    @Test fun restoreReportsDisplayPersistenceFailureAfterRestoringFinancialData() = runBlocking<Unit> {
+        repository.save(record("backup-restaurado"), null)
+        preferences.setAppearance(Appearance.DARK)
+        preferences.hideAmounts(true)
+        val file = store.create(password())
+        repository.clear()
+        repository.save(record("base-local"), null)
+        val isolated = context.getSharedPreferences("failing-display-restore-test", Context.MODE_PRIVATE)
+        try {
+            check(isolated.edit().clear().putBoolean("disclosure_v1", true)
+                .putBoolean("enabled", true).putBoolean("reminders_enabled", true).commit())
+            val failingSettings = CapturePreferences(FailingPreferencesContext(context, isolated, successfulCommits = 1))
+            val failingStore = BackupStore(context, FinanceRepository(database, failingSettings))
+            val preview = failingStore.stage(ByteArrayInputStream(file), password())
+
+            assertFalse(failingStore.restore(preview))
+            assertEquals("backup-restaurado", repository.exportRecords().single().id)
+            assertFalse(failingSettings.snapshot().enabled)
+            assertFalse(failingSettings.snapshot().remindersEnabled)
+            assertFalse(context.getDatabasePath(preview.databaseName).exists())
         } finally { isolated.edit().clear().commit() }
     }
     @Test fun failedDeletionKeepsExistingFinancialDataAndAppProtection() = runBlocking<Unit> {

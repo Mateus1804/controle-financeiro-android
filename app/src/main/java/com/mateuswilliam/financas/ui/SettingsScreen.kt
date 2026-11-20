@@ -184,7 +184,19 @@ fun SettingsScreen(
         item { Text("Rendly · ${BuildConfig.VERSION_NAME}\nDados locais · revisão obrigatória das sugestões", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     if (privacy) AlertDialog(onDismissRequest = { privacy = false }, title = { DialogSystemBars(); Text("Privacidade") },
-        text = { Text(modifier = Modifier.verticalScroll(rememberScrollState()), text = "As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.\n\nO Android concede acesso amplo às notificações; o aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.\n\nO texto original é apagado após a confirmação ou o descarte da pendência. Identificadores locais são mantidos para evitar o reprocessamento do mesmo evento.\n\nO CSV contém os lançamentos confirmados. O backup criptografado também inclui pendências e planejamento; o arquivo e a senha ficam sob responsabilidade do usuário. O bloqueio da interface não criptografa o banco local.\n\nOs dados locais são removidos ao desinstalar ou usar a opção de apagar. A recuperação depende de um backup válido e da senha original.") },
+        text = {
+            Text(modifier = Modifier.verticalScroll(rememberScrollState()), text = """
+                As notificações autorizadas são processadas neste aparelho para sugerir lançamentos. O aplicativo não transmite textos bancários, não solicita credenciais de banco e não inclui anúncios ou serviços de análise.
+
+                O Android concede acesso amplo às notificações. O aplicativo filtra as origens selecionadas antes de ler o conteúdo. Mensagens identificadas como códigos, senhas ou autenticação são descartadas.
+
+                A descrição do lançamento começa com o nome do banco e pode ser editada. O título e o texto originais são apagados da pendência após a revisão. Identificadores locais são mantidos para evitar o reprocessamento do evento.
+
+                O CSV contém as previsões de receitas e gastos do ciclo selecionado. O backup criptografado inclui lançamentos, pendências e planejamento. O arquivo e a senha ficam sob responsabilidade do usuário. O bloqueio da interface não criptografa o banco local.
+
+                Os dados locais são removidos ao desinstalar ou usar a opção de apagar. A recuperação depende de um backup válido e da senha original.
+            """.trimIndent())
+        },
         confirmButton = { TextButton(onClick = { privacy = false }) { Text("Entendi") } })
 }
 

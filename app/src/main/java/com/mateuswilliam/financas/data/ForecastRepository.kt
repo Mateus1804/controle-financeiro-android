@@ -47,18 +47,28 @@ class ForecastRepository(private val database:FinanceDatabase) {
         }
         replaceOccurrenceKey?.let { key ->
             val override = overrides.firstOrNull { it.occurrenceKey == key }
-            if (override != null) {
-                val date = override.date?.let(LocalDate::parse)
-                val due = if (date != null && previous?.dayOfMonth != updated.dayOfMonth) {
+            val date = override?.date?.let(LocalDate::parse)
+            val dayChanged = previous?.dayOfMonth != updated.dayOfMonth
+            val firstMonth = YearMonth.from(updated.startDate)
+            val firstDue = firstMonth.atDay(minOf(updated.dayOfMonth, firstMonth.lengthOfMonth()))
+            val advancesFirstMonth = updated.frequency == ForecastFrequency.MONTHLY && !updated.cycleAnchored &&
+                key == "month:$firstMonth" && updated.effectiveFrom <= updated.startDate && firstDue < updated.startDate
+            val due = when {
+                advancesFirstMonth && (date == null || dayChanged) -> maxOf(firstDue, updated.effectiveFrom)
+                date != null && dayChanged -> {
                     val cycle = CycleCalendar.periodContaining(date, dao.allCycleRules().map { it.model() })
                     sequenceOf(YearMonth.from(date), YearMonth.from(cycle.start), YearMonth.from(cycle.endExclusive.minusDays(1)))
                         .map { it.atDay(minOf(updated.dayOfMonth, it.lengthOfMonth())) }
                         .firstOrNull { it in cycle } ?: date
-                } else date
-                if (due != null || override.ignored || override.active != null) {
-                    dao.upsertForecastOverride(override.copy(amountCents = null, date = due?.toString(), title = null, category = null))
-                } else dao.deleteForecastOverride(rule.itemId, key)
+                }
+                else -> date
             }
+            if (due != null || override?.ignored == true || override?.active != null) {
+                val occurrence = override?.model() ?: ForecastOverride(updated.itemId, key)
+                dao.upsertForecastOverride(ForecastOverrideEntity.from(occurrence.copy(
+                    amountCents = null, date = due, title = null, category = null,
+                )))
+            } else if (override != null) dao.deleteForecastOverride(rule.itemId, key)
         }
     }
     suspend fun saveOverride(value:ForecastOverride) = database.withTransaction {
