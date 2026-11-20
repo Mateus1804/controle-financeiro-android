@@ -1,6 +1,7 @@
 package com.mateuswilliam.financas
 
 import android.app.Application
+import android.content.Context
 import androidx.room.Room
 import com.mateuswilliam.financas.data.CapturePreferences
 import com.mateuswilliam.financas.data.FinanceDatabase
@@ -21,9 +22,7 @@ class FinanceApplication : Application() {
     val merchantCategories by lazy { com.mateuswilliam.financas.data.MerchantCategoryStore(this) }
     val database by lazy {
         // Reset financeiro solicitado pelo proprietário: esta versão não migra dados anteriores.
-        if (getDatabasePath("financas.db").exists()) {
-            check(deleteDatabase("financas.db")) { "Não foi possível remover o banco anterior." }
-            settings.pauseForRestore()
+        if (discardLegacyDatabase(this, settings)) {
             settings.rememberOrigin("")
             merchantCategories.clear()
         }
@@ -44,4 +43,11 @@ class FinanceApplication : Application() {
             settings.state.map { it.remindersEnabled }.distinctUntilChanged().collect { RecurringReminders.schedule(this@FinanceApplication) }
         }
     }
+}
+
+internal fun discardLegacyDatabase(context: Context, settings: CapturePreferences): Boolean {
+    if (!context.getDatabasePath("financas.db").exists()) return false
+    settings.pauseForRestore()
+    check(context.deleteDatabase("financas.db")) { "Não foi possível remover o banco anterior." }
+    return true
 }

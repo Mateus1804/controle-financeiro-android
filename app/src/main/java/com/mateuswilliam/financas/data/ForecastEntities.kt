@@ -10,11 +10,16 @@ data class ForecastRuleEntity(val itemId:String, val effectiveFrom:String, val t
  val startDate:String, val dayOfMonth:Int, val installmentCount:Int, val cycleAnchored:Boolean,
  val group:String, val estimated:Boolean, val active:Boolean, val statementKey:String,
  val statementTotal:Boolean, val account:String) {
- fun model() = ForecastRule(itemId, LocalDate.parse(effectiveFrom), title, ForecastKind.valueOf(kind), amountCents,
- category, ForecastFrequency.valueOf(frequency), LocalDate.parse(startDate), dayOfMonth, installmentCount,
- cycleAnchored, ForecastGroup.valueOf(group), estimated, active, statementKey, statementTotal, account)
+ fun model(): ForecastRule {
+    val frequencyType = ForecastFrequency.valueOf(frequency)
+    return ForecastRule(itemId, LocalDate.parse(effectiveFrom), title, ForecastKind.valueOf(kind), amountCents,
+        category, frequencyType, LocalDate.parse(startDate), dayOfMonth,
+        ForecastValidation.normalizeInstallmentCount(frequencyType, installmentCount),
+        cycleAnchored, ForecastGroup.valueOf(group), estimated, active, statementKey, statementTotal, account)
+ }
  companion object { fun from(r:ForecastRule) = ForecastRuleEntity(r.itemId,r.effectiveFrom.toString(),r.title,r.kind.name,
- r.amountCents,r.category,r.frequency.name,r.startDate.toString(),r.dayOfMonth,r.installmentCount,r.cycleAnchored,
+ r.amountCents,r.category,r.frequency.name,r.startDate.toString(),r.dayOfMonth,
+ ForecastValidation.normalizeInstallmentCount(r.frequency, r.installmentCount),r.cycleAnchored,
  r.group.name,r.estimated,r.active,r.statementKey,r.statementTotal,r.account) }
 }
 @Entity(tableName = "forecast_overrides", primaryKeys = ["itemId", "occurrenceKey"])

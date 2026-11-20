@@ -13,14 +13,20 @@ internal object ForecastSnapshots {
     private fun json(vararg fields:Pair<String,Any?>)=JSONObject().apply { fields.forEach { (k,v)->put(k,v ?: JSONObject.NULL) } }
     fun ruleJson(r:ForecastRuleEntity)=json("itemId" to r.itemId,"effectiveFrom" to r.effectiveFrom,"title" to r.title,
         "kind" to r.kind,"amountCents" to r.amountCents,"category" to r.category.name,"frequency" to r.frequency,
-        "startDate" to r.startDate,"dayOfMonth" to r.dayOfMonth,"installmentCount" to r.installmentCount,
+        "startDate" to r.startDate,"dayOfMonth" to r.dayOfMonth,
+        "installmentCount" to ForecastValidation.normalizeInstallmentCount(ForecastFrequency.valueOf(r.frequency), r.installmentCount),
         "cycleAnchored" to r.cycleAnchored,"group" to r.group,"estimated" to r.estimated,"active" to r.active,
         "statementKey" to r.statementKey,"statementTotal" to r.statementTotal,"account" to r.account)
-    fun rule(j:JSONObject)=ForecastRuleEntity(j.text("itemId",320),j.text("effectiveFrom",10),j.text("title",256),
-        j.text("kind",20),j.long("amountCents"),Category.valueOf(j.text("category",30)),j.text("frequency",20),
-        j.text("startDate",10),j.integer("dayOfMonth",1,31),j.integer("installmentCount",1,600),j.bool("cycleAnchored"),
-        j.text("group",20),j.bool("estimated"),j.bool("active"),j.text("statementKey",200),j.bool("statementTotal"),
-        j.text("account",80))
+    fun rule(j: JSONObject): ForecastRuleEntity {
+        val frequency = ForecastFrequency.valueOf(j.text("frequency", 20))
+        val count = j.integer("installmentCount", Int.MIN_VALUE, Int.MAX_VALUE)
+        return ForecastRuleEntity(j.text("itemId",320),j.text("effectiveFrom",10),j.text("title",256),
+            j.text("kind",20),j.long("amountCents"),Category.valueOf(j.text("category",30)),frequency.name,
+            j.text("startDate",10),j.integer("dayOfMonth",1,31),
+            ForecastValidation.normalizeInstallmentCount(frequency, count),j.bool("cycleAnchored"),
+            j.text("group",20),j.bool("estimated"),j.bool("active"),j.text("statementKey",200),j.bool("statementTotal"),
+            j.text("account",80))
+    }
     fun overrideJson(o:ForecastOverrideEntity)=json("itemId" to o.itemId,"occurrenceKey" to o.occurrenceKey,"amountCents" to o.amountCents,
         "date" to o.date,"ignored" to o.ignored,"active" to o.active,"title" to o.title,"category" to o.category?.name)
     fun overrideRow(j:JSONObject)=ForecastOverrideEntity(j.text("itemId",320),j.text("occurrenceKey",40),

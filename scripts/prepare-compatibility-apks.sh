@@ -9,6 +9,7 @@ sign_apk() {
   "$signer" verify --verbose "$2"
 }
 sign_apk ci-previous/app/build/outputs/apk/debug/app-debug.apk ci-apks/previous-debug.apk
+sign_apk ci-previous-rendly/app/build/outputs/apk/debug/app-debug.apk ci-apks/previous-rendly-debug.apk
 sign_apk app/build/outputs/apk/debug/app-debug.apk ci-apks/app-debug.apk
 sign_apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk ci-apks/app-debug-androidTest.apk
 sign_apk app/build/outputs/apk/preview/app-preview.apk ci-apks/controle-financeiro-teste.apk

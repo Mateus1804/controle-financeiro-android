@@ -46,7 +46,12 @@ object ForecastCalculator {
                     // with the first schedule that issued that installment number.
                     val original = series == null || firstInstallmentSeries.getOrPut(occurrence.key) { series } == series
                     val adjustment = if (original) overrides[itemId to occurrence.key] else null
-                    val eligibilityDate = if (rule.cycleAnchored) maxOf(period.start, rule.startDate) else occurrence.date
+                    val eligibilityDate = when {
+                        rule.cycleAnchored -> maxOf(period.start, rule.startDate)
+                        // A one-time entry can be rescheduled before its rule took effect.
+                        rule.frequency == ForecastFrequency.ONCE -> maxOf(occurrence.date, rule.effectiveFrom)
+                        else -> occurrence.date
+                    }
                     if (nextSchedule != null && (adjustment?.date ?: eligibilityDate) >= nextSchedule.effectiveFrom) return@forEach
                     val key = series to occurrence.key
                     val existing = candidates[key]

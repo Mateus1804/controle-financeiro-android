@@ -38,4 +38,4 @@ Kotlin, Jetpack Compose, Material 3, Room, Coroutines e StateFlow. `core` conté
 
 O APK de desenvolvimento fica em `app/build/outputs/apk/debug/app-debug.apk`. Uma atualização da instalação exige a mesma assinatura. A chave definitiva deve permanecer fora do Git; sua criação e custódia continuam fora do escopo desta etapa. Consulte [Atualizações](docs/atualizacoes.md).
 
-Instrumentação e cenários do CI usam somente Android 15/API 35: suíte funcional e reset intencional do armazenamento anterior. TalkBack manual, biometria e notificações reais exigem conferência em aparelho. [Estado atual](docs/estado-atual.md) registra resultados efetivamente obtidos; [Mapa de telas](docs/novo-mapa-de-telas.md) descreve a reorganização. Relatos mais antigos em `docs` registram versões anteriores, sem garantir compatibilidade com o banco e o backup novos.
+O CI de interface roda somente no Android 15 (API 35) e cobre a suíte funcional, o reset legado e a atualização que preserva dados do Rendly v1. TalkBack manual, biometria e notificações reais exigem conferência em aparelho. [Estado atual](docs/estado-atual.md) · [Mapa de telas](docs/novo-mapa-de-telas.md)

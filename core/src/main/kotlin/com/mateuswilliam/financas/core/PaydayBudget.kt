@@ -38,13 +38,13 @@ object PaydayBudgets {
         val today = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
         val end = today.plusDays(horizonDays)
         val forecast = PendingForecasts(dataset, records).lines(BudgetPeriod(today, end))
+        val rulesByItem = dataset.rules.groupBy { it.itemId }
         val scheduled = records.filter { it.occurredAt > asOf && it.movement in setOf(Movement.INCOME, Movement.EXPENSE) }
             .mapNotNull { record ->
                 val date = Instant.ofEpochMilli(record.occurredAt).atZone(zone).toLocalDate()
                 if (date >= end) return@mapNotNull null
                 val kind = if (record.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
-                val linked = dataset.rules.filter { it.itemId == record.forecastItemId && it.effectiveFrom <= date }
-                    .maxByOrNull { it.effectiveFrom }
+                val linked = rulesByItem[record.forecastItemId]?.linkedRuleAt(record.forecastOccurrenceKey, date)
                 val id = record.forecastItemId ?: "record:${record.id}"
                 val key = record.forecastOccurrenceKey ?: "record:${record.id}"
                 val rule = linked ?: ForecastRule(id, date, record.description, kind, record.amountCents,

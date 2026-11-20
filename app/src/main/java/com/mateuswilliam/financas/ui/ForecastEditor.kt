@@ -35,34 +35,53 @@ internal fun ForecastEditor(
     val source = rule ?: line?.rule
     val canEditOccurrence = line != null && line.reusedInstallmentStart == null && source?.frequency != ForecastFrequency.ONCE
     val id = rememberSaveable { source?.itemId ?: UUID.randomUUID().toString() }
-    var title by rememberSaveable { mutableStateOf(line?.title ?: source?.title ?: initialTitle) }
-    var kind by rememberSaveable { mutableStateOf(source?.kind ?: initialKind) }
-    var category by rememberSaveable { mutableStateOf(line?.category ?: source?.category ?: initialCategory ?: if (initialKind == ForecastKind.INCOME) Category.SALARY else Category.OTHER) }
-    var frequency by rememberSaveable { mutableStateOf(source?.frequency ?: initialFrequency) }
+    val defaultTitle = source?.title ?: initialTitle
+    val defaultCategory = source?.category ?: initialCategory ?: if (initialKind == ForecastKind.INCOME) Category.SALARY else Category.OTHER
+    var ruleTitle by rememberSaveable {
+        mutableStateOf(if (source?.frequency == ForecastFrequency.ONCE) line?.title ?: defaultTitle else defaultTitle)
+    }
+    var occurrenceTitle by rememberSaveable { mutableStateOf(line?.title ?: defaultTitle) }
+    var ruleCategory by rememberSaveable {
+        mutableStateOf(if (source?.frequency == ForecastFrequency.ONCE) line?.category ?: defaultCategory else defaultCategory)
+    }
+    var occurrenceCategory by rememberSaveable { mutableStateOf(line?.category ?: defaultCategory) }
+    var ruleKind by rememberSaveable { mutableStateOf(source?.kind ?: initialKind) }
+    var ruleFrequency by rememberSaveable { mutableStateOf(source?.frequency ?: initialFrequency) }
     var group by rememberSaveable { mutableStateOf(source?.group ?: ForecastGroup.COMMITMENT) }
     var estimated by rememberSaveable { mutableStateOf(source?.estimated ?: false) }
-    var undated by rememberSaveable { mutableStateOf(source?.cycleAnchored ?: false) }
-    var date by rememberSaveable { mutableStateOf((line?.date ?: source?.startDate ?: initialStartDate ?: period.start).toString()) }
-    var day by rememberSaveable { mutableIntStateOf(source?.dayOfMonth ?: LocalDate.parse(date).dayOfMonth) }
+    var ruleUndated by rememberSaveable { mutableStateOf(source?.cycleAnchored ?: false) }
+    val defaultDate = line?.date ?: source?.startDate ?: initialStartDate ?: period.start
+    var ruleDate by rememberSaveable { mutableStateOf(defaultDate.toString()) }
+    var occurrenceDate by rememberSaveable { mutableStateOf(defaultDate.toString()) }
+    var day by rememberSaveable { mutableIntStateOf(source?.dayOfMonth ?: defaultDate.dayOfMonth) }
     var count by rememberSaveable { mutableStateOf(source?.installmentCount?.toString() ?: "") }
     var account by rememberSaveable { mutableStateOf(source?.account ?: initialAccount) }
     var statement by rememberSaveable { mutableStateOf(source?.statementKey.orEmpty()) }
     var statementTotal by rememberSaveable { mutableStateOf(source?.statementTotal ?: false) }
     var onlyOccurrence by rememberSaveable { mutableStateOf(initialOnlyOccurrence && canEditOccurrence) }
     var attempted by rememberSaveable { mutableStateOf(false) }
-    var invalidMoney by rememberSaveable { mutableStateOf(false) }
+    var invalidRuleMoney by rememberSaveable { mutableStateOf(false) }
+    var invalidOccurrenceMoney by rememberSaveable { mutableStateOf(false) }
     val scoped = onlyOccurrence && canEditOccurrence
+    val title = if (scoped) occurrenceTitle else ruleTitle
+    val category = if (scoped) occurrenceCategory else ruleCategory
+    val kind = if (scoped) line?.kind ?: ruleKind else ruleKind
+    val frequency = if (scoped) line?.frequency ?: ruleFrequency else ruleFrequency
+    val undated = if (scoped) source?.cycleAnchored ?: ruleUndated else ruleUndated
+    val date = LocalDate.parse(if (scoped) occurrenceDate else ruleDate)
     val showAdjustedDueDate = !scoped && source != null && existingOverride?.date != null &&
         frequency != ForecastFrequency.ONCE && frequency == source.frequency && undated == source.cycleAnchored
     val occurrenceAmount = rememberTextFieldState(initialText = (line?.amountCents ?: source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val ruleAmount = rememberTextFieldState(initialText = (source?.amountCents ?: initialAmountCents)?.let { MoneyInput.fromCents(abs(it)) }.orEmpty())
     val amount = if (scoped) occurrenceAmount else ruleAmount
+    val invalidMoney = if (scoped) invalidOccurrenceMoney else invalidRuleMoney
     val cents = if (invalidMoney) null else MoneyInput.cents(amount.text.toString())
-    val start = if (undated && frequency == ForecastFrequency.MONTHLY) period.start else LocalDate.parse(date)
+    val start = if (undated && frequency == ForecastFrequency.MONTHLY) period.start else date
     val candidate = ForecastRule(id, if (line != null) period.start else start, title.trim(), kind,
         cents ?: 0, category, frequency,
         if (source != null && line != null) source!!.startDate else start, day,
-        count.toIntOrNull() ?: 1, undated && frequency == ForecastFrequency.MONTHLY,
+        ForecastValidation.normalizeInstallmentCount(frequency, count.toIntOrNull() ?: 1),
+        undated && frequency == ForecastFrequency.MONTHLY,
         group, estimated, source?.active ?: true, if (kind == ForecastKind.EXPENSE) statement.trim() else "",
         kind == ForecastKind.EXPENSE && statementTotal, account.trim())
     val error = when {
@@ -91,17 +110,32 @@ internal fun ForecastEditor(
                 if (scoped) "Só esta ocorrência será alterada; os outros meses serão preservados."
                 else "A nova regra vale a partir desta ocorrência. Os ajustes individuais feitos nos meses seguintes e o histórico anterior são preservados.", style = MaterialTheme.typography.bodySmall)
             PrivateValueGate(hidden && privateDisplayText(title, true) != title, "Mostrar descrição da previsão para edição") {
-                OutlinedTextField(title, { title = it.take(200) }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
+                OutlinedTextField(title, { input ->
+                    if (scoped) occurrenceTitle = input.take(200) else ruleTitle = input.take(200)
+                }, enabled = !busy, label = { Text("Descrição") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("forecast-title"))
             }
             if (!scoped) ChoiceField("Tipo", kind, ForecastKind.entries, { if (it == ForecastKind.INCOME) "Receita" else "Despesa" }) {
-                if (!busy) { kind = it; category = if (it == ForecastKind.INCOME) Category.SALARY else Category.OTHER }
+                if (!busy) {
+                    ruleKind = it
+                    ruleCategory = if (it == ForecastKind.INCOME) Category.SALARY else Category.OTHER
+                }
             }
-            ChoiceField("Categoria", category, categoriesFor(if (kind == ForecastKind.INCOME) Movement.INCOME else Movement.EXPENSE), { it.label }) { if (!busy) category = it }
+            ChoiceField("Categoria", category, categoriesFor(if (kind == ForecastKind.INCOME) Movement.INCOME else Movement.EXPENSE), { it.label }) {
+                if (!busy) {
+                    if (scoped) occurrenceCategory = it else ruleCategory = it
+                }
+            }
             if (!scoped) ChoiceField("Frequência", frequency, ForecastFrequency.entries, {
                 when (it) { ForecastFrequency.ONCE -> "Uma vez"; ForecastFrequency.MONTHLY -> "Mensal"; ForecastFrequency.INSTALLMENTS -> "Parcelada" }
-            }) { if (!busy) frequency = it }
+            }) { if (!busy) ruleFrequency = it }
             PrivateValueGate(hidden, "Mostrar valor da previsão para edição") {
-                MoneyAmountField(amount, attempted, !busy, label = if (!scoped && frequency == ForecastFrequency.INSTALLMENTS) "Valor total a parcelar (R$)" else "Valor previsto (R$)", tag = "forecast-amount", onInvalidInput = { invalidMoney = it })
+                key(scoped) {
+                    MoneyAmountField(amount, attempted, !busy,
+                        label = if (!scoped && frequency == ForecastFrequency.INSTALLMENTS) "Valor total a parcelar (R$)" else "Valor previsto (R$)",
+                        tag = "forecast-amount", onInvalidInput = {
+                            if (scoped) invalidOccurrenceMoney = it else invalidRuleMoney = it
+                        })
+                }
                 if (!scoped && frequency == ForecastFrequency.INSTALLMENTS) {
                     OutlinedTextField(count, { if (it.length <= 3 && it.all(Char::isDigit)) count = it }, enabled = !busy, label = { Text("Quantidade de parcelas (1 a 600)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth().testTag("forecast-installment-count"))
                     val n = count.toIntOrNull()
@@ -115,14 +149,24 @@ internal fun ForecastEditor(
             }
             if (!scoped && kind == ForecastKind.EXPENSE) {
                 ChoiceField("Grupo", group, ForecastGroup.entries, { if (it == ForecastGroup.COMMITMENT) "Compromisso" else "Consumo variável" }) { if (!busy) group = it }
-                if (frequency == ForecastFrequency.MONTHLY) ForecastToggle("Sem data: estimativa para cada ciclo", undated, !busy) { undated = it }
+                if (frequency == ForecastFrequency.MONTHLY) ForecastToggle("Sem data: estimativa para cada ciclo", undated, !busy) { ruleUndated = it }
             }
             if (!scoped) ForecastToggle("Valor estimado", estimated, !busy) { estimated = it }
             if (!undated || frequency != ForecastFrequency.MONTHLY) {
                 if (showAdjustedDueDate) {
-                    Text("Vencimento atual: ${LocalDate.parse(date).format(financeDateFormat)}")
+                    Text("Vencimento atual: ${date.format(financeDateFormat)}")
                 } else {
-                    OutlinedButton(onClick = { showFinanceDatePicker(context, datePickerTheme, LocalDate.parse(date)) { date = it.toString(); day = it.dayOfMonth } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Data: ${LocalDate.parse(date).format(financeDateFormat)}") }
+                    OutlinedButton(onClick = {
+                        showFinanceDatePicker(context, datePickerTheme, date) { selected ->
+                            if (scoped) occurrenceDate = selected.toString()
+                            else {
+                                ruleDate = selected.toString()
+                                day = selected.dayOfMonth
+                            }
+                        }
+                    }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                        Text("Data: ${date.format(financeDateFormat)}")
+                    }
                 }
                 if (!scoped && frequency != ForecastFrequency.ONCE) ChoiceField("Dia habitual", day, (1..31).toList(), { "Dia $it" }) { if (!busy) day = it }
             }

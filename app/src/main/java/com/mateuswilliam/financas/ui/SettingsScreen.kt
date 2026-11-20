@@ -34,8 +34,6 @@ fun SettingsScreen(
     onClear: () -> Unit, onSimulate: () -> Unit, onAppearance: (Appearance) -> Unit, busy: Boolean,
     onBackup: () -> Unit, onRestore: () -> Unit, onPlanning: () -> Unit,
     onLockChange: (Boolean) -> Unit, onSecureScreen: (Boolean) -> Unit, onReminders: (Boolean) -> Unit = {},
-    plannerMode: Boolean = false,
-    showCapture: Boolean = !plannerMode,
     onDisplayName: (String) -> Unit = {},
     onMerchantCategories: () -> Unit = {},
     onAccounts: () -> Unit = {}, onReview: () -> Unit = {},
@@ -49,7 +47,7 @@ fun SettingsScreen(
         } }
         item { SectionTitle("Ajustes", "Preferências, captura e proteção dos dados") }
         item { OutlinedButton(onAccounts, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("settings-accounts")) { Text("Contas e saldos") } }
-        if (showCapture) item { OutlinedButton(onReview, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-notification-review")) { Text("Revisar notificações") } }
+        item { OutlinedButton(onReview, Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-notification-review")) { Text("Revisar notificações") } }
         item {
             SettingsCard {
                 SettingsHeading("Aparência", R.drawable.ic_visibility)
@@ -79,7 +77,7 @@ fun SettingsScreen(
                 }
             }
         }
-        if (showCapture) item {
+        item {
             SettingsCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -108,7 +106,7 @@ fun SettingsScreen(
                 }
             }
         }
-        if (showCapture) item { OutlinedButton(onMerchantCategories,
+        item { OutlinedButton(onMerchantCategories,
             Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("merchant-categories-settings")) {
             Text("Categorias lembradas por estabelecimento")
         } }
@@ -124,7 +122,7 @@ fun SettingsScreen(
                 Text("Os registros ficam neste aparelho. O CSV é um relatório; o backup permite recuperar os dados do aplicativo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedButton(onClick = { onExport?.invoke() }, enabled = !busy && onExport != null,
                     modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) {
-                    Text(if (plannerMode) "Exportar previsões em CSV" else "Exportar lançamentos em CSV")
+                    Text("Exportar previsões em CSV")
                 }
             }
         }

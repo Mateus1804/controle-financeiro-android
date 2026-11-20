@@ -22,5 +22,6 @@ class InstalledResetTest {
         assertEquals(Appearance.DARK,app.settings.snapshot().appearance)
         assertTrue(app.settings.snapshot().hideAmounts)
         assertFalse(app.settings.snapshot().enabled)
+        assertFalse(app.settings.snapshot().remindersEnabled)
     }
 }

@@ -2,13 +2,16 @@ package com.mateuswilliam.financas.ui
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mateuswilliam.financas.FinanceApplication
+import com.mateuswilliam.financas.FinanceViewModel
 import com.mateuswilliam.financas.MainActivity
 import com.mateuswilliam.financas.core.*
 import kotlinx.coroutines.runBlocking
@@ -17,6 +20,7 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import java.util.UUID
 
 /** Usa o seletor real do Android no emulador dedicado, somente com arquivo e senha fictícios. */
@@ -29,6 +33,29 @@ class BackupDocumentFlowTest {
     private val cryptoWaitMillis = 300_000L
 
     @Before fun reset() = rule.resetReviewBackupMain()
+
+    @Test fun preparedBackupRemainsAvailableWhenTheActivityIsRecreated() {
+        val key = "backup-export-rotation-test"
+        val filename = "backup-rotacao-ficticio.cfbackup"
+        val password = secret.toCharArray()
+        rule.runOnIdle {
+            ViewModelProvider(rule.activity)[key, FinanceViewModel::class.java].createBackup(password, filename)
+        }
+        rule.activityRule.scenario.recreate()
+        val exporter = ViewModelProvider(rule.activity)[key, FinanceViewModel::class.java]
+        rule.waitUntil(cryptoWaitMillis) { exporter.backupDestination.value == filename && !exporter.busy.value }
+        assertTrue(password.all { it == '\u0000' })
+        val file = File.createTempFile("backup-rotacao", ".cfbackup", app.cacheDir)
+        try {
+            rule.runOnIdle {
+                assertEquals(filename, exporter.takeBackupDestination())
+                exporter.busy.value = true
+                exporter.writeBackup(Uri.fromFile(file))
+            }
+            rule.waitUntil(10000) { exporter.message.value?.startsWith("Backup salvo.") == true }
+            assertTrue(file.length() > BackupCrypto.HEADER_BYTES)
+        } finally { file.delete() }
+    }
 
     @Test fun createAndRestoreThroughTheAndroidDocumentPicker() = runBlocking<Unit> {
         val expected = Record("backup-document-ui", 123456, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
@@ -112,15 +139,18 @@ class BackupDocumentFlowTest {
     }
 
     private fun awaitSystemNode(timeoutMillis: Long = 15000, predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo {
-        val end = SystemClock.uptimeMillis() + timeoutMillis
-        while (SystemClock.uptimeMillis() < end) {
-            val root = automation.rootInActiveWindow
-            if (root != null && root.packageName?.toString() != app.packageName) {
-                find(root, predicate)?.let { return it }
+        var found: AccessibilityNodeInfo? = null
+        try {
+            // Avança a composição para que o pedido assíncrono de exportação possa abrir o seletor.
+            rule.waitUntil(timeoutMillis) {
+                val root = automation.rootInActiveWindow
+                found = root?.takeIf { it.packageName?.toString() != app.packageName }?.let { find(it, predicate) }
+                found != null
             }
-            SystemClock.sleep(100)
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("O seletor do Android não apresentou o controle esperado. Janela: ${automation.rootInActiveWindow?.packageName}", timeout)
         }
-        error("O seletor do Android não apresentou o controle esperado. Janela: ${automation.rootInActiveWindow?.packageName}")
+        return checkNotNull(found)
     }
     private fun awaitApplication() {
         val end = SystemClock.uptimeMillis() + 15000
