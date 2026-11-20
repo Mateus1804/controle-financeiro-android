@@ -1,6 +1,6 @@
 # Atualizações assinadas e compatibilidade
 
-> Estado vigente: esta versão usa banco Rendly novo e descarta o armazenamento financeiro anterior, conforme autorizado. Backups antigos são incompatíveis. Veja [Armazenamento](armazenamento-rendly.md) e [Estado atual](estado-atual.md). O CI instrumental usa somente API 35, com suíte e reset intencional. As notas abaixo registram a política de preservação de versões anteriores e não se aplicam ao reset atual.
+> O Rendly usa o banco no esquema Room 1. A troca do antigo Controle Financeiro para esse banco foi um reset autorizado, com formato de backup próprio. As atualizações entre versões do Rendly v1 preservam os dados. [Armazenamento](armazenamento-rendly.md) · [Estado atual](estado-atual.md)
 
 
 ## Identidade e versões
@@ -39,8 +39,6 @@ A matriz não substitui avaliação de fabricantes, bateria, leitura de tela, se
 - [Índices Room](https://developer.android.com/reference/androidx/room/Index).
 
 A proteção das janelas do calendário é verificada na API 35 com `WindowInspector`. O código de compatibilidade para Android antigo não significa que testes nessas APIs tenham sido executados no CI atual. Um teste instrumental de permissões usa reflexão para acessar `revokePostNotificationPermissionWithoutKillForTest` no emulador; esse recurso de teste não faz parte do aplicativo distribuído.
-
-O cenário dedicado também executa o exportador carregado do APK anterior antes da atualização. Depois da instalação da nova versão, o arquivo produzido é aberto pelo código atual, conferido em base temporária e restaurado após confirmação no teste. Um registro fictício acrescentado após a atualização permanece intacto até a restauração e só então é substituído. Isso complementa o vetor criptográfico independente com um arquivo efetivamente produzido pela versão anterior.
 
 A inicialização do emulador tem limite de 180 segundos, e cada execução instrumentada tem limite de oito minutos. Interrupções reprovam a execução; os registros já produzidos permanecem no artefato. A coleta de capturas também possui prazo próprio, inclusive quando há falha. Não há repetição automática da suíte para obter aprovação.
 
