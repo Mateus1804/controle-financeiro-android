@@ -16,6 +16,13 @@ data class ForecastRule(
     val statementKey: String = "", val statementTotal: Boolean = false,
     val account: String = "",
 )
+
+internal fun List<ForecastRule>.linkedRuleAt(occurrenceKey: String?, date: LocalDate): ForecastRule? =
+    asSequence().filter { rule ->
+        rule.effectiveFrom <= date ||
+            (occurrenceKey == "once" && rule.frequency == ForecastFrequency.ONCE && rule.startDate <= date)
+    }.maxByOrNull { it.effectiveFrom }
+
 data class ForecastOverride(
     val itemId: String, val occurrenceKey: String, val amountCents: Long? = null,
     val date: LocalDate? = null, val ignored: Boolean = false, val active: Boolean? = null,

@@ -47,8 +47,7 @@ object CentralFinance {
             val linked = original ?: record
             val rules = rulesByItem[linked.forecastItemId] ?: return ForecastGroup.VARIABLE
             val date = Instant.ofEpochMilli(linked.occurredAt).atZone(zone).toLocalDate()
-            return rules.filter { it.effectiveFrom <= date }.maxByOrNull { it.effectiveFrom }?.group
-                ?: ForecastGroup.VARIABLE
+            return rules.linkedRuleAt(linked.forecastOccurrenceKey, date)?.group ?: ForecastGroup.VARIABLE
         }
 
         fun summarize(period: BudgetPeriod): CentralFinancialSummary {

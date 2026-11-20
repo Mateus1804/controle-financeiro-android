@@ -22,6 +22,22 @@ class ForecastReviewTest {
         assertEquals(original.amountCents, report.totalExpensesCents)
     }
 
+    @Test fun aScheduledRecordForARelocatedForecastStillCountsAsACommitment() {
+        val earlier = day.minusDays(2)
+        val rescheduled = rent.copy(frequency = ForecastFrequency.ONCE, startDate = earlier)
+        val linked = Record("booked", 30000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+            "Conta", "Conta agendada", at(earlier), forecastItemId = rent.itemId, forecastOccurrenceKey = "once")
+        val dataset = ForecastDataset(rules = listOf(rescheduled))
+        val today = earlier.minusDays(1)
+        val asOf = at(today)
+        val summary = CentralFinance.summarize(listOf(linked), dataset, period, zone, asOf)
+        assertEquals(0L, summary.forecast.totalExpensesCents)
+        assertEquals(30000L, summary.projectedReport.commitmentsCents)
+        assertEquals(0L, summary.projectedReport.variableCents)
+        val lines = PaydayBudgets.upcomingLines(dataset, listOf(linked), zone, asOf)
+        assertEquals(30000L, PaydayBudgets.pendingCommitments(lines, today, day.plusDays(1)))
+    }
+
     @Test fun changingFrequencyPreservesHistoryAndReplacesTheOldSchedule() {
         val start = day.plusMonths(1)
         val revised = rent.copy(effectiveFrom = period.endExclusive, startDate = start,
