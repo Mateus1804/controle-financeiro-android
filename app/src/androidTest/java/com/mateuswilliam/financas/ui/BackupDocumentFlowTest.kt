@@ -139,15 +139,18 @@ class BackupDocumentFlowTest {
     }
 
     private fun awaitSystemNode(timeoutMillis: Long = 15000, predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo {
-        val end = SystemClock.uptimeMillis() + timeoutMillis
-        while (SystemClock.uptimeMillis() < end) {
-            val root = automation.rootInActiveWindow
-            if (root != null && root.packageName?.toString() != app.packageName) {
-                find(root, predicate)?.let { return it }
+        var found: AccessibilityNodeInfo? = null
+        try {
+            // Avança a composição para que o pedido assíncrono de exportação possa abrir o seletor.
+            rule.waitUntil(timeoutMillis) {
+                val root = automation.rootInActiveWindow
+                found = root?.takeIf { it.packageName?.toString() != app.packageName }?.let { find(it, predicate) }
+                found != null
             }
-            SystemClock.sleep(100)
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError("O seletor do Android não apresentou o controle esperado. Janela: ${automation.rootInActiveWindow?.packageName}", timeout)
         }
-        error("O seletor do Android não apresentou o controle esperado. Janela: ${automation.rootInActiveWindow?.packageName}")
+        return checkNotNull(found)
     }
     private fun awaitApplication() {
         val end = SystemClock.uptimeMillis() + 15000
