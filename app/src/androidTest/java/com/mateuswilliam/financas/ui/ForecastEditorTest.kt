@@ -78,9 +78,10 @@ class ForecastEditorTest {
             source.kind, Category.SERVICES, source.group, source.frequency, false, false, true, "", false, source)
         var saved: ForecastRule? = null
         compose.setContent { FinanceTheme {
-            ForecastEditor(source, line, period, false, false, {}, { saved = it }, { fail("Must save the series") },
-                initialOnlyOccurrence = false)
+            ForecastEditor(source, line, period, false, false, {}, { saved = it }, { fail("Must save the series") })
         } }
+        compose.onNodeWithContentDescription("Aplicar alteração").performScrollTo().performClick()
+        compose.onNodeWithText("Aplicar deste mês em diante").performClick()
         compose.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("120000")
         compose.onNodeWithTag("forecast-save").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         compose.runOnIdle {
