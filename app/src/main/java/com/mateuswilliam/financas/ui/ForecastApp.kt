@@ -45,6 +45,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val busyFinance by finance.busy.collectAsStateWithLifecycle()
     val forecastMessage by model.message.collectAsStateWithLifecycle()
     val csvDestination by model.csvDestination.collectAsStateWithLifecycle()
+    val backupDestination by finance.backupDestination.collectAsStateWithLifecycle()
+    val financialDataRevision by finance.financialDataRevision.collectAsStateWithLifecycle()
     val financeMessage by finance.message.collectAsStateWithLifecycle()
     val loadError by model.loadError.collectAsStateWithLifecycle()
     val financeState by finance.state.collectAsStateWithLifecycle()
@@ -130,7 +132,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     val snackbar = remember { SnackbarHostState() }
-    LaunchedEffect(resumeCount) {
+    LaunchedEffect(resumeCount, financialDataRevision) {
         model.refresh()
     }
     LaunchedEffect(incomingPlanning) { if (incomingPlanning) {
@@ -138,7 +140,6 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     } }
     LaunchedEffect(forecastMessage) { forecastMessage?.let { snackbar.showSnackbar(it); if (model.message.value == it) model.message.value = null } }
     LaunchedEffect(financeMessage) { financeMessage?.let {
-        if (it.startsWith("Dados restaurados") || it.startsWith("Dados apagados")) model.refresh()
         snackbar.showSnackbar(it); if (finance.message.value == it) finance.message.value = null
     } }
     if (!settings.namePromptSeen) DisplayNameDialog(settings.displayName,
@@ -179,6 +180,13 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         }
     }
     val backupExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { finance.writeBackup(it) }
+    LaunchedEffect(backupDestination) {
+        val name = finance.takeBackupDestination() ?: return@LaunchedEffect
+        runCatching { backupExport.launch(name) }.onFailure {
+            finance.writeBackup(null)
+            finance.message.value = "Não foi possível abrir o seletor de arquivos."
+        }
+    }
     val backupImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { editors.restoreUri = uri.toString(); editors.backupDialog = 2 }
     }
@@ -286,7 +294,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onBackup = { editors.backupDialog = 1 }, onRestore = { backupImport.launch(arrayOf("*/*")) }, onPlanning = { navigation.destination = RendlyDestination.PROJECTION },
                         onLockChange = onLockChange, onSecureScreen = finance.preferences::setSecureScreen,
                         onReminders = { finance.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
-                        plannerMode = true, showCapture = true, onDisplayName = finance.preferences::setDisplayName,
+                        onDisplayName = finance.preferences::setDisplayName,
                         onMerchantCategories = { editors.merchantCategoriesOpen = true },
                         onAccounts = { editors.accountsOpen = true }, onReview = { navigation.destination = RendlyDestination.REVIEW })
                     loadError != null -> { Text(loadError!!, Modifier.padding(FinanceSpacing.page)); Button({ model.refresh() }) { Text("Tentar novamente") } }
@@ -420,7 +428,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     if (editors.goalEditor) ReserveGoalEditor(snapshot?.reserveGoalCents, busy, hidden, { editors.goalEditor = false }) { value -> model.saveReserveGoal(value) { editors.goalEditor = false } }
     if (editors.backupDialog != 0) BackupPasswordDialog(editors.backupDialog == 1, busy, { editors.backupDialog = 0; editors.restoreUri = null }) { secret ->
         val creating = editors.backupDialog == 1; editors.backupDialog = 0
-        if (creating) finance.createBackup(secret) { backupExport.launch("planejamento-${today}.cfbackup") }
+        if (creating) finance.createBackup(secret, "planejamento-${today}.cfbackup")
         else { val uri = editors.restoreUri; editors.restoreUri = null; if (uri != null) finance.stageBackup(uri.toUri(), secret) else secret.fill('\u0000') }
     }
     staged?.let { BackupPreviewDialog(it, busy, finance::cancelRestore, finance::restoreBackup) }

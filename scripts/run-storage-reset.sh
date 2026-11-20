@@ -22,7 +22,7 @@ adb shell run-as "$package" mkdir -p databases shared_prefs
 adb shell run-as "$package" cp /data/local/tmp/old-storage.db databases/financas.db
 cat > qa/reset-preferences.xml <<'XML'
 <?xml version='1.0' encoding='utf-8' standalone='yes' ?>
-<map><string name="appearance">DARK</string><boolean name="hide_amounts" value="true" /><boolean name="intro_seen" value="true" /><boolean name="enabled" value="false" /></map>
+<map><string name="appearance">DARK</string><boolean name="hide_amounts" value="true" /><boolean name="intro_seen" value="true" /><boolean name="enabled" value="true" /><boolean name="disclosure_v1" value="true" /><boolean name="reminders_enabled" value="true" /></map>
 XML
 adb push qa/reset-preferences.xml /data/local/tmp/reset-preferences.xml
 adb shell run-as "$package" cp /data/local/tmp/reset-preferences.xml shared_prefs/capture_settings.xml

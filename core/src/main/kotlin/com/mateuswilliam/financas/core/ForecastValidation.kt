@@ -1,6 +1,10 @@
 package com.mateuswilliam.financas.core
 
 object ForecastValidation {
+    /** Earlier versions could store a count even for a frequency that does not use it. */
+    fun normalizeInstallmentCount(frequency: ForecastFrequency, count: Int): Int =
+        if (frequency != ForecastFrequency.INSTALLMENTS && count !in 1..Installments.MAX_INSTALLMENTS) 1 else count
+
     fun error(rule: ForecastRule): String? = when {
         rule.itemId.isBlank() || rule.itemId.length > 200 || '\u0000' in rule.itemId -> "Identificador inválido."
         rule.title.isBlank() || rule.title.length > 200 || '\u0000' in rule.title -> "Informe uma descrição de até 200 caracteres."

@@ -11,6 +11,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.core.*
 import com.mateuswilliam.financas.core.Record
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.YearMonth
 import java.time.ZoneId
 
@@ -37,15 +40,13 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
         val month = YearMonth.from(selected.start)
         List(6) { index -> FinancialPeriods.month(month.plusMonths(index.toLong()), data.cycleRules) }
     }
-    val baseline = remember(data, periods, records, asOf, zone) {
-        CentralFinance.summarizePeriods(records, data, periods, zone, asOf)
+    val baseline by projectionReports(data, periods, records, asOf, zone)
+    val simulatedData = remember(data, simulation) {
+        simulation?.let { data.copy(rules = data.rules + it) }
     }
-    val simulationResults = remember(data, simulation, periods, records, asOf, zone) {
-        simulation?.let {
-            CentralFinance.summarizePeriods(records, data.copy(rules = data.rules + it), periods, zone, asOf)
-        }
-    }
-    LazyColumn(Modifier.testTag("forecast-projections"), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val simulated = if (simulatedData == null) null else projectionReports(simulatedData, periods, records, asOf, zone).value
+    val layoutTag = if (baseline == null) "forecast-projections-loading" else "forecast-projections"
+    LazyColumn(Modifier.testTag(layoutTag), contentPadding = PaddingValues(FinanceSpacing.page), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             SectionTitle("Próximos ciclos", "O mesmo orçamento, considerando o término das parcelas e os ajustes de cada período")
             OutlinedButton(onSimulate, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("forecast-simulate")) { Text(if (simulation == null) "Simular uma nova parcela" else "Editar simulação") }
@@ -60,9 +61,14 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
                 }
             }
         }
-        baseline.forEachIndexed { index, summary ->
-            val base = summary.projectedReport
-            val simulated = simulationResults?.get(index)?.projectedReport
+        when {
+            baseline == null -> item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Calculando projeções…") }
+            baseline?.isFailure == true -> item { Text("Não foi possível calcular as projeções.") }
+            simulation != null && simulated == null -> item { Text("Calculando a simulação…") }
+            simulated?.isFailure == true -> item { Text("Não foi possível calcular a simulação.") }
+        }
+        baseline?.getOrNull().orEmpty().forEachIndexed { index, base ->
+            val withSimulation = simulated?.getOrNull()?.get(index)
             item(key = base.period.start.toString()) {
                 Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.large) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -70,9 +76,9 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
                         Text(if (hidden) "Percentual oculto" else "Gastos totais: ${base.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}")
                         Text("Margem estimada", style = MaterialTheme.typography.bodySmall)
                         Amount(base.marginCents, hidden, Modifier.testTag("projection-margin-${base.period.start}"))
-                        if (simulated != null) {
-                            Text(if (hidden) "Simulação: valores ocultos" else "Com a simulação: ${simulated.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}", style = MaterialTheme.typography.bodySmall)
-                            Amount(simulated.marginCents, hidden)
+                        if (withSimulation != null) {
+                            Text(if (hidden) "Simulação: valores ocultos" else "Com a simulação: ${withSimulation.expensePercentage?.toPlainString()?.replace('.', ',')?.plus("% da renda") ?: "renda não informada"}", style = MaterialTheme.typography.bodySmall)
+                            Amount(withSimulation.marginCents, hidden)
                         }
                         TextButton({ onOpen(base.period) }) { Text("Abrir este ciclo") }
                     }
@@ -80,5 +86,22 @@ internal fun ForecastProjectionScreen(data: ForecastDataset, selected: BudgetPer
             }
         }
 
+    }
+}
+
+@Composable
+private fun projectionReports(
+    data: ForecastDataset, periods: List<BudgetPeriod>, records: List<Record>, asOf: Long, zone: ZoneId,
+): State<Result<List<ForecastReport>>?> = key(data, periods, records, asOf, zone) {
+    produceState<Result<List<ForecastReport>>?>(null) {
+        value = withContext(Dispatchers.Default) {
+            try {
+                Result.success(CentralFinance.summarizePeriods(records, data, periods, zone, asOf).map { it.projectedReport })
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
     }
 }

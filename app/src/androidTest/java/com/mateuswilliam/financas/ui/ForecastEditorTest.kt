@@ -71,6 +71,25 @@ class ForecastEditorTest {
         }
     }
 
+    @Test fun editingTheSeriesAmountDoesNotCopyTheOccurrencesTitleOrCategory() {
+        val source = ForecastRule("rent", period.start, "Aluguel", ForecastKind.EXPENSE,
+            100000, Category.HOME, ForecastFrequency.MONTHLY, period.start)
+        val line = ForecastLine(source.itemId, "month:2026-11", "Ajuste pontual", period.start, 85000,
+            source.kind, Category.SERVICES, source.group, source.frequency, false, false, true, "", false, source)
+        var saved: ForecastRule? = null
+        compose.setContent { FinanceTheme {
+            ForecastEditor(source, line, period, false, false, {}, { saved = it }, { fail("Must save the series") },
+                initialOnlyOccurrence = false)
+        } }
+        compose.onNodeWithTag("forecast-amount").performScrollTo().performTextReplacement("120000")
+        compose.onNodeWithTag("forecast-save").performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        compose.runOnIdle {
+            assertEquals("Aluguel", saved?.title)
+            assertEquals(Category.HOME, saved?.category)
+            assertEquals(120000L, saved?.amountCents)
+        }
+    }
+
     @Test fun hiddenImportedTitleDoesNotExposeCurrencyUntilRevealed() {
         val source = ForecastRule("private", period.start, "Compra R$ 1.234,56", ForecastKind.EXPENSE,
             1000, Category.HOME, ForecastFrequency.MONTHLY, period.start,

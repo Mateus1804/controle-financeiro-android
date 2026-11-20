@@ -13,6 +13,15 @@ class ForecastReviewTest {
         Category.HOME, ForecastFrequency.MONTHLY, day)
     private fun at(date: LocalDate) = date.atStartOfDay(zone).toInstant().toEpochMilli()
 
+    @Test fun movingAOneTimeForecastBeforeItsOriginalDateKeepsItInTheReport() {
+        val original = rent.copy(frequency = ForecastFrequency.ONCE)
+        val earlier = day.minusDays(2)
+        val edited = original.copy(startDate = earlier)
+        val report = ForecastCalculator.report(ForecastDataset(rules = listOf(edited)), period)
+        assertEquals(earlier, report.lines.single().date)
+        assertEquals(original.amountCents, report.totalExpensesCents)
+    }
+
     @Test fun changingFrequencyPreservesHistoryAndReplacesTheOldSchedule() {
         val start = day.plusMonths(1)
         val revised = rent.copy(effectiveFrom = period.endExclusive, startDate = start,

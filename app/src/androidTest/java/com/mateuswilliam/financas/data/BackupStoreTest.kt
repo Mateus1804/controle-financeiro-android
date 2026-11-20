@@ -1,8 +1,10 @@
 package com.mateuswilliam.financas.data
 
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.mateuswilliam.financas.discardLegacyDatabase
 import com.mateuswilliam.financas.core.*
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -11,6 +13,8 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.File
+import java.time.LocalDate
 
 class BackupStoreTest {
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
@@ -66,6 +70,26 @@ class BackupStoreTest {
         assertTrue(runCatching { store.stage(ByteArrayInputStream(file), secret) }.exceptionOrNull() is BackupAuthenticationException)
         assertEquals("preservado", repository.exportRecords().single().id)
         assertTrue(secret.all { it == '\u0000' })
+    }
+
+    @Test fun oldNonInstallmentCountsDoNotPreventRestoringOrCreatingBackups() = runBlocking {
+        val start = LocalDate.of(2026, 10, 1)
+        val rule = ForecastRule("monthly", start, "Aluguel fictício", ForecastKind.EXPENSE, 60000,
+            Category.HOME, ForecastFrequency.MONTHLY, start)
+        // The old editor could store this unused value before the current validation was added.
+        database.financeDao().upsertForecastRule(ForecastRuleEntity.from(rule).copy(installmentCount = 0))
+        val encoded = BackupSnapshot.encode(repository.snapshot())
+        assertEquals(1, BackupSnapshot.decode(encoded).forecastRules.single().installmentCount)
+
+        val payload = JSONObject(encoded.toString(Charsets.UTF_8))
+        val row = payload.getJSONArray("forecastRules").getJSONObject(0)
+        row.put("installmentCount", 601)
+        val fromOldApp = BackupCrypto.encrypt(payload.toString().toByteArray(Charsets.UTF_8), password())
+        store.restore(store.stage(ByteArrayInputStream(fromOldApp), password()))
+        assertEquals(rule, repository.snapshot().forecastRules.single().model())
+
+        row.put("frequency", ForecastFrequency.INSTALLMENTS.name)
+        assertTrue(runCatching { BackupSnapshot.decode(payload.toString().toByteArray(Charsets.UTF_8)) }.isFailure)
     }
     @Test fun tamperedBackupIsRejectedBeforeReplacingAnyData() = runBlocking<Unit> {
         repository.save(record("preservado"), null)
@@ -145,6 +169,31 @@ class BackupStoreTest {
         assertTrue(preferences.snapshot().lockEnabled)
         assertTrue(preferences.snapshot().secureScreen)
         assertFalse(preferences.snapshot().enabled)
+    }
+
+    @Test fun legacyDatabaseRemainsAvailableWhenPersistingThePauseFails() {
+        val file = File.createTempFile("legacy-test", ".db", context.cacheDir)
+        val isolated = context.getSharedPreferences("failing-legacy-pause-test", Context.MODE_PRIVATE)
+        val legacyContext = object : ContextWrapper(context) {
+            override fun getDatabasePath(name: String) = file
+            override fun deleteDatabase(name: String): Boolean {
+                assertFalse(isolated.getBoolean("enabled", true))
+                assertFalse(isolated.getBoolean("reminders_enabled", true))
+                return file.delete()
+            }
+        }
+        try {
+            check(isolated.edit().putBoolean("enabled", true).putBoolean("reminders_enabled", true).commit())
+            val failing = CapturePreferences(FailingPreferencesContext(context, isolated))
+            assertTrue(runCatching { discardLegacyDatabase(legacyContext, failing) }.exceptionOrNull() is IllegalStateException)
+            assertTrue(file.exists())
+            val retry = CapturePreferences(FailingPreferencesContext(context, isolated, successfulCommits = 1))
+            assertTrue(discardLegacyDatabase(legacyContext, retry))
+            assertFalse(file.exists())
+        } finally {
+            file.delete()
+            isolated.edit().clear().commit()
+        }
     }
     @Test fun preferenceCleanupFailureIsReportedAfterFinancialDataWasRemoved() = runBlocking<Unit> {
         repository.save(record("a-apagar"), null)

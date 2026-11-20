@@ -65,6 +65,15 @@ jobs:
       - name: Compilar APK anterior de teste
         working-directory: ci-previous
         run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Obter versão anterior do Rendly v1
+        uses: actions/checkout@v6
+        with:
+          ref: 815528feaaeb16fbf2ad2acc46103c490aaa568c
+          path: ci-previous-rendly
+          persist-credentials: false
+      - name: Compilar APK do Rendly v1 anterior
+        working-directory: ci-previous-rendly
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
       - name: Conferir assinatura e preparar os APKs compatíveis
         run: bash scripts/prepare-compatibility-apks.sh
       - name: Disponibilizar APKs exclusivos de teste
@@ -107,6 +116,9 @@ jobs:
           - api: 35
             target: default
             scenario: reset
+          - api: 35
+            target: default
+            scenario: upgrade
     steps:
       - uses: actions/checkout@v6
         with:

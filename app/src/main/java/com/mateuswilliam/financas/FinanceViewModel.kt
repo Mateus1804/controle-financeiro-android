@@ -17,9 +17,11 @@ import com.mateuswilliam.financas.data.DraftEntity
 import com.mateuswilliam.financas.data.DraftChangedException
 import com.mateuswilliam.financas.notifications.ReviewNotifications
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -45,7 +47,6 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     private val app = application as FinanceApplication
     private val repository = app.repository
     val preferences = app.settings
-    val sessionStartedAt = System.currentTimeMillis()
     val connected = app.listenerConnected
     val captureError = app.captureError
     val busy = MutableStateFlow(false)
@@ -60,6 +61,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             accountBalances = snapshot.balances, balanceReferences = snapshot.references, asOf = snapshot.asOf)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
     val stagedRestore = MutableStateFlow<StagedRestore?>(null)
+    private val dataRevision = MutableStateFlow(0L)
+    val financialDataRevision = dataRevision.asStateFlow()
+    private val backupDestinationRequest = MutableStateFlow<String?>(null)
+    val backupDestination = backupDestinationRequest.asStateFlow()
     private var encryptedBackup: ByteArray? = null
 
     fun save(record: Record, draftId: String?, editing: Boolean, expectedRevision: Int?, onSaved: () -> Unit) = action {
@@ -90,32 +95,51 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
     fun clear() = action {
         val preferencesCleared = repository.clear()
+        dataRevision.update { it + 1 }
         ReviewNotifications.cancelAll(app)
         app.merchantCategories.clear()
         if (preferencesCleared) "Dados apagados e captura desativada."
         else "Os dados financeiros foram apagados, mas as preferências não puderam ser limpas. Captura e lembretes permanecem pausados. Confira o armazenamento e tente novamente."
     }
 
-    fun createBackup(password: CharArray, onReady: () -> Unit) {
+    fun createBackup(password: CharArray, fileName: String) {
         if (busy.value) { password.fill('\u0000'); return }
+        if (encryptedBackup != null) {
+            password.fill('\u0000')
+            message.value = "Conclua a exportação do backup que já está aberta."
+            return
+        }
         action {
-            encryptedBackup?.fill(0)
             encryptedBackup = app.backups.create(password)
-            onReady()
+            backupDestinationRequest.value = fileName
             "Backup criptografado preparado. Escolha o destino."
         }
     }
+
+    fun takeBackupDestination(): String? = backupDestinationRequest.value.also { backupDestinationRequest.value = null }
+
     fun writeBackup(uri: Uri?) {
-        if (uri == null) { encryptedBackup?.fill(0); encryptedBackup = null; return }
-        action {
-            val bytes = encryptedBackup ?: throw IllegalArgumentException("Prepare o backup novamente. A senha não foi guardada.")
+        val bytes = encryptedBackup
+        encryptedBackup = null
+        if (uri == null) { bytes?.fill(0); return }
+        if (bytes == null) {
+            message.value = "Prepare o backup novamente. A senha não foi guardada."
+            return
+        }
+        viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
                     val output = app.contentResolver.openOutputStream(uri, "wt") ?: error("Destino indisponível")
                     output.use { it.write(bytes); it.flush() }
                 }
-            } finally { bytes.fill(0); encryptedBackup = null }
-            "Backup salvo. Guarde a senha separadamente e confira a recuperação antes de depender dele."
+                message.value = "Backup salvo. Guarde a senha separadamente e confira a recuperação antes de depender dele."
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                message.value = "Não foi possível salvar o backup. Escolha outro destino."
+            } finally {
+                bytes.fill(0)
+            }
         }
     }
     fun stageBackup(uri: Uri, password: CharArray) {
@@ -141,8 +165,13 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
     fun restoreBackup() = action {
         val staged = stagedRestore.value ?: throw IllegalArgumentException("Selecione um backup para conferir.")
-        try { app.backups.restore(staged); ReviewNotifications.cancelAll(app) }
-        finally { stagedRestore.value = null }
+        try {
+            app.backups.restore(staged)
+            dataRevision.update { it + 1 }
+            ReviewNotifications.cancelAll(app)
+        } finally {
+            stagedRestore.value = null
+        }
         "Dados restaurados. A captura e os lembretes ficaram pausados; as autorizações do Android não são transferidas."
     }
 
@@ -157,6 +186,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         busy.value = true
         viewModelScope.launch {
             try { message.value = block() }
+            catch (cancelled: CancellationException) { throw cancelled }
             catch (exception: IllegalArgumentException) { message.value = exception.message ?: "Confira os campos." }
             catch (_: Exception) { message.value = "Não foi possível concluir. Seus dados não foram descartados. Tente novamente." }
             finally { busy.value = false }

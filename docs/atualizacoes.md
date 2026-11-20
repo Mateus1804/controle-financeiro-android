@@ -21,9 +21,12 @@ Uma cópia protegida e recuperável da chave e das senhas é necessária fora do
 
 ## Compatibilidade automatizada
 
-O CI primeiro confere a recusa explícita da preparação sem assinatura. Depois prepara uma chave descartável de dois dias exclusivamente no runner. A versão anterior fica congelada na revisão `7aec1bd102fcfbfb18eed493ceeb9ca0ac89fefe`, com versão 1 e esquema Room 3. Os APKs anterior, atual e de testes são assinados com a mesma chave de teste; o caminho Gradle release também compila APK e AAB, executa lint e confere assinatura, certificado, versão e ausência de depuração. Essa chave não é incluída nos artefatos e não serve para atualizações definitivas.
+O CI confere a recusa da preparação sem assinatura e usa uma chave descartável, disponível somente no runner, para assinar os APKs dos cenários de teste. O build release verifica a assinatura e o certificado do APK e do AAB. A versão e a ausência de depuração também são verificadas no APK.
 
-O CI atual executa a suíte instrumental somente no Android 15 (API 35), conforme `.github/workflows/android.yml`. As APIs 26, 33 e 36 não fazem parte da matriz atual. Um cenário adicional, também na API 35, instala o APK anterior, prepara dados fictícios no esquema 3 e preferências, e instala o APK atual com `adb install -r`, sem desinstalar entre essas duas versões. O teste confere valores, identificadores, vínculos, revisão das pendências, contas, orçamento, recorrência, ocorrências, aparência e ocultação de valores após a migração para o esquema atual, Room 10.
+Todos os testes instrumentados do workflow `.github/workflows/android.yml` rodam no Android 15 (API 35). A suíte completa e os dois cenários de atualização usam emuladores dedicados.
+
+- **Reset legado.** O CI instala o APK da revisão `7aec1bd102fcfbfb18eed493ceeb9ca0ac89fefe`, prepara um `financas.db` fictício identificado como esquema 10 e habilita captura e lembretes nas preferências de teste. Depois instala o APK atual com `adb install -r`. O teste confere a remoção do banco legado autorizada pelo proprietário, a criação do banco Rendly no esquema 1, a pausa da captura e dos lembretes e a preservação da aparência e da ocultação de valores.
+- **Atualização do Rendly v1.** O CI grava dados fictícios na versão `815528f` antes de instalar o APK atual com `adb install -r`. O teste confere o mesmo identificador de usuário do app e verifica o lançamento, o vínculo com a previsão, a recorrência, o ajuste mensal, a referência de saldo e as preferências.
 
 Os relatórios recusam execuções vazias, falhas, interrupções e testes ignorados. A suíte só executa em emulador dedicado, pois seus testes limpam bases de desenvolvimento. Não deve ser usada em aparelho com dados pessoais.
 
