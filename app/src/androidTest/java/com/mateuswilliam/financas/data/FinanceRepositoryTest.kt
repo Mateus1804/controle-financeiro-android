@@ -76,7 +76,7 @@ class FinanceRepositoryTest {
                 async(Dispatchers.Default) { repository.save(record("b"), draft.id) }).map { it.await() }
         }
         assertEquals(1, results.count { it })
-        assertEquals(1, repository.records.first().size)
+        assertEquals(1, repository.observeAccountLedger().first().records.size)
         assertTrue(repository.pending.first().isEmpty())
         assertEquals("", database.financeDao().draftById(draft.id)?.sourceBody)
         assertNull(repository.capture(input))
@@ -86,7 +86,7 @@ class FinanceRepositoryTest {
         authorize()
         val draft = repository.capture(input)!!
         repository.dismiss(draft.id)
-        assertTrue(repository.records.first().isEmpty())
+        assertTrue(repository.observeAccountLedger().first().records.isEmpty())
         assertEquals("", database.financeDao().draftById(draft.id)?.sourceBody)
         assertNull(repository.capture(input))
     }
@@ -97,7 +97,7 @@ class FinanceRepositoryTest {
         val result = runCatching { repository.save(record().copy(amountCents = 0), draft.id) }
         assertTrue(result.isFailure)
         assertEquals(1, repository.pending.first().size)
-        assertTrue(repository.records.first().isEmpty())
+        assertTrue(repository.observeAccountLedger().first().records.isEmpty())
     }
 
     @Test fun editingPreservesSourceAndUpdatesInsteadOfInserting() = runBlocking {
@@ -105,8 +105,9 @@ class FinanceRepositoryTest {
         val draft = repository.capture(input)!!
         repository.save(record(), draft.id)
         assertTrue(repository.save(record().copy(amountCents = 5000), null, editing = true))
-        assertEquals(1, repository.records.first().size)
-        assertEquals(5000L, repository.records.first().single().amountCents)
+        val records = repository.observeAccountLedger().first().records
+        assertEquals(1, records.size)
+        assertEquals(5000L, records.single().amountCents)
         assertEquals(draft.id, database.financeDao().recordById("registro-1")?.sourceDraftId)
     }
 
@@ -116,7 +117,7 @@ class FinanceRepositoryTest {
         repository.save(record(), null)
         repository.clear()
         assertTrue(repository.pending.first().isEmpty())
-        assertTrue(repository.records.first().isEmpty())
+        assertTrue(repository.observeAccountLedger().first().records.isEmpty())
         assertFalse(preferences.state.value.consented)
         assertNull(repository.capture(input))
     }
@@ -128,7 +129,7 @@ class FinanceRepositoryTest {
         repository.capture(input.copy(body = "Compra aprovada de R$ 50,00 no supermercado"))
         val failed = runCatching { repository.save(record(), capture.id, expectedRevision = opened.revision) }
         assertTrue(failed.exceptionOrNull() is DraftChangedException)
-        assertTrue(repository.records.first().isEmpty())
+        assertTrue(repository.observeAccountLedger().first().records.isEmpty())
         assertEquals(5000L, repository.pending.first().single().amountCents)
     }
 

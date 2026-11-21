@@ -42,7 +42,7 @@ Com início no dia 5, **05/11/2026 a 04/12/2026** corresponde a `[05/11/2026, 05
 
 Para dias 29, 30 e 31, cada fronteira usa o último dia disponível se o mês for mais curto. Por exemplo, a fronteira do dia 31 em fevereiro de 2027 é **28/02/2027**; em fevereiro de 2028 é **29/02/2028**. Vencimentos mensais e parcelas também ajustam o dia aos meses curtos.
 
-A primeira configuração define o calendário inicial quando ainda não há configuração nem destinação à reserva vinculada a ciclo. Depois disso, uma mudança entra na próxima fronteira do ciclo vigente, preservando os períodos anteriores e as destinações registradas. Pode haver um ciclo de transição com duração diferente, sem lacunas nem sobreposições. Exemplo de mudança do dia 5 para o dia 10 durante novembro: preserva **05/11/2026 a 04/12/2026**, cria a transição **05/12/2026 a 09/12/2026** e segue com **10/12/2026 a 09/01/2027**.
+A primeira configuração define o calendário inicial quando ainda não há ciclos protegidos por ajustes de previsões, vínculos com lançamentos ou destinações à reserva. O calendário preserva o ciclo vigente e esses vínculos nas mudanças posteriores. A prévia mostra quando a nova configuração começa. Uma mudança do dia 5 para o dia 10 em novembro pode preservar **05/11/2026 a 04/12/2026**, criar a transição de **05/12/2026 a 09/12/2026** e seguir com **10/12/2026 a 09/01/2027**.
 
 Ao abrir ou retornar ao aplicativo, o ciclo atual é recalculado pela data do aparelho. Não é necessário manter o aplicativo aberto na virada.
 

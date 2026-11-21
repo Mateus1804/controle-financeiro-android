@@ -56,8 +56,14 @@ class CommitmentEntryUiTest {
     @Test fun notificationRevisionRequiresAcceptanceAndKeepsEditedActualCents() = runBlocking<Unit> {
         val timestamp = System.currentTimeMillis()
         val draft = DraftEntity("parcelada-ficticia", "fixture:parcelada", "fixture.local", "Banco fictício",
-            "EXEMPLO FICTÍCIO", "Compra aprovada no cartão de R$ 129,90.", 12990, Movement.EXPENSE,
-            PaymentMethod.CARD, Category.OTHER, "Dados fictícios", timestamp, timestamp - 60_000)
+            "EXEMPLO FICTÍCIO", "Compra aprovada de R$ 129,90 em Padaria Fictícia", 12990, Movement.EXPENSE,
+            PaymentMethod.CARD, Category.FOOD, "Dados fictícios", timestamp, timestamp - 60_000)
+        val revisedText = "Compra aprovada de R$ 139,90 em Farmácia Fictícia"
+        val revisedMerchant = requireNotNull(MerchantIdentity.identify("EXEMPLO atualizado", revisedText))
+        val revisedInput = NotificationInput(draft.sourcePackage, draft.sourceKey, draft.bank,
+            "EXEMPLO atualizado", revisedText, timestamp)
+        assertEquals(Category.HEALTH, NotificationParser.parse(revisedInput).category)
+        app.merchantCategories.forget(revisedMerchant.key)
         dao.insertDraft(draft)
         ui.clickTag("dashboard-notification-review", dashboard = true)
         rule.waitUntil(10000) { rule.onAllNodesWithTag("review-${draft.id}").fetchSemanticsNodes().isNotEmpty() }
@@ -65,8 +71,7 @@ class CommitmentEntryUiTest {
         ui.type("amount-input", "13500")
         rule.onNodeWithText("Descrição").performScrollTo().performTextReplacement("Compra revisada fictícia")
         rule.onNodeWithText("Descrição").performImeAction()
-        app.repository.capture(NotificationInput(draft.sourcePackage, draft.sourceKey, draft.bank, "EXEMPLO atualizado",
-            "Compra aprovada no cartão de R$ 139,90.", timestamp), simulation = true)
+        app.repository.capture(revisedInput, simulation = true)
         rule.waitUntil(10000) { rule.onAllNodesWithText("Usar esta versão e manter a edição").fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("Confirmar lançamento").assertIsNotEnabled()
         assertTrue(app.repository.exportRecords().isEmpty())
@@ -76,12 +81,44 @@ class CommitmentEntryUiTest {
         val saved = app.repository.exportRecords().single()
         assertEquals(13500L, saved.amountCents)
         assertEquals(Movement.EXPENSE, saved.movement)
+        assertEquals(Category.HEALTH, saved.category)
         assertEquals("Compra revisada fictícia", saved.description)
         assertEquals(draft.id, dao.allRecords().single().sourceDraftId)
         assertEquals("SAVED", dao.draftById(draft.id)?.status)
         assertEquals("", dao.draftById(draft.id)?.sourceBody)
+        rule.waitForIdle()
+        assertNull(app.merchantCategories.get(revisedMerchant.key))
         assertTrue(ui.current().rules.isEmpty())
         assertFalse(app.settings.snapshot().consented)
+    }
+
+    @Test fun turningAPurchaseSuggestionIntoIncomeDoesNotTeachTheMerchantCategory() = runBlocking<Unit> {
+        val timestamp = System.currentTimeMillis()
+        val draft = DraftEntity("categoria-ficticia", "fixture:categoria", "fixture.local", "Banco fictício",
+            "EXEMPLO FICTÍCIO", "Compra aprovada de R$ 12,90 em Padaria Exemplo", 1290, Movement.EXPENSE,
+            PaymentMethod.CARD, Category.FOOD, "Dados fictícios", timestamp, timestamp)
+        val merchant = requireNotNull(MerchantIdentity.identify(draft.sourceTitle, draft.sourceBody))
+        app.merchantCategories.remember(merchant.key, Category.SELF_EMPLOYED)
+        try {
+            dao.insertDraft(draft)
+            rule.openRendlyReview()
+            rule.waitUntil(10000) { rule.onAllNodesWithTag("review-${draft.id}").fetchSemanticsNodes().isNotEmpty() }
+            ui.clickTag("review-${draft.id}")
+            val category = rule.onNodeWithContentDescription("Categoria sugerida · editável")
+            category.assertTextContains(Category.FOOD.label)
+            rule.openRecordDetails()
+            rule.onNodeWithContentDescription("Movimentação").performScrollTo().performClick()
+            ui.clickText(Movement.INCOME.label)
+            category.performScrollTo().performClick()
+            ui.clickText(Category.SALARY.label)
+            ui.clickText("Confirmar lançamento")
+            rule.waitUntil(10000) { runBlocking { app.repository.exportRecords().size == 1 } }
+            rule.waitForIdle()
+            assertEquals(Category.SALARY, app.repository.exportRecords().single().category)
+            assertEquals(Category.SELF_EMPLOYED, app.merchantCategories.get(merchant.key))
+        } finally {
+            app.merchantCategories.forget(merchant.key)
+        }
     }
 
     @Test fun confirmingANotificationDoesNotUseItsRawBodyAsTheDescription() = runBlocking<Unit> {
@@ -114,7 +151,7 @@ class CommitmentEntryUiTest {
         ui.waitRules(1)
         ui.clickText("Fixas e parcelas")
         val actions = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
-        rule.onNodeWithTag("fixed-screen").performScrollToNode(hasTestTag(actions))
+        rule.scrollToLoadedItem("fixed-screen", hasTestTag(actions))
         rule.onNodeWithText("Vinculada a lançamento").assertIsDisplayed()
         ui.clickTag(actions)
         rule.onNodeWithText("Aplicar deste mês em diante").assertIsDisplayed()

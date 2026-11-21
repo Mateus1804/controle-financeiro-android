@@ -10,26 +10,23 @@ import com.mateuswilliam.financas.core.AccountNames
 import com.mateuswilliam.financas.core.Movement
 import com.mateuswilliam.financas.core.*
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.util.UUID
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-internal data class AccountLedger(
-    val asOf: Long,
-    val records: List<Record>,
-    val manualRecords: List<Record>,
-    val balances: List<AccountBalance>,
-    val references: List<AccountBalanceReference>,
-)
 
 data class CaptureResult(val id: String, val isNew: Boolean)
 class DraftChangedException : IllegalStateException("A notificação mudou. Abra a pendência novamente para conferir os dados atuais.")
@@ -38,7 +35,6 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
     private val dao = database.financeDao()
     private val writes = Mutex()
     val pending = dao.pending()
-    val records = dao.records().map { rows -> rows.map { it.toRecord() } }.flowOn(Dispatchers.Default)
     val allAccounts = combine(dao.accounts(), dao.usedAccounts()) { saved, used ->
         AccountCatalog.merge(saved.map { it.toOption() }, used.map { AccountOption("", it.label, it.lastUsedAt) })
     }.flowOn(Dispatchers.Default)
@@ -47,32 +43,24 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         merged.filterNot { it.key in archived }
     }
     fun observeAccountBalances(asOf: Long = System.currentTimeMillis()) =
-        observeAccountLedger { asOf }.map { it.balances }.distinctUntilChanged()
+        observeAccountLedgerHistory().map { it.at(asOf).balances }.distinctUntilChanged().flowOn(Dispatchers.Default)
 
-    private data class AccountLedgerRows(
-        val asOf: Long,
-        val accounts: List<AccountEntity>,
-        val records: List<RecordEntity>,
-        val references: List<AccountBalanceEventEntity>,
-    )
+    @OptIn(ExperimentalCoroutinesApi::class)
+    internal fun observeAccountLedger(clockChanges: Flow<Unit> = flowOf(Unit)): Flow<AccountLedger> =
+        combine(observeAccountLedgerHistory(), clockChanges) { history, _ -> history }
+            .flatMapLatest { it.observe(System::currentTimeMillis, ZoneId::systemDefault) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
-    // Extrato, referências e saldos usam a mesma leitura do banco e o mesmo horário.
-    internal fun observeAccountLedger(now: () -> Long = System::currentTimeMillis) = database.invalidationTracker.createFlow(
+    // O relógio atualiza a projeção em memória. Só uma nova observação ou uma invalidação lê o banco.
+    private fun observeAccountLedgerHistory() = database.invalidationTracker.createFlow(
         "accounts", "account_balance_events", "records",
     ).conflate().map {
-        val (asOf, saved, rows, referenceRows) = database.withTransaction {
-            AccountLedgerRows(now(), dao.allAccounts(), dao.allRecords(), dao.allAccountBalanceEvents())
+        val (accounts, records, references) = database.withTransaction {
+            Triple(dao.allAccounts(), dao.allRecords(), dao.allAccountBalanceEvents())
         }
-        val records = rows.map(RecordEntity::toRecord)
-        val manualRecords = records.filterIndexed { index, _ -> rows[index].sourceDraftId == null }
-        val references = referenceRows.map(AccountBalanceEventEntity::toReference)
-        val balances = AccountBalances.calculate(
-            AccountCatalog.options(saved.map(AccountEntity::toOption), records),
-            saved.filter { it.archived }.map { it.nameKey }.toSet(),
-            references, records, asOf,
-        )
-        AccountLedger(asOf, records, manualRecords, balances, references)
-    }.distinctUntilChanged().flowOn(Dispatchers.Default)
+        AccountLedgerHistory(accounts, records, references)
+    }
 
     suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) = writes.withLock {
         val label = AccountNames.clean(name)
@@ -127,21 +115,26 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
 
     suspend fun capture(input: NotificationInput, simulation: Boolean = false): CaptureResult? = writes.withLock {
         if (!simulation && !settings.permits(input.packageName)) return@withLock null
+        if (!validDraftSource(input.sourceKey, input.packageName)) return@withLock null
         if (NotificationParser.isSensitive(input.title, input.body)) return@withLock null
-        val suggestion = NotificationParser.parse(input)
+        val title = normalizeDraftText(input.title)
+        val body = normalizeDraftText(input.body)
+        if (title.isBlank() && body.isBlank()) return@withLock null
+        if ((title != input.title || body != input.body) && NotificationParser.isSensitive(title, body)) return@withLock null
+        val suggestion = NotificationParser.parse(input.copy(title = title, body = body))
         database.withTransaction {
             val existing = dao.draftBySource(input.sourceKey)
             if (existing != null) {
                 if (existing.status != "PENDING") return@withTransaction null
-                if (existing.sourceTitle != input.title || existing.sourceBody != input.body) {
-                    dao.updateDraft(existing.id, input.title, input.body, suggestion.amountCents,
+                if (existing.sourceTitle != title || existing.sourceBody != body) {
+                    dao.updateDraft(existing.id, title, body, suggestion.amountCents,
                         suggestion.movement, suggestion.method, suggestion.category, suggestion.explanation)
                 }
                 CaptureResult(existing.id, false)
             } else {
                 val id = UUID.randomUUID().toString()
-                dao.insertDraft(DraftEntity(id, input.sourceKey, input.packageName, input.bank,
-                    input.title, input.body, suggestion.amountCents, suggestion.movement, suggestion.method,
+                dao.insertDraft(DraftEntity(id, input.sourceKey, input.packageName, normalizeDraftText(input.bank),
+                    title, body, suggestion.amountCents, suggestion.movement, suggestion.method,
                     suggestion.category, suggestion.explanation, input.occurredAt, System.currentTimeMillis()))
                 CaptureResult(id, true)
             }
@@ -158,8 +151,18 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
                 val kind = if (record.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
                 require(dao.hasForecastRule(id, kind.name)) { "Previsão vinculada não encontrada." }
                 val keepsLink = previous?.forecastItemId == id && previous.forecastOccurrenceKey == key
-                if (!keepsLink) require(!dao.hasForecastOccurrenceLink(id, key)) {
-                    "Esta ocorrência já está vinculada a outro lançamento."
+                if (!keepsLink) {
+                    require(!dao.hasForecastOccurrenceLink(id, key)) {
+                        "Esta ocorrência já está vinculada a outro lançamento."
+                    }
+                    val forecast = ForecastDataset(
+                        dao.forecastRulesFor(id).map { it.model() },
+                        dao.forecastOverridesFor(id).map { it.model() },
+                        dao.allCycleRules().map { it.model() },
+                    )
+                    require(forecast.findForecastOccurrences(setOf(key)).any { it.kind == kind && !it.ignored }) {
+                        "Esta ocorrência mudou. Escolha uma previsão disponível ou retire o vínculo."
+                    }
                 }
             }
             val original = record.originalRecordId?.let { dao.recordById(it)?.toRecord() }

@@ -19,7 +19,7 @@ class CentralEntryUiTest {
         var actualSaved = false
         val date = LocalDate.now().minusDays(1)
         compose.setContent { FinanceTheme {
-            RecordEditor(null, null, false, {}, { actualSaved = true }, null, null,
+            RecordEditor(null, null, false, {}, { _, _ -> actualSaved = true }, null, null,
                 emptyList(), "Conta principal", { it }, initialMovement = Movement.INCOME,
                 initialCategory = Category.SALARY, initialDescription = "Salário líquido", initialDate = date,
                 realizedOnly = true, onOpenForecast = { record, selected -> seed = record; frequency = selected })
@@ -63,7 +63,7 @@ class CentralEntryUiTest {
         var seed: Record? = null
         var actualSaved = false
         compose.setContent { FinanceTheme {
-            RecordEditor(null, null, false, {}, { actualSaved = true }, null, null,
+            RecordEditor(null, null, false, {}, { _, _ -> actualSaved = true }, null, null,
                 emptyList(), "Conta principal", { it }, initialMovement = Movement.EXPENSE,
                 initialCategory = Category.HOME, initialDescription = "Aluguel", initialDate = LocalDate.now().plusDays(5),
                 realizedOnly = true, onOpenForecast = { record, frequency -> seed = record; selectedFrequency = frequency })

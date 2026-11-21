@@ -47,7 +47,7 @@ internal class ForecastReportTestDriver(
     fun waitRules(count: Int) = waitData { it.rules.size == count }
     fun scroll(tag: String) {
         if (tag.startsWith("forecast-actions:") || tag.startsWith("forecast-line:")) {
-            rule.openRendlyMonth(); rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag))
+            rule.openRendlyMonth(); rule.scrollToLoadedItem("records-list", hasTestTag(tag))
         } else { rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag)) }
     }
     fun startForecast(kind: Movement, title: String, amount: String,

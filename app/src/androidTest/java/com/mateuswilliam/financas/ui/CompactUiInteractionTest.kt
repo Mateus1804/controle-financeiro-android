@@ -95,7 +95,7 @@ class CompactUiInteractionTest {
     }
 
     private fun actions(line: ForecastLine) = "forecast-actions:${line.itemId}:${line.occurrenceKey}"
-    private fun scroll(tag: String) { rule.openRendlyMonth(); rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag)) }
+    private fun scroll(tag: String) { rule.openRendlyMonth(); rule.scrollToLoadedItem("records-list", hasTestTag(tag)) }
     private fun clickTag(tag: String) = rule.onNodeWithTag(tag)
         .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
     private fun clickText(text: String) = rule.onNode(hasText(text) and hasClickAction())

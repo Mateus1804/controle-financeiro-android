@@ -44,7 +44,7 @@ class RecordEditorDestinationTest {
 
     private fun showEditor(record: Record) {
         rule.setContent { FinanceTheme {
-            RecordEditor(draft = null, existing = record, busy = false, onDismiss = {}, onSave = { saved = it },
+            RecordEditor(draft = null, existing = record, busy = false, onDismiss = {}, onSave = { value, _ -> saved = value },
                 onIgnore = null, onDelete = null, accounts = emptyList(), lastOrigin = "", onAddAccount = { it })
         } }
     }

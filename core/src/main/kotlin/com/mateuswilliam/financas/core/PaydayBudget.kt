@@ -15,13 +15,13 @@ data class PaydayBudget(
     val payday: LocalDate, val daysRemaining: Int, val availableCents: Long,
     val pendingCommitmentsCents: Long, val variableForecastCents: Long = 0,
 ) {
-    val spendableCents: Long get() = availableCents - pendingCommitmentsCents
-    val withVariablesCents: Long get() = spendableCents - variableForecastCents
-    val deficitCents: Long get() = maxOf(0L, -spendableCents)
-    val totalCents: Long get() = maxOf(0L, spendableCents)
+    val spendableCents = Math.subtractExact(availableCents, pendingCommitmentsCents)
+    val withVariablesCents = Math.subtractExact(spendableCents, variableForecastCents)
+    val deficitCents = if (spendableCents < 0) Math.negateExact(spendableCents) else 0L
+    val totalCents = maxOf(0L, spendableCents)
 
     /** Média por semana proporcional aos dias restantes; nula quando o pagamento é hoje. */
-    val weeklyCents: Long? get() = if (daysRemaining <= 0) null else
+    val weeklyCents: Long? = if (daysRemaining <= 0) null else
         BigDecimal.valueOf(totalCents).multiply(BigDecimal.valueOf(7))
             .divide(BigDecimal.valueOf(daysRemaining.toLong()), 0, RoundingMode.HALF_UP).longValueExact()
 }
@@ -32,13 +32,49 @@ object PaydayBudgets {
         (lines.filter { it.included && !it.ignored && it.kind == ForecastKind.INCOME && it.category == Category.SALARY }.map { it.date } + extraDates)
             .filter { it >= today }.minOrNull()
 
+    fun fromForecasts(availableCents: Long, dataset: ForecastDataset, records: List<Record>, zone: ZoneId, asOf: Long): PaydayBudget? {
+        val today = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
+        val scheduled = scheduledLines(dataset, records, zone, asOf)
+        val scheduledPayday = nextPayday(scheduled, emptyList(), today)
+        if (scheduledPayday == today) return compute(availableCents, emptyList(), today, today)
+
+        val hasIncome = dataset.rules.any { it.kind == ForecastKind.INCOME }
+        if (!hasIncome && scheduledPayday == null) return null
+        val forecasts = PendingForecasts(dataset, records)
+        val calendar = PaydayForecastCalendar(dataset, records, today)
+        val forecastPayday = if (hasIncome) {
+            calendar.samples(scheduledPayday).firstNotNullOfOrNull { sample ->
+                nextPayday(forecasts.lines(sample.period), emptyList(), today)
+            }
+        } else null
+        val payday = listOfNotNull(forecastPayday, scheduledPayday).minOrNull() ?: return null
+        if (today == payday || dataset.rules.none { it.kind == ForecastKind.EXPENSE }) {
+            return compute(availableCents, scheduled, today, payday)
+        }
+
+        var commitments = pendingCommitments(scheduled, today, payday)
+        var variables = pending(scheduled, today, payday, ForecastGroup.VARIABLE)
+        for (sample in calendar.samples(payday, countRepeated = true)) {
+            val lines = upcomingForecasts(forecasts, sample.period, today)
+            commitments = Math.addExact(commitments, Math.multiplyExact(pendingCommitments(lines, today, payday), sample.count))
+            variables = Math.addExact(variables, Math.multiplyExact(pending(lines, today, payday, ForecastGroup.VARIABLE), sample.count))
+        }
+        return PaydayBudget(payday, daysBetween(today, payday), availableCents, commitments, variables)
+    }
+
     /** Scheduled entries replace linked forecasts immediately; received salary never remains a future payday. */
     fun upcomingLines(dataset: ForecastDataset, records: List<Record>, zone: ZoneId, asOf: Long, horizonDays: Long = 62): List<ForecastLine> {
         require(horizonDays > 0)
         val today = Instant.ofEpochMilli(asOf).atZone(zone).toLocalDate()
         val end = today.plusDays(horizonDays)
         val currentCycle = CycleCalendar.periodContaining(today, dataset.cycleRules)
-        val forecast = PendingForecasts(dataset, records).lines(BudgetPeriod(currentCycle.start, end)).mapNotNull { line ->
+        val forecast = upcomingForecasts(PendingForecasts(dataset, records), BudgetPeriod(currentCycle.start, end), today)
+        val scheduled = scheduledLines(dataset, records, zone, asOf, end)
+        return (forecast + scheduled).sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
+    }
+
+    private fun upcomingForecasts(forecasts: PendingForecasts, period: BudgetPeriod, today: LocalDate): List<ForecastLine> =
+        forecasts.lines(period).mapNotNull { line ->
             when {
                 line.date >= today -> line
                 line.rule.cycleAnchored && line.kind == ForecastKind.EXPENSE && line.group == ForecastGroup.VARIABLE ->
@@ -46,11 +82,15 @@ object PaydayBudgets {
                 else -> null
             }
         }
+
+    private fun scheduledLines(
+        dataset: ForecastDataset, records: List<Record>, zone: ZoneId, asOf: Long, end: LocalDate? = null,
+    ): List<ForecastLine> {
         val rulesByItem = dataset.rules.groupBy { it.itemId }
-        val scheduled = records.filter { it.occurredAt > asOf && it.movement in setOf(Movement.INCOME, Movement.EXPENSE) }
+        return records.filter { it.occurredAt > asOf && it.movement in setOf(Movement.INCOME, Movement.EXPENSE) }
             .mapNotNull { record ->
                 val date = Instant.ofEpochMilli(record.occurredAt).atZone(zone).toLocalDate()
-                if (date >= end) return@mapNotNull null
+                if (end != null && date >= end) return@mapNotNull null
                 val kind = if (record.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE
                 val linked = rulesByItem[record.forecastItemId]?.linkedRuleAt(record.forecastOccurrenceKey, date)
                 val id = record.forecastItemId ?: "record:${record.id}"
@@ -61,7 +101,6 @@ object PaydayBudgets {
                     rule.group, rule.frequency, false, false, true, rule.statementKey, rule.statementTotal, rule,
                     scheduledRecordId = record.id)
             }
-        return (forecast + scheduled).sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
     }
 
     /** Compromissos de despesa ainda pendentes em [today, payday). */
@@ -71,11 +110,13 @@ object PaydayBudgets {
     private fun pending(lines: List<ForecastLine>, today: LocalDate, payday: LocalDate, group: ForecastGroup): Long =
         lines.filter { it.included && !it.ignored && it.kind == ForecastKind.EXPENSE && it.group == group && it.date >= today && it.date < payday }
             .distinctBy { Triple(it.itemId, it.occurrenceKey, it.scheduledRecordId to it.reusedInstallmentStart) }
-            .sumOf { it.amountCents }
+            .fold(0L) { total, line -> Math.addExact(total, line.amountCents) }
 
     fun compute(availableCents: Long, lines: List<ForecastLine>, today: LocalDate, payday: LocalDate): PaydayBudget {
         require(payday >= today) { "O pagamento precisa ser hoje ou depois." }
-        return PaydayBudget(payday, ChronoUnit.DAYS.between(today, payday).toInt(), availableCents,
+        return PaydayBudget(payday, daysBetween(today, payday), availableCents,
             pendingCommitments(lines, today, payday), pending(lines, today, payday, ForecastGroup.VARIABLE))
     }
+
+    private fun daysBetween(today: LocalDate, payday: LocalDate) = Math.toIntExact(ChronoUnit.DAYS.between(today, payday))
 }

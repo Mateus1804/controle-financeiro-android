@@ -61,6 +61,129 @@ class ForecastRepositoryDataTest {
         } finally { db.close() }
     }
 
+    @Test fun changingFrequencyKeepsTheLinkedCycleAndAllowsTheNextCycle() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val records = FinanceRepository(db, CapturePreferences(context))
+            val forecasts = ForecastRepository(db)
+            val month = LocalDate.of(2026, 11, 1)
+            val due = month.plusDays(9)
+            val next = month.plusMonths(1)
+            val monthly = ForecastRule("rent", due, "Aluguel", ForecastKind.EXPENSE, 60000,
+                Category.HOME, ForecastFrequency.MONTHLY, due)
+            forecasts.saveRule(monthly)
+            val record = Record("rent-paid", 60000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+                "Carteira", "Aluguel lançado", due.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                forecastItemId = monthly.itemId, forecastOccurrenceKey = "month:2026-11")
+            assertTrue(records.save(record, null))
+
+            val converted = monthly.copy(effectiveFrom = month, frequency = ForecastFrequency.ONCE)
+            assertTrue(runCatching { forecasts.saveRule(converted) }.exceptionOrNull() is IllegalArgumentException)
+            val summary = CentralFinance.summarize(records.exportRecords(), forecasts.dataset.first(),
+                BudgetPeriod(month, next), ZoneOffset.UTC, Long.MAX_VALUE)
+            assertEquals(60000L, summary.projectedExpensesCents)
+
+            forecasts.saveRule(converted.copy(effectiveFrom = next, startDate = due.plusMonths(1)))
+            assertEquals(record, records.exportRecords().single())
+            val future = ForecastCalculator.report(forecasts.dataset.first(), BudgetPeriod(next, next.plusMonths(1)))
+            assertEquals("once", future.lines.single().occurrenceKey)
+        } finally { db.close() }
+    }
+
+    @Test fun overwritingABackdatedRuleCannotDropItsLinkedOccurrence() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val records = FinanceRepository(db, CapturePreferences(context))
+            val forecasts = ForecastRepository(db)
+            val effective = LocalDate.of(2026, 1, 15)
+            val date = LocalDate.of(2025, 12, 20)
+            val once = ForecastRule("rent", effective, "Aluguel", ForecastKind.EXPENSE, 60000,
+                Category.HOME, ForecastFrequency.ONCE, date)
+            forecasts.saveRule(once)
+            val record = Record("rent-paid", 60000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+                "Carteira", "Aluguel lançado", date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                forecastItemId = once.itemId, forecastOccurrenceKey = "once")
+            assertTrue(records.save(record, null))
+
+            val monthly = once.copy(frequency = ForecastFrequency.MONTHLY, startDate = effective)
+            assertTrue(runCatching { forecasts.saveRule(monthly) }.exceptionOrNull() is IllegalArgumentException)
+            assertEquals(once, forecasts.dataset.first().rules.single())
+            assertEquals(record, records.exportRecords().single())
+        } finally { db.close() }
+    }
+
+    @Test fun aNewLinkCannotUseAnOccurrenceRemovedSinceTheEditorOpened() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val records = FinanceRepository(db, CapturePreferences(context))
+            val forecasts = ForecastRepository(db)
+            val date = LocalDate.of(2026, 11, 10)
+            val monthly = ForecastRule("rent", date, "Aluguel", ForecastKind.EXPENSE, 60000,
+                Category.HOME, ForecastFrequency.MONTHLY, date)
+            forecasts.saveRule(monthly)
+            val record = Record("rent-paid", 60000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+                "Carteira", "Aluguel lançado", date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                forecastItemId = monthly.itemId, forecastOccurrenceKey = "month:2026-11")
+            forecasts.saveRule(monthly.copy(frequency = ForecastFrequency.ONCE))
+
+            assertTrue(runCatching { records.save(record, null) }.exceptionOrNull() is IllegalArgumentException)
+            assertTrue(records.exportRecords().isEmpty())
+            assertTrue(records.save(record.copy(forecastOccurrenceKey = "once"), null))
+        } finally { db.close() }
+    }
+
+    @Test fun choosingACycleDayForTheFirstTimeDoesNotRepeatAnAlreadyRecordedExpense() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val records = FinanceRepository(db, CapturePreferences(context))
+            val forecasts = ForecastRepository(db)
+            val month = LocalDate.of(2026, 11, 1)
+            val today = month.plusDays(12)
+            val market = ForecastRule("market", month, "Mercado", ForecastKind.EXPENSE, 60000,
+                Category.FOOD, ForecastFrequency.MONTHLY, month, cycleAnchored = true)
+            forecasts.saveRule(market)
+            val record = Record("market-paid", 60000, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD,
+                "Carteira", "Mercado lançado", today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                forecastItemId = market.itemId, forecastOccurrenceKey = "cycle:$month")
+            assertTrue(records.save(record, null))
+
+            forecasts.setCycleDay(5, today)
+            val data = forecasts.dataset.first()
+            val period = CycleCalendar.periodContaining(today, data.cycleRules)
+            val summary = CentralFinance.summarize(records.exportRecords(), data, period, ZoneOffset.UTC, Long.MAX_VALUE)
+            assertEquals(month, period.start)
+            assertEquals(60000L, summary.projectedExpensesCents)
+            assertTrue(summary.forecast.lines.isEmpty())
+        } finally { db.close() }
+    }
+
+    @Test fun restartingInstallmentsEarlierCannotReplaceAnAlreadyLinkedFutureSeries() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val records = FinanceRepository(db, CapturePreferences(context))
+            val forecasts = ForecastRepository(db)
+            val january = LocalDate.of(2026, 1, 1)
+            val february = january.plusMonths(1)
+            val march = january.plusMonths(2)
+            val monthly = ForecastRule("rent", january, "Aluguel", ForecastKind.EXPENSE, 60000,
+                Category.HOME, ForecastFrequency.MONTHLY, january.plusDays(9))
+            forecasts.saveRule(monthly)
+            val installments = monthly.copy(effectiveFrom = february, startDate = february.plusDays(9),
+                frequency = ForecastFrequency.INSTALLMENTS, installmentCount = 3)
+            forecasts.saveRule(installments)
+            val record = Record("rent-paid", 20000, Movement.EXPENSE, PaymentMethod.PIX, Category.HOME,
+                "Carteira", "Aluguel lançado", march.plusDays(9).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+                forecastItemId = monthly.itemId, forecastOccurrenceKey = "installment:2")
+            assertTrue(records.save(record, null))
+
+            val restart = installments.copy(effectiveFrom = january, startDate = monthly.startDate)
+            assertTrue(runCatching { forecasts.saveRule(restart) }.exceptionOrNull() is IllegalArgumentException)
+            val summary = CentralFinance.summarize(records.exportRecords(), forecasts.dataset.first(),
+                BudgetPeriod(march, march.plusMonths(1)), ZoneOffset.UTC, Long.MAX_VALUE)
+            assertEquals(20000L, summary.projectedExpensesCents)
+        } finally { db.close() }
+    }
+
     @Test fun anOccurrenceRejectsANewLinkAndKeepsEditableHistory() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
         try {

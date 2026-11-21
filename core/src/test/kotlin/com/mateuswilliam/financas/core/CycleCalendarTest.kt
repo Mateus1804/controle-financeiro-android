@@ -32,4 +32,28 @@ class CycleCalendarTest {
         assertEquals(BudgetPeriod(date("2026-12-05"),date("2026-12-15")),transition)
         assertEquals(transition.endExclusive,CycleCalendar.periodContaining(transition.endExclusive,changed).start)
     }
+
+    @Test fun firstExplicitDayPreservesAnOccurrenceLinkedUnderTheDefaultCalendar() {
+        val today = date("2026-11-20")
+        val linkedStart = date("2026-11-01")
+
+        val changed = CycleConfiguration.rulesAfterChange(5, today, ForecastDataset(), listOf("cycle:$linkedStart"))
+
+        assertEquals(BudgetPeriod(linkedStart, date("2026-12-01")), CycleCalendar.periodContaining(today, changed))
+        assertEquals(5, changed.last().day)
+        assertEquals(date("2026-12-01"), changed.last().effectiveStart)
+    }
+
+    @Test fun cycleDayChangeKeepsFutureOccurrenceExceptionsInTheirOriginalCycle() {
+        val today = date("2026-11-20")
+        val future = date("2027-01-01")
+        val data = ForecastDataset(
+            overrides = listOf(ForecastOverride("market", "cycle:$future", ignored = true)),
+        )
+
+        val changed = CycleConfiguration.rulesAfterChange(5, today, data)
+
+        assertEquals(BudgetPeriod(future, date("2027-02-01")), CycleCalendar.periodContaining(future, changed))
+        assertEquals(date("2027-02-01"), changed.last().effectiveStart)
+    }
 }

@@ -69,8 +69,10 @@ kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 dependencies {
+    // Compose Foundation 1.11 protege a rolagem do campo focado durante o redimensionamento do teclado.
+    val composeBom = platform("androidx.compose:compose-bom:2026.06.01")
     implementation(project(":core"))
-    implementation(platform("androidx.compose:compose-bom:2025.11.01"))
+    implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -84,7 +86,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2025.11.01"))
+    androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
