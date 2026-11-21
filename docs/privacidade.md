@@ -28,7 +28,7 @@ O aplicativo não envia dados bancários, inventário de aplicativos ou credenci
 
 O backup também depende de uma ação explícita e é entregue já criptografado ao seletor de arquivos. Inclui pendências, que podem conter texto bancário ainda não revisado, além de lançamentos e planejamento. O provedor de arquivos escolhido pode oferecer armazenamento local ou externo. A senha e a segurança desse destino ficam sob responsabilidade do usuário; o aplicativo não guarda uma cópia da senha.
 
-Durante a conferência de uma restauração, os dados são decifrados em memória e inseridos em um banco temporário privado. A base temporária é excluída ao cancelar, concluir ou falhar a operação; arquivos abandonados após encerramento do processo são removidos na próxima inicialização. A exclusão lógica não garante apagamento físico de memória ou armazenamento flash. A restauração preserva as autorizações e a proteção locais, mantendo captura e lembretes pausados para conferência.
+Durante a conferência de uma restauração, os dados são decifrados em memória e inseridos em um banco temporário privado. O aplicativo confere a exclusão dessa base ao cancelar, concluir ou falhar a operação. Se a limpeza ficar pendente, o aplicativo avisa e tenta novamente na próxima abertura ou operação de backup. A exclusão lógica não garante apagamento físico de memória ou armazenamento flash. A restauração preserva as autorizações e a proteção locais, mantendo captura e lembretes pausados para conferência.
 
 ## Proteção e limitações
 

@@ -40,7 +40,7 @@ class OptionalFeaturesUiTest {
         Movement.EXPENSE, PaymentMethod.CARD, Category.FOOD, "Dados fictícios para revisão.", System.currentTimeMillis(), System.currentTimeMillis() - 60_000)
     private fun scrollForecast(matcher: SemanticsMatcher) {
         rule.openRendlyMonth()
-        rule.onNodeWithTag("records-list").performScrollToNode(matcher)
+        rule.scrollToLoadedItem("records-list", matcher)
     }
     private fun openReview(id: String) {
         val model = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]

@@ -98,9 +98,13 @@ data class UsedAccount(val label: String, val lastUsedAt: Long)
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM forecast_rules ORDER BY itemId,effectiveFrom") suspend fun allForecastRules(): List<ForecastRuleEntity>
+    @Query("SELECT * FROM forecast_rules WHERE itemId = :id ORDER BY effectiveFrom")
+    suspend fun forecastRulesFor(id: String): List<ForecastRuleEntity>
     @Query("SELECT EXISTS(SELECT 1 FROM forecast_rules WHERE itemId = :id AND kind = :kind)")
     suspend fun hasForecastRule(id: String, kind: String): Boolean
     @Query("SELECT * FROM forecast_overrides ORDER BY itemId,occurrenceKey") suspend fun allForecastOverrides(): List<ForecastOverrideEntity>
+    @Query("SELECT * FROM forecast_overrides WHERE itemId = :id ORDER BY occurrenceKey")
+    suspend fun forecastOverridesFor(id: String): List<ForecastOverrideEntity>
     @Query("SELECT * FROM cycle_rules ORDER BY effectiveStart") suspend fun allCycleRules(): List<CycleRuleEntity>
     @Query("SELECT * FROM reserve_events ORDER BY createdAt,id") suspend fun allReserveEvents(): List<ReserveEventEntity>
     @Query("SELECT * FROM forecast_meta ORDER BY `key`") suspend fun allForecastMeta(): List<ForecastMetaEntity>
@@ -112,7 +116,6 @@ interface FinanceDao {
     @Query("DELETE FROM forecast_rules WHERE itemId=:id AND effectiveFrom>:date") suspend fun deleteFutureForecastRules(id:String,date:String)
     @Query("DELETE FROM forecast_overrides WHERE itemId = :id AND occurrenceKey = :key")
     suspend fun deleteForecastOverride(id: String, key: String)
-    @Query("DELETE FROM cycle_rules WHERE effectiveStart>=:date") suspend fun deleteFutureCycleRules(date:String)
     @Query("DELETE FROM forecast_rules") suspend fun clearForecastRules()
     @Query("DELETE FROM forecast_overrides") suspend fun clearForecastOverrides()
     @Query("DELETE FROM cycle_rules") suspend fun clearCycleRules()
@@ -143,8 +146,6 @@ interface FinanceDao {
     @Query("SELECT * FROM drafts WHERE status = 'PENDING' ORDER BY capturedAt DESC, id ASC")
     fun pending(): Flow<List<DraftEntity>>
     @Query("SELECT * FROM records ORDER BY occurredAt DESC, id ASC")
-    fun records(): Flow<List<RecordEntity>>
-    @Query("SELECT * FROM records ORDER BY occurredAt DESC, id ASC")
     suspend fun allRecords(): List<RecordEntity>
     @Query("SELECT * FROM drafts ORDER BY capturedAt DESC, id") suspend fun allDrafts(): List<DraftEntity>
     @Query("SELECT * FROM drafts WHERE sourceKey = :key LIMIT 1")
@@ -156,11 +157,14 @@ interface FinanceDao {
     suspend fun updateDraft(id: String, title: String, body: String, amount: Long?, movement: Movement, method: PaymentMethod, category: Category, explanation: String)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertRecord(record: RecordEntity)
     @Update suspend fun updateRecord(record: RecordEntity): Int
-    @Query("SELECT * FROM records WHERE id IN (:ids)") suspend fun recordsByIds(ids: List<String>): List<RecordEntity>
     @Query("SELECT * FROM records WHERE originalRecordId = :id") suspend fun refundsForRecord(id: String): List<RecordEntity>
     @Query("SELECT * FROM records WHERE id = :id LIMIT 1") suspend fun recordById(id: String): RecordEntity?
     @Query("SELECT EXISTS(SELECT 1 FROM records WHERE forecastItemId = :itemId AND forecastOccurrenceKey = :key)")
     suspend fun hasForecastOccurrenceLink(itemId: String, key: String): Boolean
+    @Query("SELECT * FROM records WHERE forecastItemId = :id")
+    suspend fun recordsLinkedToForecast(id: String): List<RecordEntity>
+    @Query("SELECT DISTINCT forecastOccurrenceKey FROM records WHERE forecastOccurrenceKey LIKE 'cycle:%'")
+    suspend fun linkedCycleKeys(): List<String>
     @Query("UPDATE drafts SET status = :status, sourceTitle = '', sourceBody = '' WHERE id = :id AND status = 'PENDING'")
     suspend fun reviewDraft(id: String, status: String)
     @Query("DELETE FROM records WHERE id = :id") suspend fun deleteRecord(id: String)

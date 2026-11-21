@@ -32,6 +32,16 @@ internal fun ComposeContentTestRule.openRendlyReview() {
     onNodeWithTag("open-notification-review").performClick()
 }
 internal fun ComposeContentTestRule.openRendlyGraphs() { clickRendlyTab("Gráficos") }
+internal fun ComposeContentTestRule.scrollToLoadedItem(container: String, matcher: SemanticsMatcher) {
+    waitUntil(10000) {
+        try {
+            onNodeWithTag(container).performScrollToNode(matcher)
+            true
+        } catch (_: AssertionError) {
+            false
+        }
+    }
+}
 internal fun ComposeContentTestRule.openRendlyProjections() {
     openRendlyPlanner()
     onNodeWithTag("forecast-dashboard").performScrollToNode(hasText("Projetar próximos ciclos"))

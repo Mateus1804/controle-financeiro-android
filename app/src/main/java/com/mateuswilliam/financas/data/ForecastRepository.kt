@@ -22,18 +22,26 @@ class ForecastRepository(private val database:FinanceDatabase) {
         rule: ForecastRule, replaceFuture: Boolean = true, replaceOccurrenceKey: String? = null,
     ) = database.withTransaction {
         ForecastValidation.error(rule)?.let { throw IllegalArgumentException(it) }
-        val linked = dao.allRecords().filter { it.forecastItemId == rule.itemId }
+        val linked = dao.recordsLinkedToForecast(rule.itemId)
         require(linked.all { (if (it.movement == Movement.INCOME) ForecastKind.INCOME else ForecastKind.EXPENSE) == rule.kind }) {
             "Há lançamentos vinculados. Crie outra previsão para mudar entre receita e despesa."
         }
-        val history = dao.allForecastRules().filter { it.itemId == rule.itemId }.map { it.model() }
-        val overrides = dao.allForecastOverrides().filter { it.itemId == rule.itemId }
+        val history = dao.forecastRulesFor(rule.itemId).map { it.model() }
+        val overrides = dao.forecastOverridesFor(rule.itemId)
         val previous = history.filter { it.effectiveFrom <= rule.effectiveFrom }.maxByOrNull { it.effectiveFrom }
         val hadInstallments = history.any { it.frequency == ForecastFrequency.INSTALLMENTS && it.effectiveFrom < rule.effectiveFrom } ||
             overrides.any { it.occurrenceKey.startsWith("installment:") } ||
             linked.any { it.forecastOccurrenceKey?.startsWith("installment:") == true }
         val restartInstallments = replaceFuture && previous != null && previous.frequency != ForecastFrequency.INSTALLMENTS &&
             rule.active && rule.frequency == ForecastFrequency.INSTALLMENTS && hadInstallments
+        val occurrenceKeys = linked.mapNotNull { it.forecastOccurrenceKey }.toSet()
+        if (rule.active && occurrenceKeys.isNotEmpty() && history.any { !it.sameScheduleAs(rule) }) {
+            val cycles = dao.allCycleRules().map { it.model() }
+            val data = ForecastDataset(history, overrides.map { it.model() }, cycles)
+            require(!data.hasLinkedScheduleInScope(rule, occurrenceKeys, replaceFuture, restartInstallments)) {
+                "A mudança de frequência afetaria lançamentos já vinculados. Escolha um ciclo posterior ou crie outra previsão."
+            }
+        }
         val stop = history.filter { !it.active && it.effectiveFrom > rule.effectiveFrom }.minByOrNull { it.effectiveFrom }
         if (replaceFuture) dao.deleteFutureForecastRules(rule.itemId, rule.effectiveFrom.toString())
         val updated = if (restartInstallments) {
@@ -83,7 +91,7 @@ class ForecastRepository(private val database:FinanceDatabase) {
     }
     suspend fun setCycleDay(day:Int,today:LocalDate) = database.withTransaction {
         require(day in 1..31)
-        val proposed=CycleConfiguration.rulesAfterChange(day,today,readDataset())
+        val proposed = CycleConfiguration.rulesAfterChange(day, today, readDataset(), dao.linkedCycleKeys())
         dao.clearCycleRules()
         proposed.forEach { dao.upsertCycleRule(CycleRuleEntity(it.effectiveStart.toString(),it.day)) }
     }
@@ -94,4 +102,51 @@ class ForecastRepository(private val database:FinanceDatabase) {
         dao.clearForecastMeta(); meta.forEach { dao.upsertForecastMeta(it) }
         if(cents!=null) dao.upsertForecastMeta(ForecastMetaEntity("reserveGoal",cents.toString()))
     }
+}
+
+private fun ForecastRule.sameScheduleAs(other: ForecastRule) =
+    frequency == other.frequency && cycleAnchored == other.cycleAnchored
+
+private fun ForecastDataset.hasLinkedScheduleInScope(
+    updated: ForecastRule, keys: Set<String>, replaceFuture: Boolean, restartInstallments: Boolean,
+): Boolean {
+    val start = if (updated.frequency == ForecastFrequency.ONCE) minOf(updated.effectiveFrom, updated.startDate) else updated.effectiveFrom
+    val end = if (replaceFuture) null else rules.firstOrNull { it.effectiveFrom > updated.effectiveFrom }?.effectiveFrom
+    return findForecastOccurrences(keys).any { line ->
+        val effective = line.rule.effectiveFrom
+        // Uma ocorrência antecipada pode pertencer a uma versão que a alteração remove.
+        val overwritesRule = effective == updated.effectiveFrom || (replaceFuture && effective > updated.effectiveFrom)
+        (restartInstallments || !line.rule.sameScheduleAs(updated)) &&
+            (overwritesRule || line.date >= start && (end == null || line.date < end))
+    }
+}
+
+internal fun ForecastDataset.findForecastOccurrences(keys: Set<String>): Sequence<ForecastLine> {
+    val dates = buildSet {
+        for (rule in rules) {
+            add(rule.effectiveFrom)
+            keys.mapNotNullTo(this) { rule.nominalDate(it) }
+        }
+        overrides.filter { it.occurrenceKey in keys }.mapNotNullTo(this) { it.date }
+    }
+    val forecasts = PendingForecasts(this, emptyList())
+    return dates.asSequence().map { CycleCalendar.periodContaining(it, cycleRules) }.distinct()
+        .flatMap { forecasts.lines(it) }
+        .filter { it.occurrenceKey in keys && it.reusedInstallmentStart == null }
+}
+
+private fun ForecastRule.nominalDate(key: String): LocalDate? {
+    val month = when (frequency) {
+        ForecastFrequency.ONCE -> return startDate.takeIf { key == "once" }
+        ForecastFrequency.MONTHLY -> {
+            if (cycleAnchored) return if (key.startsWith("cycle:")) LocalDate.parse(key.removePrefix("cycle:")) else null
+            if (key.startsWith("month:")) YearMonth.parse(key.removePrefix("month:")) else return null
+        }
+        ForecastFrequency.INSTALLMENTS -> {
+            if (!key.startsWith("installment:")) return null
+            val number = key.removePrefix("installment:").toIntOrNull()?.takeIf { it in 1..installmentCount } ?: return null
+            YearMonth.from(startDate).plusMonths(number - 1L)
+        }
+    }
+    return month.atDay(minOf(dayOfMonth, month.lengthOfMonth()))
 }

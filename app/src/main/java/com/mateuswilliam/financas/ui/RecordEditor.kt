@@ -38,7 +38,7 @@ fun RecordEditor(
     existing: Record?,
     busy: Boolean,
     onDismiss: () -> Unit,
-    onSave: (Record) -> Unit,
+    onSave: (record: Record, categoryMerchantKey: String?) -> Unit,
     onIgnore: (() -> Unit)?,
     onDelete: (() -> Unit)?,
     accounts: List<AccountOption>,
@@ -57,7 +57,7 @@ fun RecordEditor(
     realizedOnly: Boolean = false,
     forecastData: ForecastDataset? = null,
     rememberedCategory: Category? = null,
-    merchantLabel: String? = null,
+    merchant: Merchant? = null,
     onOpenForecast: ((Record, ForecastFrequency) -> Unit)? = null,
     initialFrequency: ForecastFrequency = ForecastFrequency.ONCE,
     balancesAsOf: Long = System.currentTimeMillis(),
@@ -77,9 +77,19 @@ fun RecordEditor(
     var description by rememberSaveable { mutableStateOf(initial?.description ?: suggestedDescription ?: initialDescription) }
     var movement by rememberSaveable { mutableStateOf(initial?.movement ?: draft?.movement ?: initialMovement) }
     var method by rememberSaveable { mutableStateOf(initial?.method ?: draft?.method ?: PaymentMethod.UNKNOWN) }
-    var category by rememberSaveable { mutableStateOf(initial?.category ?: draft?.let { source -> (rememberedCategory ?: source.category).takeIf { it in categoriesFor(source.movement) } }
-        ?: initialCategory ?: if ((draft?.movement ?: initialMovement) == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER) }
+    val purchaseCategory = rememberedCategory?.takeIf { draft?.movement == Movement.EXPENSE && it in categoriesFor(Movement.EXPENSE) }
+    val suggestedCategory = draft?.let { source ->
+        purchaseCategory ?: source.category.takeIf { it in categoriesFor(source.movement) }
+    }
+    val defaultCategory = initialCategory ?: if ((draft?.movement ?: initialMovement) == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER
+    var category by rememberSaveable { mutableStateOf(initial?.category ?: suggestedCategory ?: defaultCategory) }
     var categoryEdited by rememberSaveable { mutableStateOf(false) }
+    var categoryMerchantKey by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(draft?.revision, notificationChanged, suggestedCategory) {
+        if (draft != null && !notificationChanged && !categoryEdited && movement == draft.movement) {
+            category = suggestedCategory ?: defaultCategory
+        }
+    }
     var accountEdited by rememberSaveable { mutableStateOf(false) }
     var originalRecordId by rememberSaveable { mutableStateOf(initial?.originalRecordId) }
     var reversalMovement by rememberSaveable { mutableStateOf(initial?.reversalMovement ?: Movement.EXPENSE) }
@@ -183,9 +193,13 @@ fun RecordEditor(
                         Text("Remova o vínculo para editar a categoria.", style = MaterialTheme.typography.bodySmall)
                     } else {
                         ChoiceField(if (draft != null) "Categoria sugerida · editável" else "Categoria", category,
-                            categoryOptions, { it.label }) { category = it; categoryEdited = true }
-                        if (draft != null && rememberedCategory != null && merchantLabel != null && !categoryEdited) Text(
-                            "Categoria lembrada para ${privateDisplayText(merchantLabel, hideAmounts)}. Você pode alterá-la antes de confirmar.",
+                            categoryOptions, { it.label }) {
+                            category = it
+                            categoryEdited = true
+                            categoryMerchantKey = merchant?.key
+                        }
+                        if (movement == Movement.EXPENSE && purchaseCategory == category && merchant != null && !categoryEdited) Text(
+                            "Categoria lembrada para ${privateDisplayText(merchant.label, hideAmounts)}. Você pode alterá-la antes de confirmar.",
                             Modifier.testTag("remembered-category"), style = MaterialTheme.typography.bodySmall)
                     }
                 } else Text("Transferência entre minhas contas", style = MaterialTheme.typography.titleSmall)
@@ -238,6 +252,7 @@ fun RecordEditor(
                         frequency = ForecastFrequency.ONCE
                         category = if (it == Movement.INCOME) Category.OTHER_INCOME else Category.OTHER
                         categoryEdited = false
+                        categoryMerchantKey = null
                         destination = ""
                         forecastItemId = null; forecastOccurrenceKey = null
                         originalRecordId = null
@@ -286,7 +301,8 @@ fun RecordEditor(
                 Button(onClick = {
                     attempted = true
                     if (error == null && !notificationChanged) {
-                        if (planning) onOpenForecast?.invoke(record, frequency) else onSave(record)
+                        if (planning) onOpenForecast?.invoke(record, frequency)
+                        else onSave(record, categoryMerchantKey?.takeIf { it == merchant?.key })
                     }
                 }, enabled = !busy && !notificationChanged, modifier = Modifier.weight(1f)) {
                     Text(if (busy) "Salvando…" else if (planning) "Continuar previsão" else if (realizedOnly && draft != null) "Confirmar lançamento" else if (realizedOnly && existing == null && movement == Movement.EXPENSE) "Registrar despesa" else if (realizedOnly) "Salvar lançamento" else "Confirmar")

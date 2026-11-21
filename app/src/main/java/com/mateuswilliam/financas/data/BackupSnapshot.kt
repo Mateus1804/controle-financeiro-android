@@ -14,6 +14,12 @@ data class FinanceSnapshot(
     val forecastMeta: List<ForecastMetaEntity> = emptyList(),
 )
 
+internal fun normalizeDraftText(value: String): String = value.replace("\u0000", "")
+
+internal fun validDraftSource(sourceKey: String, sourcePackage: String): Boolean =
+    sourceKey.isNotBlank() && sourceKey.length <= 2048 && '\u0000' !in sourceKey &&
+        sourcePackage.isNotBlank() && sourcePackage.length <= 300 && '\u0000' !in sourcePackage
+
 /** Formato Rendly novo. Não interpreta backups do Controle Financeiro nem versões anteriores. */
 object BackupSnapshot {
     const val FORMAT_VERSION = 1
@@ -30,8 +36,10 @@ object BackupSnapshot {
                 "originalRecordId" to r.originalRecordId, "reversalMovement" to r.reversalMovement.name,
                 "forecastItemId" to r.forecastItemId, "forecastOccurrenceKey" to r.forecastOccurrenceKey) },
             "drafts" to array(snapshot.drafts) { d -> json("id" to d.id, "sourceKey" to d.sourceKey, "sourcePackage" to d.sourcePackage,
-                "bank" to d.bank, "sourceTitle" to d.sourceTitle, "sourceBody" to d.sourceBody, "amountCents" to d.amountCents,
-                "movement" to d.movement.name, "method" to d.method.name, "category" to d.category.name, "explanation" to d.explanation,
+                "bank" to normalizeDraftText(d.bank), "sourceTitle" to normalizeDraftText(d.sourceTitle),
+                "sourceBody" to normalizeDraftText(d.sourceBody), "amountCents" to d.amountCents,
+                "movement" to d.movement.name, "method" to d.method.name, "category" to d.category.name,
+                "explanation" to normalizeDraftText(d.explanation),
                 "occurredAt" to d.occurredAt, "capturedAt" to d.capturedAt, "status" to d.status, "revision" to d.revision) },
             "accounts" to array(snapshot.accounts) { a -> json("nameKey" to a.nameKey, "label" to a.label, "lastUsedAt" to a.lastUsedAt, "archived" to a.archived) },
             "accountBalanceEvents" to array(snapshot.accountBalanceEvents) { e -> json("id" to e.id, "accountKey" to e.accountKey,
@@ -53,9 +61,9 @@ object BackupSnapshot {
                 Movement.valueOf(r.text("movement",30)),PaymentMethod.valueOf(r.text("method",30)),Category.valueOf(r.text("category",30)),
                 r.text("bank",80),r.text("description",200),r.long("occurredAt"),r.text("destination",80),r.nullableText("originalRecordId",128),
                 Movement.valueOf(r.text("reversalMovement",30)),r.nullableText("forecastItemId",200),r.nullableText("forecastOccurrenceKey",40)) },
-            drafts = j.rows("drafts") { d -> DraftEntity(d.text("id",128),d.text("sourceKey",2048),d.text("sourcePackage",300),d.text("bank",80),
-                d.text("sourceTitle",2000),d.text("sourceBody",20000),if(d.isNull("amountCents")) null else d.long("amountCents"),Movement.valueOf(d.text("movement",30)),
-                PaymentMethod.valueOf(d.text("method",30)),Category.valueOf(d.text("category",30)),d.text("explanation",2000),d.long("occurredAt"),d.long("capturedAt"),
+            drafts = j.rows("drafts") { d -> DraftEntity(d.text("id",128),d.text("sourceKey",2048),d.text("sourcePackage",300),d.draftText("bank",80),
+                d.draftText("sourceTitle",2000),d.draftText("sourceBody",20000),if(d.isNull("amountCents")) null else d.long("amountCents"),Movement.valueOf(d.text("movement",30)),
+                PaymentMethod.valueOf(d.text("method",30)),Category.valueOf(d.text("category",30)),d.draftText("explanation",2000),d.long("occurredAt"),d.long("capturedAt"),
                 d.text("status",30),d.integer("revision",1,Int.MAX_VALUE)) },
             accounts = j.rows("accounts") { AccountEntity(it.text("nameKey",160),it.text("label",80),it.long("lastUsedAt"),it.bool("archived")) },
             display = BackupDisplay(Appearance.valueOf(display.text("appearance",20)),display.bool("hideAmounts"),display.text("lastOrigin",80)),
@@ -87,7 +95,7 @@ object BackupSnapshot {
             }
         }
         s.drafts.forEach { d ->
-            require(d.id.length <= 128 && d.sourceKey.length <= 2048 && d.sourcePackage.isNotBlank() && d.sourcePackage.length <= 300)
+            require(d.id.length <= 128 && '\u0000' !in d.id && validDraftSource(d.sourceKey, d.sourcePackage))
             require(d.bank.length <= 80 && d.sourceTitle.length <= 2000 && d.sourceBody.length <= 20000 && d.explanation.length <= 2000)
             require(d.revision > 0 && d.occurredAt > 0 && d.capturedAt > 0 && (d.amountCents == null || d.amountCents in 0..Money.MAX_CENTS))
             require(d.status in setOf("PENDING","SAVED","DISMISSED") && (d.status == "PENDING" || d.sourceBody.isEmpty() && d.sourceTitle.isEmpty()))
@@ -101,7 +109,10 @@ object BackupSnapshot {
     }
     internal fun JSONObject.integer(key: String, min: Int, max: Int): Int = long(key).also { require(it in min.toLong()..max.toLong()) }.toInt()
     internal fun JSONObject.long(key: String): Long = get(key).also { require(it is Int || it is Long) { "Número inteiro inválido: $key" } }.let { (it as Number).toLong() }
-    internal fun JSONObject.text(key: String, max: Int): String = get(key).also { require(it is String && it.length <= max && '\u0000' !in it) { "Texto inválido: $key" } } as String
+    private fun JSONObject.boundedText(key: String, max: Int): String = get(key).also { require(it is String && it.length <= max) { "Texto inválido: $key" } } as String
+    internal fun JSONObject.text(key: String, max: Int): String = boundedText(key, max).also { require('\u0000' !in it) { "Texto inválido: $key" } }
+    // Backups V1 existentes podem conter caracteres nulos no texto exibido da notificação.
+    private fun JSONObject.draftText(key: String, max: Int): String = normalizeDraftText(boundedText(key, max))
     internal fun JSONObject.nullableText(key: String, max: Int): String? { require(has(key)); return if(isNull(key)) null else text(key,max) }
     internal fun JSONObject.bool(key: String): Boolean = get(key).also { require(it is Boolean) } as Boolean
     private fun <T> JSONObject.rows(key: String, convert: (JSONObject) -> T): List<T> {

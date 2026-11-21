@@ -30,7 +30,7 @@ class FinanceApplication : Application() {
     }
     val repository by lazy { FinanceRepository(database, settings) }
     val forecasts by lazy { com.mateuswilliam.financas.data.ForecastRepository(database) }
-    val backups by lazy { BackupStore(this, repository) }
+    val backups by lazy { BackupStore(this) { repository } }
     val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val maintenanceReady by lazy { background.async { backups.removeAbandonedStages() } }
     val listenerConnected = MutableStateFlow(false)

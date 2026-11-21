@@ -46,6 +46,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     val forecastMessage by model.message.collectAsStateWithLifecycle()
     val csvDestination by model.csvDestination.collectAsStateWithLifecycle()
     val backupDestination by finance.backupDestination.collectAsStateWithLifecycle()
+    val backupCleanupPending by finance.backupCleanupPending.collectAsStateWithLifecycle()
     val financialDataRevision by finance.financialDataRevision.collectAsStateWithLifecycle()
     val financeMessage by finance.message.collectAsStateWithLifecycle()
     val loadError by model.loadError.collectAsStateWithLifecycle()
@@ -102,14 +103,20 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         else -> null
     }
     val currentFunds = remember(financeState.accountBalances) { AccountFunds.of(financeState.accountBalances) }
-    val paydayBudget = if (destination == RendlyDestination.PLANNER) remember(snapshot, financeState.records, currentFunds.operating, asOf, zone, today) {
-        runCatching {
-            val lines = PaydayBudgets.upcomingLines(snapshot ?: ForecastDataset(), financeState.records, zone, asOf)
-            PaydayBudgets.nextPayday(lines, emptyList(), today)?.let { payday ->
-                PaydayBudgets.compute(currentFunds.operating.cents, lines, today, payday)
-            }
-        }.getOrNull()
+    val readyData = snapshot?.takeIf { financeState.loaded && loadError == null }
+    val records = financeState.records
+    val paydayResult = if (destination == RendlyDestination.PLANNER && readyData != null && currentFunds.operating.hasBalance) {
+        val available = currentFunds.operating.cents
+        calculateInBackground(listOf(readyData, records, available, asOf, zone)) {
+            PaydayBudgets.fromForecasts(available, readyData, records, zone, asOf)
+        }.value
     } else null
+    val paydayStatus = when {
+        !financeState.loaded -> "Consultando os saldos…"
+        paydayResult?.isFailure == true -> "Não foi possível calcular o orçamento até o próximo salário."
+        currentFunds.operating.hasBalance && paydayResult == null -> "Calculando o orçamento até o próximo salário…"
+        else -> null
+    }
     fun openActual(kind: Movement = Movement.EXPENSE, recordId: String? = null,
         frequency: ForecastFrequency = ForecastFrequency.ONCE, category: Category? = null, description: String = "") {
         review.preset = null
@@ -123,11 +130,10 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
         review.recordEditor = true
     }
     // A fila da sessão é fixada ao abrir a primeira pendência; "Revisar próxima" continua nela.
-    fun rememberMerchantCategory(source: com.mateuswilliam.financas.data.DraftEntity, confirmed: Category) {
-        val found = source.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } ?: return
-        when (val change = MerchantCategoryPolicy.change(source.category, confirmed, merchantStore.get(found.key))) {
-            is MerchantCategoryPolicy.Change.Remember -> merchantStore.remember(found.key, change.category)
-            MerchantCategoryPolicy.Change.Forget -> merchantStore.forget(found.key)
+    fun rememberMerchantCategory(merchantKey: String, suggested: Category, confirmed: Category) {
+        when (val change = MerchantCategoryPolicy.change(suggested, confirmed, merchantStore.get(merchantKey))) {
+            is MerchantCategoryPolicy.Change.Remember -> merchantStore.remember(merchantKey, change.category)
+            MerchantCategoryPolicy.Change.Forget -> merchantStore.forget(merchantKey)
             MerchantCategoryPolicy.Change.None -> Unit
         }
     }
@@ -157,18 +163,23 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     LaunchedEffect(financeMessage) { financeMessage?.let {
         snackbar.showSnackbar(it); if (finance.message.value == it) finance.message.value = null
     } }
+    LaunchedEffect(backupCleanupPending) {
+        if (backupCleanupPending) snackbar.showSnackbar("Uma cópia temporária do backup aguarda limpeza. Confira em Ajustes.")
+    }
     if (!settings.namePromptSeen) DisplayNameDialog(settings.displayName,
         finance.preferences::dismissNamePrompt, finance.preferences::setDisplayName, firstRun = true)
     val centralResult = when (destination) {
         RendlyDestination.MONTH, RendlyDestination.PLANNER,
-        RendlyDestination.COMMITMENT, RendlyDestination.SETTINGS -> remember(snapshot, period, financeState.records, asOf, zone) {
-            snapshot?.let { runCatching { CentralFinance.summarize(financeState.records, it, period, zone, asOf) } }
+        RendlyDestination.COMMITMENT, RendlyDestination.SETTINGS -> readyData?.let { availableData ->
+            calculateInBackground(listOf(availableData, period, records, asOf, zone)) {
+                CentralFinance.summarize(records, availableData, period, zone, asOf)
+            }.value
         }
         else -> null
     }
     val central = centralResult?.getOrNull()
     val report = central?.forecast
-    val monthForecastStatus = when {
+    val forecastStatus = when {
         loadError != null -> loadError
         centralResult?.isFailure == true -> "Não foi possível calcular as previsões e os agendamentos deste período."
         report == null || !financeState.loaded -> "Carregando previsões e agendamentos…"
@@ -257,7 +268,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
     BackHandler(navigation.destination != RendlyDestination.MONTH && !editors.editor && !review.recordEditor) { navigation.destination = navigation.destination.parent }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = { if (navigation.destination == RendlyDestination.MONTH) FloatingActionButton({ adding = true }, Modifier.testTag("add-movement")) { AppIcon(R.drawable.ic_add, description = "Novo lançamento") } },
+        floatingActionButton = { if (navigation.destination == RendlyDestination.MONTH && financeState.loadError == null) FloatingActionButton({ adding = true }, Modifier.testTag("add-movement")) { AppIcon(R.drawable.ic_add, description = "Novo lançamento") } },
         bottomBar = { ForecastNavigationBar(navigation.destination.primaryTab) { navigation.destination = it } },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
@@ -275,6 +286,12 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                     IconButton({ finance.preferences.hideAmounts(!hidden) }, Modifier.size(48.dp)) { AppIcon(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, description = if (hidden) "Mostrar valores" else "Ocultar valores") }
                 }
                 when {
+                    financeState.loadError != null && destination != RendlyDestination.MORE && destination != RendlyDestination.SETTINGS -> {
+                        Column(Modifier.padding(FinanceSpacing.page).testTag("finance-load-error")) {
+                            Text(financeState.loadError.orEmpty())
+                            Button({ finance.refreshBalances(); model.refresh() }) { Text("Tentar novamente") }
+                        }
+                    }
                     navigation.destination == RendlyDestination.REVIEW -> Column {
                         TextButton({ navigation.destination = RendlyDestination.SETTINGS }, Modifier.padding(horizontal = FinanceSpacing.page)) { Text("Configurar captura") }
                         Box(Modifier.weight(1f)) {
@@ -294,7 +311,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onIgnoreForecast = model::ignore, onStopForecast = model::stop, onEditFutureForecast = { edit(it, false) }, busy = busy,
                         scheduledRecords = central?.scheduled?.records.orEmpty(),
                         reserveNeedsReference = snapshot?.reserveEvents?.isNotEmpty() == true && !currentFunds.reserve.hasBalance,
-                        today = today, forecastStatus = monthForecastStatus, balanceStatus = balancesStatus,
+                        today = today, forecastStatus = forecastStatus, balanceStatus = balancesStatus,
                         onRetryForecast = if (loadError != null) model::refresh else null)
                     navigation.destination == RendlyDestination.GRAPHS -> {
                         val monthComparison = remember(realized, period, cycleRules, today, zone) {
@@ -319,7 +336,8 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onReminders = { finance.preferences.setReminders(it); if (it && !canAlert) requestAlerts() },
                         onDisplayName = finance.preferences::setDisplayName,
                         onMerchantCategories = { editors.merchantCategoriesOpen = true },
-                        onAccounts = { editors.accountsOpen = true }, onReview = { navigation.destination = RendlyDestination.REVIEW })
+                        onAccounts = { editors.accountsOpen = true }, onReview = { navigation.destination = RendlyDestination.REVIEW },
+                        backupCleanupPending = backupCleanupPending, onRetryBackupCleanup = finance::retryBackupCleanup)
                     loadError != null -> { Text(loadError!!, Modifier.padding(FinanceSpacing.page)); Button({ model.refresh() }) { Text("Tentar novamente") } }
                     snapshot == null -> Text("Abrindo seu planejamento…", Modifier.padding(FinanceSpacing.page))
                     navigation.destination == RendlyDestination.RESERVE -> {
@@ -336,24 +354,30 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                         onOpen = { selectMonth(YearMonth.from(it.start)); navigation.destination = RendlyDestination.PLANNER },
                         records = financeState.records, asOf = asOf)
                     navigation.destination == RendlyDestination.FIXED -> {
-                        val lines = remember(snapshot, financeState.records, period) {
-                            runCatching { PendingForecasts(snapshot, financeState.records).lines(period, includeCovered = true) }.getOrNull()
+                        val result = if (financeState.loaded) calculateInBackground(listOf(snapshot, records, period)) {
+                            PendingForecasts(snapshot, records).lines(period, includeCovered = true)
+                        }.value else null
+                        val status = when {
+                            result?.isFailure == true -> "Não foi possível calcular as previsões deste período."
+                            result == null -> "Carregando previsões…"
+                            else -> null
                         }
-                        if (lines == null) Text("Não foi possível calcular as previsões deste período.", Modifier.padding(FinanceSpacing.page))
-                        else FixedForecastScreen(lines, month, ::selectMonth, hidden, busy,
+                        FixedForecastScreen(result?.getOrNull().orEmpty(), month, ::selectMonth, hidden, busy,
                             { edit(it) }, { edit(it, false) }, model::ignore, model::stop,
                             { navigation.destination = RendlyDestination.MONTH; openActual(Movement.EXPENSE, frequency = ForecastFrequency.MONTHLY) },
-                            { editors.templates = true }, period)
+                            { editors.templates = true }, period, status)
                     }
-                    central == null || report == null -> Text("Não foi possível calcular este ciclo. Confira as previsões em seus dados e tente novamente.", Modifier.padding(FinanceSpacing.page))
-                    navigation.destination == RendlyDestination.COMMITMENT -> CommitmentScreen(central, hidden)
+                    navigation.destination == RendlyDestination.COMMITMENT -> {
+                        if (central != null) CommitmentScreen(central, hidden)
+                        else Text(forecastStatus.orEmpty(), Modifier.padding(FinanceSpacing.page))
+                    }
                     else -> LazyColumn(Modifier.testTag("forecast-dashboard"), contentPadding = PaddingValues(FinanceSpacing.page, 8.dp, FinanceSpacing.page, FinanceSpacing.listBottom), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.cardGap)) {
                         item { SectionTitle("Planejamento", "Registrado e previsto no mesmo controle, sem contar duas vezes.") }
-                        item { PaydayBudgetCard(paydayBudget, currentFunds.operating.hasBalance, hidden, partialBalance = currentFunds.operating.partial,
+                        item { PaydayBudgetCard(paydayResult?.getOrNull(), currentFunds.operating.hasBalance, hidden, partialBalance = currentFunds.operating.partial,
                             onAccounts = { editors.accountsOpen = true }, onSalary = {
                                 navigation.destination = RendlyDestination.MONTH
                                 openActual(Movement.INCOME, frequency = ForecastFrequency.MONTHLY, category = Category.SALARY)
-                            }) }
+                            }, calculationStatus = paydayStatus) }
                         item { ForecastCyclePicker(period, { selectMonth(month.minusMonths(1)) }, { selectMonth(month.plusMonths(1)) },
                             { navigation.followingCurrent = true }, { editors.cycleEditor = true }) }
                         item { Text(if (closed) "Ciclo encerrado · valores estimados" else "Planejamento do ciclo · valores estimados", style = MaterialTheme.typography.labelMedium) }
@@ -362,7 +386,10 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
                             enabled = upcomingDue.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
                             AppIcon(R.drawable.ic_chevron_right); Spacer(Modifier.width(8.dp)); Text("Próximos vencimentos · consultar previsão")
                         } }
-                        item { CentralProjectionCard(central, hidden) }
+                        item {
+                            if (central != null) CentralProjectionCard(central, hidden)
+                            else Text(forecastStatus.orEmpty())
+                        }
                         item { OutlinedButton({ navigation.destination = RendlyDestination.MONTH }, Modifier.fillMaxWidth().testTag("planning-open-month")) { Text("Gerenciar lançamentos na aba Mês") } }
 
                     }
@@ -388,13 +415,20 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             editors.accountsOpen = false; navigation.destination = RendlyDestination.MONTH
         }, onSave = finance::configureAccountBalance, onArchive = finance::setAccountArchived)
     val draft = financeState.pending.firstOrNull { it.id == review.editingDraftId }
-    val merchant = remember(draft?.id) { draft?.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) } }
+    val merchant = remember(draft?.id, draft?.revision) {
+        draft?.takeIf { it.movement == Movement.EXPENSE }?.let { MerchantIdentity.identify(it.sourceTitle, it.sourceBody) }
+    }
     val record = financeState.records.firstOrNull { it.id == review.editingRecordId }
     if (review.recordEditor && (review.editingDraftId == null || draft != null) && (review.editingRecordId == null || record != null)) key(review.editingDraftId, review.editingRecordId, review.actualKind) {
         RecordEditor(draft, record, busy, preset = review.preset, onDismiss = { review.recordEditor = false },
-            onSave = { value -> finance.save(value, draft?.id, editing = record != null, expectedRevision = review.draftRevision) {
+            onSave = { value, merchantKey -> finance.save(value, draft?.id, editing = record != null, expectedRevision = review.draftRevision) {
                 review.recordEditor = false
-                if (draft != null) { review.reviewAfter = draft.id; rememberMerchantCategory(draft, value.category) }
+                if (draft != null) {
+                    review.reviewAfter = draft.id
+                    if (value.movement == Movement.EXPENSE && merchantKey != null && merchantKey == merchant?.key) {
+                        rememberMerchantCategory(merchantKey, draft.category, value.category)
+                    }
+                }
             } },
             onIgnore = draft?.let { { finance.dismiss(it.id) { review.recordEditor = false; review.reviewAfter = it.id } } },
             onDelete = record?.let { { finance.delete(it.id) } },
@@ -403,7 +437,7 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             initialCategory = review.initialCategory, initialDescription = review.initialDescription,
             hideAmounts = hidden, duplicateIndex = duplicateIndex,
             balances = financeState.accountBalances, balancesAsOf = asOf, history = financeState.records, forecastData = snapshot,
-            rememberedCategory = merchant?.let { merchantStore.get(it.key) }, merchantLabel = merchant?.label,
+            rememberedCategory = merchant?.let { merchantStore.get(it.key) }, merchant = merchant,
             notificationChanged = draft != null && draft.revision != review.draftRevision,
             onAcceptUpdate = { review.draftRevision = draft?.revision },
             realizedOnly = true, onOpenForecast = if (draft == null && record == null && snapshot != null) { { seed, frequency ->
@@ -439,15 +473,20 @@ fun ForecastApp(finance: FinanceViewModel, model: ForecastViewModel, resumeCount
             openActual(Movement.EXPENSE, frequency = ForecastFrequency.MONTHLY, category = item.category, description = item.title)
         }, Modifier.fillMaxWidth()) { Text(item.title) } }
             Text("Você informará o valor antes de salvar.", style = MaterialTheme.typography.bodySmall) } }, confirmButton = { TextButton({ editors.templates = false }) { Text("Fechar") } })
-    if (editors.cycleEditor && snapshot != null) CycleDayEditor(snapshot.cycleRules.lastOrNull { it.effectiveStart <= today }?.day ?: 1, busy,
-        preview = { day ->
-            val rules = CycleConfiguration.rulesAfterChange(day, today, snapshot)
-            val nextCycle = CycleCalendar.periodContaining(maxOf(today, rules.last().effectiveStart), rules)
-            FinancialPeriods.month(YearMonth.from(nextCycle.start), rules)
-        },
-        onDismiss = { editors.cycleEditor = false },
-        onSave = { model.setCycleDay(it) { editors.cycleEditor = false; navigation.followingCurrent = true } },
-        firstConfiguration = snapshot.cycleRules.isEmpty() && snapshot.reserveEvents.none { it.cycleStart != null })
+    if (editors.cycleEditor && snapshot != null) {
+        val linkedKeys = remember(records) { records.mapNotNull { it.forecastOccurrenceKey } }
+        val currentDay = snapshot.cycleRules.lastOrNull { it.effectiveStart <= today }?.day ?: 1
+        fun proposed(day: Int) = CycleConfiguration.rulesAfterChange(day, today, snapshot, linkedKeys)
+
+        CycleDayEditor(currentDay, busy,
+            preview = { day ->
+                val rules = proposed(day)
+                CycleCalendar.periodContaining(maxOf(today, rules.last().effectiveStart), rules)
+            },
+            onDismiss = { editors.cycleEditor = false },
+            onSave = { model.setCycleDay(it) { editors.cycleEditor = false; navigation.followingCurrent = true } },
+            firstConfiguration = proposed(currentDay).last().effectiveStart <= today)
+    }
     editors.balanceEditorName?.let { name ->
         val existing = financeState.accountBalances.firstOrNull { it.account.key == AccountNames.key(name) }
         AccountBalanceEditor(existing, financeState.balanceReferences.filter { it.accountKey == AccountNames.key(name) }, hidden, busy,

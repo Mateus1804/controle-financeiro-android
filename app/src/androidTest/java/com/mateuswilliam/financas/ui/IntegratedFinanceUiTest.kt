@@ -47,7 +47,7 @@ class IntegratedFinanceUiTest {
         assertTrue(app.repository.exportRecords().isEmpty())
         val lineTag = "forecast-actions:rent:${report.lines.single { it.itemId == rent.itemId }.occurrenceKey}"
         rule.openRendlyMonth()
-        rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(lineTag))
+        rule.scrollToLoadedItem("records-list", hasTestTag(lineTag))
         rule.onNodeWithText("Aluguel fictício").assertExists()
         rule.openRendlyProjections()
         val projection = "projection-margin-${period.start}"
@@ -65,7 +65,7 @@ class MainAccountsUiTest {
 
     @Test fun explicitZeroBalancePersistsWithoutRevenueAndStatementActionSelectsTheAccount() {
         rule.openRendlySalary()
-        rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag("payday-accounts"))
+        rule.scrollToLoadedItem("forecast-dashboard", hasTestTag("payday-accounts"))
         rule.onNodeWithTag("payday-accounts").performClick()
         rule.onNodeWithTag("new-account-balance").performClick()
         rule.onNodeWithTag("balance-account-name").performTextInput("Carteira pessoal")

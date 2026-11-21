@@ -37,6 +37,7 @@ fun SettingsScreen(
     onDisplayName: (String) -> Unit = {},
     onMerchantCategories: () -> Unit = {},
     onAccounts: () -> Unit = {}, onReview: () -> Unit = {},
+    backupCleanupPending: Boolean = false, onRetryBackupCleanup: () -> Unit = {},
 ) {
     var nameEditor by remember { mutableStateOf(false) }
     if (nameEditor) DisplayNameDialog(settings.displayName, { nameEditor = false }, onDisplayName)
@@ -134,6 +135,10 @@ fun SettingsScreen(
                 OutlinedButton(onClick = onRestore, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = FinanceSpacing.touch)) { Text("Restaurar backup") }
                 FinanceDisclosure("Sobre o backup e a restauração", "backup-explanation") {
                     Text("O backup guarda os dados do aplicativo. A restauração apresenta uma conferência e pede confirmação antes de substituir os dados atuais.", style = MaterialTheme.typography.bodySmall)
+                }
+                if (backupCleanupPending) {
+                    Text("Uma cópia temporária da restauração ainda está no aparelho.", color = MaterialTheme.colorScheme.error)
+                    TextButton(onRetryBackupCleanup, enabled = !busy) { Text("Tentar limpar novamente") }
                 }
             }
         }

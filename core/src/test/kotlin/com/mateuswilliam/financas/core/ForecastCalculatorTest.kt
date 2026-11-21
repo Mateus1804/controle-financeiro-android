@@ -89,6 +89,81 @@ class ForecastCalculatorTest {
             overrides=listOf(ForecastOverride("bill","month:2026-10",date=date("2026-11-10"))))
         assertEquals(20000L,ForecastCalculator.report(data,november).totalExpensesCents)
     }
+
+    @Test fun monthlyOverridesKeepDistantMovedKeysAndInteriorMonthsInWideReports() {
+        val forecast = rule("bill", 10000, start = "2026-01-05")
+        val next = forecast.copy(effectiveFrom = date("2026-12-01"), amountCents = 20000)
+        val data = ForecastDataset(rules = listOf(next, forecast), overrides = listOf(
+            ForecastOverride("bill", "month:2026-03", date = date("2026-11-20")),
+            ForecastOverride("bill", "month:2026-12", amountCents = 21000),
+            ForecastOverride("other", "month:2026-10", date = date("2026-12-12")),
+            ForecastOverride("bill", "month:2027-01", date = date("2027-02-05")),
+        ))
+        val period = BudgetPeriod(november.start, date("2027-01-06"))
+        val lines = ForecastCalculator.report(data, period).lines
+        assertEquals(listOf("month:2026-11", "month:2026-03", "month:2026-12"), lines.map { it.occurrenceKey })
+        assertEquals(listOf(10000L, 10000L, 21000L), lines.map { it.amountCents })
+    }
+
+    @Test fun calendarMonthlyVersionsStopAtTheFirstAnchoredVersion() {
+        val original = rule("bill", 10000, start = "2026-09-05")
+        val revised = original.copy(effectiveFrom = date("2026-10-05"), amountCents = 20000)
+        val anchored = revised.copy(effectiveFrom = november.start, cycleAnchored = true, amountCents = 30000)
+        val oneTime = anchored.copy(effectiveFrom = november.endExclusive, startDate = november.endExclusive,
+            frequency = ForecastFrequency.ONCE, cycleAnchored = false)
+        val data = ForecastDataset(rules = listOf(original, revised, anchored, oneTime))
+
+        val line = ForecastCalculator.report(data, november).lines.single()
+        assertEquals("cycle:2026-11-05", line.occurrenceKey)
+        assertEquals(30000L, line.amountCents)
+    }
+
+    @Test fun pendingForecastsReadTheRuleSnapshotOnceAcrossCycles() {
+        val forecast = rule("bill", 10000, frequency = ForecastFrequency.INSTALLMENTS).copy(installmentCount = 3)
+        var reads = 0
+        val rules = object : AbstractList<ForecastRule>() {
+            override val size = 1
+
+            override fun get(index: Int): ForecastRule {
+                if (index != 0) throw IndexOutOfBoundsException()
+                reads++
+                return forecast
+            }
+        }
+        val pending = PendingForecasts(ForecastDataset(rules = rules), emptyList())
+        val lines = pending.lines(BudgetPeriod(november.start, november.start.plusMonths(3)))
+
+        assertEquals(listOf("installment:1", "installment:2", "installment:3"), lines.map { it.occurrenceKey })
+        assertEquals(1, reads)
+    }
+
+    @Test fun installmentRevisionCanClampIntoAPeriodWithoutAnyOriginalDueDates() {
+        val original = rule("purchase", 12000, frequency = ForecastFrequency.INSTALLMENTS, start = "2026-06-10")
+            .copy(installmentCount = 3)
+        val cutoff = date("2026-04-05")
+        val revised = original.copy(effectiveFrom = cutoff, startDate = date("2026-03-10"), amountCents = 15000)
+        val period = BudgetPeriod(cutoff, cutoff.plusDays(1))
+
+        val line = ForecastCalculator.report(ForecastDataset(rules = listOf(original, revised)), period).lines.single()
+        assertEquals("installment:1", line.occurrenceKey)
+        assertEquals(cutoff, line.date)
+        assertEquals(5000L, line.amountCents)
+    }
+
+    @Test fun installmentMovedBeyondTheOriginalScheduleKeepsItsKeyAndAmount() {
+        val forecast = rule("purchase", 10001, frequency = ForecastFrequency.INSTALLMENTS, start = "2026-01-31")
+            .copy(installmentCount = 2)
+        val moved = date("2026-11-16")
+        val data = ForecastDataset(rules = listOf(forecast), overrides = listOf(
+            ForecastOverride(forecast.itemId, "installment:1", date = moved),
+        ))
+
+        val line = ForecastCalculator.report(data, november).lines.single()
+        assertEquals("installment:1", line.occurrenceKey)
+        assertEquals(moved, line.date)
+        assertEquals(5001L, line.amountCents)
+    }
+
     @Test fun dueDayChangesPreserveClosedCyclesInBothDirections() {
         val closed=BudgetPeriod(date("2026-10-05"),date("2026-11-05"))
         val old=rule("bill",10000,start="2026-10-02")

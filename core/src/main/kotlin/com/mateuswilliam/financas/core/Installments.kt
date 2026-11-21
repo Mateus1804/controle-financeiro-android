@@ -21,6 +21,20 @@ object Installments {
     // Limite técnico de geração em memória; não é uma condição oferecida por bancos.
     const val MAX_INSTALLMENTS = 600
 
+    internal class Terms(
+        val firstMonth: YearMonth,
+        val numbers: IntRange,
+        private val dayOfMonth: Int,
+        private val baseCents: Long,
+        private val extraCents: Long,
+    ) {
+        fun installment(number: Int): Installment {
+            val month = firstMonth.plusMonths((number - numbers.first).toLong())
+            val amount = baseCents + if (number.toLong() <= extraCents) 1L else 0L
+            return Installment(number, month.atDay(minOf(dayOfMonth, month.lengthOfMonth())), amount)
+        }
+    }
+
     /** nextDueDate é a próxima parcela aberta, inclusive em compras já iniciadas. */
     fun fromTotal(
         totalCents: Long,
@@ -29,6 +43,18 @@ object Installments {
         paidInstallments: Int = 0,
         dayOfMonth: Int = nextDueDate.dayOfMonth,
     ): InstallmentSchedule {
+        val terms = termsFromTotal(totalCents, installmentCount, nextDueDate, paidInstallments, dayOfMonth)
+        return InstallmentSchedule(totalCents, installmentCount, paidInstallments, dayOfMonth,
+            terms.numbers.map(terms::installment))
+    }
+
+    internal fun termsFromTotal(
+        totalCents: Long,
+        installmentCount: Int,
+        nextDueDate: LocalDate,
+        paidInstallments: Int = 0,
+        dayOfMonth: Int = nextDueDate.dayOfMonth,
+    ): Terms {
         require(installmentCount in 1..MAX_INSTALLMENTS) {
             "Informe de 1 a $MAX_INSTALLMENTS parcelas."
         }
@@ -47,24 +73,14 @@ object Installments {
             "A próxima data precisa corresponder ao dia de vencimento ajustado ao mês."
         }
 
-        val baseCents = totalCents / installmentCount
-        val extraCents = totalCents % installmentCount
-        var date = nextDueDate
-        val pending = try {
-            (paidInstallments + 1..installmentCount).map { number ->
-                // A numeração original conserva a distribuição dos centavos já pagos.
-                val amount = baseCents + if (number.toLong() <= extraCents) 1L else 0L
-                val installment = Installment(number, date, amount)
-                if (number < installmentCount) {
-                    val nextMonth = YearMonth.from(date).plusMonths(1)
-                    date = nextMonth.atDay(minOf(dayOfMonth, nextMonth.lengthOfMonth()))
-                }
-                installment
-            }
+        try {
+            month.plusMonths((installmentCount - paidInstallments - 1).toLong())
         } catch (exception: DateTimeException) {
             throw IllegalArgumentException("O período das parcelas ultrapassa as datas permitidas.", exception)
         }
-        return InstallmentSchedule(totalCents, installmentCount, paidInstallments, dayOfMonth, pending)
+        // A numeração original conserva a distribuição dos centavos já pagos.
+        return Terms(month, paidInstallments + 1..installmentCount, dayOfMonth,
+            totalCents / installmentCount, totalCents % installmentCount)
     }
 
     /** O valor informado representa cada parcela; o total inclui também as já pagas. */

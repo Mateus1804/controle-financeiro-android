@@ -151,13 +151,13 @@ class CommitmentReportUiTest {
 
     private fun scrollCategories() {
         rule.openRendlyCommitment()
-        rule.onNodeWithTag("commitment-screen").performScrollToNode(hasText("Gastos por categoria"))
+        rule.scrollToLoadedItem("commitment-screen", hasText("Gastos por categoria"))
     }
 
     private fun assertCategory(category: Category, cents: Long) {
         val value = Money.format(cents)
         val categoryRegion = hasAnyAncestor(hasTestTag("forecast-categories"))
-        rule.onNodeWithTag("commitment-screen").performScrollToNode(hasText(value) and categoryRegion)
+        rule.scrollToLoadedItem("commitment-screen", hasText(value) and categoryRegion)
         val labels = rule.onAllNodes(hasText(category.label) and categoryRegion, useUnmergedTree = true).fetchSemanticsNodes()
         val sameRow = SemanticsMatcher("$value na mesma linha de ${category.label}") { amount ->
             val amountBounds = amount.boundsInRoot

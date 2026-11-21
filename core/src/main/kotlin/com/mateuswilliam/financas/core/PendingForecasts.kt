@@ -2,7 +2,8 @@ package com.mateuswilliam.financas.core
 
 /** Forecasts still due after accounting for explicitly linked records. */
 class PendingForecasts(dataset: ForecastDataset, records: List<Record>) {
-    private val data = dataset.copy(reserveEvents = emptyList())
+    private val cycleRules = dataset.cycleRules
+    private val schedule by lazy { ForecastCalculator.Schedule(dataset) }
     private val linked = records.mapNotNull { record ->
         val item = record.forecastItemId ?: return@mapNotNull null
         val occurrence = record.forecastOccurrenceKey ?: return@mapNotNull null
@@ -10,16 +11,16 @@ class PendingForecasts(dataset: ForecastDataset, records: List<Record>) {
     }.groupBy({ it.first }, { it.second })
 
     fun lines(period: BudgetPeriod, includeCovered: Boolean = false): List<ForecastLine> = buildList {
-        var cycle = CycleCalendar.periodContaining(period.start, data.cycleRules)
+        var cycle = CycleCalendar.periodContaining(period.start, cycleRules)
         while (cycle.start < period.endExclusive) {
             addAll(cycleLines(cycle, includeCovered).filter { it.date in period })
-            cycle = CycleCalendar.periodContaining(cycle.endExclusive, data.cycleRules)
+            cycle = CycleCalendar.periodContaining(cycle.endExclusive, cycleRules)
         }
     }.distinctBy { Triple(it.itemId, it.occurrenceKey, it.reusedInstallmentStart) }
         .sortedWith(compareBy<ForecastLine> { it.date }.thenBy { it.title })
 
     private fun cycleLines(cycle: BudgetPeriod, includeCovered: Boolean): List<ForecastLine> {
-        val forecasts = ForecastCalculator.report(data, cycle).lines
+        val forecasts = schedule.lines(cycle)
         val covered = forecasts.asSequence().filter {
             it.kind == ForecastKind.EXPENSE && !it.statementTotal && it.statementKey.isNotBlank()
         }.groupBy { it.statementKey }.mapValues { (_, components) ->

@@ -6,42 +6,77 @@ import androidx.room.withTransaction
 import com.mateuswilliam.financas.core.BackupCrypto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.UUID
+
+private const val STAGE_PREFIX = "restore-stage-"
+private val stageFile = Regex("""(${STAGE_PREFIX}[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.db)(?:-wal|-shm|-journal|-mj.*)?""")
 
 class StagedRestore internal constructor(val databaseName: String, val createdAt: Long, val records: Int,
     val pending: Int, val accounts: Int, val forecasts: Int, internal val display: BackupDisplay)
 
-class BackupStore(private val context: Context, private val repository: FinanceRepository) {
-    suspend fun create(password: CharArray): ByteArray = withContext(Dispatchers.IO) {
-        try {
-            val plaintext = BackupSnapshot.encode(repository.snapshot())
+class BackupStore internal constructor(private val context: Context, private val repository: () -> FinanceRepository) {
+    constructor(context: Context, repository: FinanceRepository) : this(context, { repository })
+
+    private val stages = Mutex()
+    private val activeStages = mutableSetOf<String>()
+    private val cleanupState = MutableStateFlow(false)
+    val cleanupPending = cleanupState.asStateFlow()
+
+    suspend fun create(password: CharArray): ByteArray = try {
+        withContext(Dispatchers.IO) {
+            removeAbandonedStages()
+            val plaintext = BackupSnapshot.encode(repository().snapshot())
             try { BackupCrypto.encrypt(plaintext, password) } finally { plaintext.fill(0) }
-        } finally { password.fill('\u0000') }
+        }
+    } finally { password.fill('\u0000') }
+
+    suspend fun stage(input: InputStream, password: CharArray): StagedRestore = stage(password) { input }
+
+    internal suspend fun stage(password: CharArray, openInput: () -> InputStream): StagedRestore {
+        val name = "$STAGE_PREFIX${UUID.randomUUID()}.db"
+        var delivered = false
+        try {
+            val preview = withContext(Dispatchers.IO) {
+                val file = readBackupFile(openInput())
+                val plaintext = try { BackupCrypto.decrypt(file, password) } finally { file.fill(0) }
+                val snapshot = try { BackupSnapshot.decode(plaintext) } finally { plaintext.fill(0) }
+                stages.withLock {
+                    removeAbandonedStagesLocked()
+                    prepareStage(name, snapshot).also { activeStages.add(name) }
+                }
+            }
+            delivered = true
+            return preview
+        } finally {
+            password.fill('\u0000')
+            if (!delivered) discardStage(name)
+        }
     }
 
-    suspend fun stage(input: InputStream, password: CharArray): StagedRestore = withContext(Dispatchers.IO) {
-        var database: FinanceDatabase? = null
-        val name = "restore-stage-${UUID.randomUUID()}.db"
-        try {
-            val file = input.use { stream ->
-                val output = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(8192)
-                var total = 0
-                while (true) {
-                    val count = stream.read(buffer)
-                    if (count < 0) break
-                    total += count
-                    require(total <= BackupCrypto.MAX_FILE_BYTES) { "O arquivo excede o limite de 16 MiB." }
-                    output.write(buffer, 0, count)
-                }
-                output.toByteArray()
-            }
-            val plaintext = try { BackupCrypto.decrypt(file, password) } finally { file.fill(0) }
-            val snapshot = try { BackupSnapshot.decode(plaintext) } finally { plaintext.fill(0) }
-            val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).build()
-            database = temporary
+    private fun readBackupFile(input: InputStream): ByteArray = input.use { stream ->
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        var total = 0
+        while (true) {
+            val count = stream.read(buffer)
+            if (count < 0) break
+            total += count
+            require(total <= BackupCrypto.MAX_FILE_BYTES) { "O arquivo excede o limite de 16 MiB." }
+            output.write(buffer, 0, count)
+        }
+        output.toByteArray()
+    }
+
+    private suspend fun prepareStage(name: String, snapshot: FinanceSnapshot): StagedRestore {
+        val temporary = Room.databaseBuilder(context, FinanceDatabase::class.java, name).build()
+        return try {
             temporary.withTransaction { insertSnapshot(temporary.financeDao(), snapshot) }
             verify(temporary)
             val copy = readSnapshot(temporary.financeDao(), snapshot.createdAt, snapshot.display)
@@ -53,28 +88,57 @@ class BackupStore(private val context: Context, private val repository: FinanceR
                 copy.forecastMeta.toSet() == snapshot.forecastMeta.toSet()) { "A conferência da base temporária falhou." }
             StagedRestore(name, snapshot.createdAt, copy.records.size, copy.drafts.count { it.status == "PENDING" },
                 copy.accounts.size, copy.forecastRules.map { it.itemId }.distinct().size, copy.display)
-        } catch (exception: Exception) {
-            database?.close(); context.deleteDatabase(name); throw exception
-        } finally { database?.close(); password.fill('\u0000') }
+        } finally { temporary.close() }
     }
 
     /** Retorna se as preferências de exibição foram salvas após restaurar os dados financeiros. */
-    suspend fun restore(staged: StagedRestore): Boolean = withContext(Dispatchers.IO) {
-        require(staged.databaseName.startsWith("restore-stage-") && context.getDatabasePath(staged.databaseName).exists()) { "A prévia expirou. Selecione o backup novamente." }
-        val database = Room.databaseBuilder(context, FinanceDatabase::class.java, staged.databaseName).build()
-        try {
-            verify(database)
-            val snapshot = readSnapshot(database.financeDao(), staged.createdAt, staged.display)
-            BackupSnapshot.validate(snapshot)
-            repository.restore(snapshot)
-        } finally { database.close(); withContext(NonCancellable) { discard(staged) } }
+    suspend fun restore(staged: StagedRestore): Boolean = try {
+        withContext(Dispatchers.IO) {
+            stages.withLock {
+                val name = staged.databaseName
+                require(activeStages.remove(name) && context.getDatabasePath(name).exists()) { "A prévia expirou. Selecione o backup novamente." }
+                val database = Room.databaseBuilder(context, FinanceDatabase::class.java, name).build()
+                val snapshot = try {
+                    verify(database)
+                    readSnapshot(database.financeDao(), staged.createdAt, staged.display)
+                } finally { database.close() }
+                BackupSnapshot.validate(snapshot)
+                repository().restore(snapshot)
+            }
+        }
+    } finally {
+        discardStage(staged.databaseName)
     }
 
-    suspend fun discard(staged: StagedRestore) = withContext(Dispatchers.IO) { context.deleteDatabase(staged.databaseName); Unit }
+    suspend fun discard(staged: StagedRestore) = discardStage(staged.databaseName)
+
+    private suspend fun discardStage(name: String) = withContext(NonCancellable + Dispatchers.IO) {
+        stages.withLock {
+            activeStages.remove(name)
+            removeAbandonedStagesLocked()
+        }
+    }
 
     suspend fun removeAbandonedStages() = withContext(Dispatchers.IO) {
-        context.databaseList().filter { it.startsWith("restore-stage-") && !it.endsWith("-wal") && !it.endsWith("-shm") && !it.endsWith("-journal") }
-            .forEach { context.deleteDatabase(it) }
+        stages.withLock { removeAbandonedStagesLocked() }
+    }
+
+    private fun abandonedStageNames(): Set<String> = context.databaseList()
+        .mapNotNull { stageFile.matchEntire(it)?.groupValues?.get(1) }
+        .toSet() - activeStages
+
+    private fun removeAbandonedStagesLocked() {
+        cleanupState.value = try {
+            var deletionFailed = false
+            for (name in abandonedStageNames()) {
+                val deleted = try { context.deleteDatabase(name) } catch (_: Exception) { false }
+                if (!deleted) deletionFailed = true
+            }
+            // O Android pode retornar sucesso mesmo quando só parte dos arquivos foi removida.
+            deletionFailed || abandonedStageNames().isNotEmpty()
+        } catch (_: Exception) {
+            true
+        }
     }
 
     private fun verify(database: FinanceDatabase) {

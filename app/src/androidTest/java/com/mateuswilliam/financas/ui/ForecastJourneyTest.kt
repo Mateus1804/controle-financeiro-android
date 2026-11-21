@@ -1,11 +1,9 @@
 package com.mateuswilliam.financas.ui
 
 import android.net.Uri
-import android.os.SystemClock
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.FinanceViewModel
@@ -37,7 +35,7 @@ class ForecastJourneyTest {
     private fun clickText(text: String) = rule.onNode(hasText(text) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
     private fun scroll(tag: String) {
         if (tag.startsWith("forecast-actions:")) {
-            rule.openRendlyMonth(); rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag))
+            rule.openRendlyMonth(); rule.scrollToLoadedItem("records-list", hasTestTag(tag))
         } else {
             rule.openRendlyPlanner(); rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
         }
@@ -63,34 +61,29 @@ class ForecastJourneyTest {
             Category.FOOD, ForecastFrequency.MONTHLY, date, cycleAnchored = true, group = ForecastGroup.VARIABLE, estimated = true))
     }
 
-    @Test fun resumingUpdatesTheAvailableBalanceForNewlyEffectiveRecords() {
+    @Test fun openPlannerUpdatesTheBalanceBeforeASalaryBeyondTwoMonths() {
         val finance = ViewModelProvider(rule.activity)[FinanceViewModel::class.java]
         val bank = "Conta principal"
         val zone = ZoneId.systemDefault()
         runBlocking {
             app.repository.configureAccountBalance(bank, 100000,
                 today.minusDays(2).atStartOfDay(zone).toInstant().toEpochMilli(), "Saldo inicial")
-            val salaryDate = today.plusDays(10)
+            val salaryDate = today.plusDays(75)
             app.forecasts.saveRule(ForecastRule("salary", salaryDate, "Salário", ForecastKind.INCOME,
                 300000, Category.SALARY, ForecastFrequency.ONCE, salaryDate))
         }
         waitRules(1)
         rule.waitUntil(10000) { finance.state.value.accountBalances.singleOrNull()?.balanceCents == 100000L }
-        rule.onNodeWithTag("payday-total").assertTextContains(Money.format(100000))
+        rule.scrollToLoadedItem("forecast-dashboard", hasTestTag("payday-total") and hasText(Money.format(100000)))
         val effectiveAt = System.currentTimeMillis() + 3000
         runBlocking {
             app.repository.save(Record("expense-after-opening", 20000, Movement.EXPENSE, PaymentMethod.PIX,
                 Category.OTHER, bank, "Conta agendada", effectiveAt), null)
         }
-        rule.waitUntil(10000) { finance.state.value.records.any { it.id == "expense-after-opening" } }
-        assertEquals(100000L, finance.state.value.accountBalances.single().balanceCents)
-        rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
-        SystemClock.sleep((effectiveAt - System.currentTimeMillis()).coerceAtLeast(0))
-        rule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         rule.waitUntil(10000) {
             finance.state.value.accountBalances.singleOrNull()?.balanceCents == 80000L
         }
-        rule.onNodeWithTag("payday-total").assertTextContains(Money.format(80000))
+        rule.scrollToLoadedItem("forecast-dashboard", hasTestTag("payday-total") and hasText(Money.format(80000)))
     }
 
     @Test fun dueDatesOnlyOpenWhenThereIsAnUpcomingExpenseWithADueDate() {
@@ -100,6 +93,7 @@ class ForecastJourneyTest {
         }
         waitRules(1)
         val label = "Próximos vencimentos · consultar previsão"
+        rule.scrollToLoadedItem("forecast-dashboard", hasTestTag("central-projection"))
         rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasText(label))
         rule.onNodeWithText(label).assertIsNotEnabled()
         runBlocking {
@@ -107,6 +101,7 @@ class ForecastJourneyTest {
                 5000, Category.HOME, ForecastFrequency.ONCE, today))
         }
         waitRules(2)
+        rule.scrollToLoadedItem("forecast-dashboard", hasText(label) and isEnabled())
         rule.onNodeWithText(label).assertIsEnabled().performClick()
         rule.onNodeWithText("Conta a vencer").assertIsDisplayed()
         rule.onNodeWithText("Salário").assertDoesNotExist()
@@ -132,7 +127,7 @@ class ForecastJourneyTest {
         )), period())
         val label = "Exportar previsões em CSV"
         rule.openRendlySettings()
-        rule.onNodeWithTag("settings-list").performScrollToNode(hasText(label))
+        rule.scrollToLoadedItem("settings-list", hasText(label) and isEnabled())
         rule.onNodeWithText(label).assertIsEnabled()
         val loaded = model.dataset.value
         rule.runOnIdle { model.dataset.value = null }

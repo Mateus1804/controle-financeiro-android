@@ -24,13 +24,15 @@ class BackupStoreTest {
     private lateinit var store: BackupStore
     private fun password() = "Backup fictício 2026!".toCharArray()
     private fun record(id: String) = Record(id, 4290, Movement.EXPENSE, PaymentMethod.PIX, Category.FOOD, "Inter pessoal", "Mercado fictício", 1_792_800_000_000L)
+    private fun notification() = NotificationInput("fixture.bank", "fixture:tag|ç", "Banco fictício",
+        "Compra aprovada", "Compra aprovada de R$ 42,90\nPão e café", 1_792_800_000_000L)
     @Before fun setup() {
         database = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
         preferences = CapturePreferences(context).also { it.reset() }
         repository = FinanceRepository(database, preferences)
         store = BackupStore(context, repository)
     }
-    @After fun cleanup() = runBlocking { store.removeAbandonedStages(); preferences.reset(); database.close() }
+    @After fun cleanup() = runBlocking { BackupStore(context, repository).removeAbandonedStages(); preferences.reset(); database.close() }
 
     @Test fun roundTripRestoresEveryFinancialTableAndPausesDeviceFeatures() = runBlocking<Unit> {
         repository.save(record("manual"), null)
@@ -63,6 +65,69 @@ class BackupStoreTest {
         assertEquals("fixture.bank", restored.drafts.first().sourcePackage)
         assertFalse(context.getDatabasePath(preview.databaseName).exists())
     }
+
+    @Test fun capturedDraftTextWithNullCharactersRoundTrips() = runBlocking<Unit> {
+        val input = notification().copy(bank = "Banco fi\u0000ctício", title = "Compra apro\u0000vada",
+            body = "Compra aprovada de R$ 42,\u000090\nPão e café")
+        val captured = repository.capture(input, simulation = true)!!
+        val draft = repository.snapshot().drafts.single()
+        assertEquals("Banco fictício", draft.bank)
+        assertEquals("Compra aprovada", draft.sourceTitle)
+        assertEquals("Compra aprovada de R$ 42,90\nPão e café", draft.sourceBody)
+        assertEquals(4290L, draft.amountCents)
+        assertEquals("fixture:tag|ç", draft.sourceKey)
+        assertEquals(captured.id, repository.capture(notification(), simulation = true)?.id)
+        assertEquals(draft.revision, repository.snapshot().drafts.single().revision)
+
+        val file = store.create(password())
+        repository.clear()
+        assertTrue(store.restore(store.stage(ByteArrayInputStream(file), password())))
+        assertEquals(draft, repository.snapshot().drafts.single())
+    }
+
+    @Test fun previousRendlyBackupsWithNullInDraftTextAreStillRestorable() = runBlocking<Unit> {
+        val input = notification()
+        repository.capture(input, simulation = true)
+        val snapshot = repository.snapshot()
+        val oldDraft = snapshot.drafts.single().copy(bank = "Banco fi\u0000ctício", sourceTitle = "Compra apro\u0000vada",
+            sourceBody = "Compra aprovada de R$ 42,90\nPão\u0000 e café", explanation = "Confira\u0000 o valor.")
+        val payload = JSONObject(BackupSnapshot.encode(snapshot.copy(drafts = listOf(oldDraft))).toString(Charsets.UTF_8))
+        val row = payload.getJSONArray("drafts").getJSONObject(0)
+        assertEquals("Banco fictício", row.getString("bank"))
+        assertEquals("Compra aprovada", row.getString("sourceTitle"))
+        assertEquals("Compra aprovada de R$ 42,90\nPão e café", row.getString("sourceBody"))
+        assertEquals("Confira o valor.", row.getString("explanation"))
+
+        row.put("bank", oldDraft.bank).put("sourceTitle", oldDraft.sourceTitle)
+            .put("sourceBody", oldDraft.sourceBody).put("explanation", oldDraft.explanation)
+        val oldFile = BackupCrypto.encrypt(payload.toString().toByteArray(Charsets.UTF_8), password())
+        repository.clear()
+        assertTrue(store.restore(store.stage(ByteArrayInputStream(oldFile), password())))
+        assertEquals(snapshot.drafts.single().copy(explanation = "Confira o valor."), repository.snapshot().drafts.single())
+    }
+
+    @Test fun nullCharactersInOpaqueDraftFieldsAreRejected() = runBlocking<Unit> {
+        repository.capture(notification(), simulation = true)
+        val payload = JSONObject(BackupSnapshot.encode(repository.snapshot()).toString(Charsets.UTF_8))
+        val row = payload.getJSONArray("drafts").getJSONObject(0)
+        for (field in listOf("id", "sourceKey", "sourcePackage")) {
+            val value = row.getString(field)
+            row.put(field, "$value\u0000-outro")
+            assertTrue(runCatching { BackupSnapshot.decode(payload.toString().toByteArray(Charsets.UTF_8)) }
+                .exceptionOrNull() is IllegalArgumentException)
+            row.put(field, value)
+        }
+        assertNull(repository.capture(notification().copy(sourceKey = "fixture:tag\u0000|ç"), simulation = true))
+        assertEquals(1, repository.snapshot().drafts.size)
+    }
+
+    @Test fun sensitiveTextIsFilteredBeforeAndAfterRemovingNullCharacters() = runBlocking<Unit> {
+        for (body in listOf("A senha\u0000expirou", "A se\u0000nha expirou")) {
+            assertNull(repository.capture(notification().copy(body = body), simulation = true))
+        }
+        assertTrue(repository.snapshot().drafts.isEmpty())
+    }
+
     @Test fun wrongPasswordPreservesLocalDataAndClearsTheProvidedPassword() = runBlocking<Unit> {
         repository.save(record("preservado"), null)
         val file = store.create(password())
@@ -115,6 +180,79 @@ class BackupStoreTest {
         assertFalse(context.getDatabasePath(preview.databaseName).exists())
         assertEquals("preservado", repository.exportRecords().single().id)
     }
+
+    @Test fun failedStageDeletionWarnsAfterRestoreAndIsRetriedAtTheNextBackup() = runBlocking<Unit> {
+        val deletion = object : ContextWrapper(context) {
+            var failDeletion = false
+            override fun deleteDatabase(name: String): Boolean = !failDeletion && super.deleteDatabase(name)
+        }
+        store = BackupStore(deletion, repository)
+        repository.save(record("restaurado"), null)
+        val file = store.create(password())
+        repository.clear()
+        repository.save(record("substituído"), null)
+        val preview = store.stage(ByteArrayInputStream(file), password())
+
+        deletion.failDeletion = true
+        assertTrue(store.restore(preview))
+        assertEquals("restaurado", repository.exportRecords().single().id)
+        assertTrue(context.getDatabasePath(preview.databaseName).exists())
+        assertTrue(store.cleanupPending.value)
+        assertTrue(runCatching { store.restore(preview) }.exceptionOrNull() is IllegalArgumentException)
+
+        deletion.failDeletion = false
+        store.create(password())
+        assertFalse(context.getDatabasePath(preview.databaseName).exists())
+        assertFalse(store.cleanupPending.value)
+    }
+
+    @Test fun cleanupChecksForLeftoverSidecarFilesWithoutRemovingActivePreviews() = runBlocking<Unit> {
+        val abandonedName = "restore-stage-00000000-0000-0000-0000-000000000000.db"
+        val deletion = object : ContextWrapper(context) {
+            var leaveSidecar = true
+            override fun deleteDatabase(name: String): Boolean =
+                if (leaveSidecar && name == abandonedName) true else super.deleteDatabase(name)
+        }
+        store = BackupStore(deletion, repository)
+        repository.save(record("preservado"), null)
+        val preview = store.stage(ByteArrayInputStream(store.create(password())), password())
+        val sidecar = File(context.getDatabasePath(abandonedName).path + "-wal").also { it.writeText("dados fictícios") }
+
+        store.removeAbandonedStages()
+        assertTrue(sidecar.exists())
+        assertTrue(store.cleanupPending.value)
+        assertTrue(context.getDatabasePath(preview.databaseName).exists())
+
+        deletion.leaveSidecar = false
+        store.removeAbandonedStages()
+        assertFalse(sidecar.exists())
+        assertFalse(store.cleanupPending.value)
+        assertTrue(store.restore(preview))
+    }
+
+    @Test fun startupCleanupDoesNotNeedTheLiveRepository() = runBlocking<Unit> {
+        val preview = store.stage(ByteArrayInputStream(store.create(password())), password())
+        val file = context.getDatabasePath(preview.databaseName)
+        assertTrue(file.exists())
+
+        val deletion = object : ContextWrapper(context) {
+            var blocked = true
+            override fun deleteDatabase(name: String): Boolean {
+                if (blocked && name == preview.databaseName) throw SecurityException("Exclusão bloqueada no teste.")
+                return super.deleteDatabase(name)
+            }
+        }
+        val afterRestart = BackupStore(deletion) { error("O banco financeiro está indisponível.") }
+        afterRestart.removeAbandonedStages()
+        assertTrue(file.exists())
+        assertTrue(afterRestart.cleanupPending.value)
+
+        deletion.blocked = false
+        afterRestart.removeAbandonedStages()
+        assertFalse(file.exists())
+        assertFalse(afterRestart.cleanupPending.value)
+    }
+
     @Test fun oversizedInputIsBoundedAndClosedWithoutTouchingTheLiveDatabase() = runBlocking<Unit> {
         repository.save(record("preservado"), null)
         var delivered = 0

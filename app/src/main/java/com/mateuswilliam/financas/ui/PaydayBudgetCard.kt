@@ -16,13 +16,15 @@ private val paydayFormat = DateTimeFormatter.ofPattern("dd/MM")
 
 /** Quanto ainda pode ser gasto até o próximo pagamento; estado nulo pede o dado que falta. */
 @Composable
-internal fun PaydayBudgetCard(budget: PaydayBudget?, hasBalance: Boolean, hidden: Boolean, partialBalance: Boolean = false, onAccounts: () -> Unit = {}, onSalary: () -> Unit) {
+internal fun PaydayBudgetCard(budget: PaydayBudget?, hasBalance: Boolean, hidden: Boolean, partialBalance: Boolean = false,
+    onAccounts: () -> Unit = {}, calculationStatus: String? = null, onSalary: () -> Unit) {
     Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerLowest) {
         Column(Modifier.fillMaxWidth().testTag("payday-budget").padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(FinanceSpacing.medium)) {
             SectionTitle("Até o próximo salário", budget?.let { "Cálculo até ${it.payday.format(paydayFormat)} (próximo salário previsto)" })
             if (partialBalance) Text("Saldo parcial · uma ou mais contas ativas estão sem saldo informado.",
                 Modifier.testTag("payday-partial"), style = MaterialTheme.typography.bodySmall)
             when {
+                calculationStatus != null -> Text(calculationStatus, style = MaterialTheme.typography.bodySmall)
                 !hasBalance -> {
                     Text("Cadastre o saldo de uma conta para calcular quanto você pode gastar até o pagamento.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     FilledTonalButton(onAccounts, Modifier.heightIn(min = FinanceSpacing.touch).testTag("payday-accounts")) { Text("Configurar saldo das contas") }

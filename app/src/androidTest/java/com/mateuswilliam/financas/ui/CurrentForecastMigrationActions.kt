@@ -54,7 +54,7 @@ internal class CurrentForecastUi(
             rule.onNodeWithTag("forecast-dashboard").performScrollToNode(hasTestTag(tag))
         } else {
             rule.openRendlyMonth()
-            rule.onNodeWithTag("records-list").performScrollToNode(hasTestTag(tag))
+            rule.scrollToLoadedItem("records-list", hasTestTag(tag))
         }
     }
     fun clickTag(tag: String) {

@@ -18,7 +18,6 @@ import java.time.LocalDate
 /** Planning edits forecast rules, cycle settings and the reserve goal. */
 class ForecastViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as FinanceApplication
-    private val repository = app.forecasts
     val dataset = MutableStateFlow<ForecastDataset?>(null)
     val busy = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
@@ -28,11 +27,14 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
     private val csvDestinationRequest = MutableStateFlow<String?>(null)
     val csvDestination = csvDestinationRequest.asStateFlow()
     init { observe() }
+
+    private suspend fun loadRepository() = withContext(Dispatchers.IO) { app.forecasts }
+
     private fun observe() {
         observing = viewModelScope.launch {
             try {
                 app.maintenanceReady.await()
-                repository.dataset.collect { dataset.value = it; loadError.value = null }
+                loadRepository().dataset.collect { dataset.value = it; loadError.value = null }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { loadError.value = "Não foi possível abrir o planejamento. Seus dados foram preservados. Tente novamente." }
         }
@@ -40,12 +42,12 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
 
     fun refresh() { if (observing?.isActive != true) observe() }
     fun saveRule(rule: ForecastRule, replaceOccurrenceKey: String? = null, onSaved: () -> Unit) = action {
-        repository.saveRule(rule, replaceOccurrenceKey = replaceOccurrenceKey)
+        loadRepository().saveRule(rule, replaceOccurrenceKey = replaceOccurrenceKey)
         onSaved()
         "Previsão salva. O orçamento e as projeções foram atualizados."
     }
     fun saveOverride(value: ForecastOverride, onSaved: () -> Unit = {}) = action {
-        repository.saveOverride(value)
+        loadRepository().saveOverride(value)
         onSaved()
         if (value.ignored) "Ocorrência ignorada neste período." else "Ocorrência atualizada. Os outros períodos foram preservados."
     }
@@ -55,16 +57,16 @@ class ForecastViewModel(application: Application) : AndroidViewModel(application
         saveOverride(previous.copy(ignored = !line.ignored))
     }
     fun stop(line: ForecastLine) = action {
-        repository.saveRule(line.rule.copy(effectiveFrom = line.date, active = false))
+        loadRepository().saveRule(line.rule.copy(effectiveFrom = line.date, active = false))
         "Previsões interrompidas desta ocorrência em diante. O histórico anterior foi preservado."
     }
     fun setCycleDay(day: Int, onSaved: () -> Unit) = action {
-        repository.setCycleDay(day, LocalDate.now())
+        loadRepository().setCycleDay(day, LocalDate.now())
         onSaved()
         "Dia do ciclo salvo. Confira as datas completas do período."
     }
     fun saveReserveGoal(cents: Long?, onSaved: () -> Unit) = action {
-        repository.setReserveGoal(cents)
+        loadRepository().setReserveGoal(cents)
         onSaved()
         "Meta da reserva salva."
     }

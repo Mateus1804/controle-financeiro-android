@@ -25,7 +25,7 @@ class RecordEditorPresetTest {
         var saved: Record? = null
         rule.setContent { FinanceTheme {
             RecordEditor(draft = null, existing = null, preset = forecast, busy = false,
-                onDismiss = {}, onSave = { saved = it }, onIgnore = null, onDelete = null,
+                onDismiss = {}, onSave = { value, _ -> saved = value }, onIgnore = null, onDelete = null,
                 accounts = emptyList(), lastOrigin = "", onAddAccount = { it })
         } }
 

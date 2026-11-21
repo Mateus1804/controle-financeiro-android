@@ -20,7 +20,7 @@ class RecordEditorNatureTest {
             originalRecordId = "original-ausente", reversalMovement = Movement.INCOME)
         var saved: Record? = null
         rule.setContent { FinanceTheme {
-            RecordEditor(null, refund, false, {}, { saved = it }, null, null, emptyList(), "", { it })
+            RecordEditor(null, refund, false, {}, { value, _ -> saved = value }, null, null, emptyList(), "", { it })
         } }
         rule.onNode(hasText("Confirmar") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         rule.runOnIdle {
@@ -33,7 +33,7 @@ class RecordEditorNatureTest {
 
     @Test fun templateStartsWithEmptyEditableAmount() {
         rule.setContent { FinanceTheme {
-            RecordEditor(null, null, false, {}, {}, null, null, emptyList(), "Carteira", { it },
+            RecordEditor(null, null, false, {}, { _, _ -> }, null, null, emptyList(), "Carteira", { it },
                 initialDescription = "Aluguel", initialCategory = Category.HOME)
         } }
         rule.onNodeWithTag("amount-input").assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
@@ -45,7 +45,7 @@ class RecordEditorNatureTest {
         val draft = DraftEntity("draft-income", "source", "example.bank", "Conta", "Recebimento", "Salário", 5000,
             Movement.INCOME, PaymentMethod.PIX, Category.HOME, "Sugestão", 1_792_800_000_000L, 1_792_800_000_000L)
         rule.setContent { FinanceTheme {
-            RecordEditor(draft, null, false, {}, {}, null, null, emptyList(), "", { it })
+            RecordEditor(draft, null, false, {}, { _, _ -> }, null, null, emptyList(), "", { it })
         } }
         rule.onNodeWithText("Outras receitas").performScrollTo().assertExists()
         rule.onNodeWithText("Moradia").assertDoesNotExist()
@@ -54,7 +54,7 @@ class RecordEditorNatureTest {
     @Test fun firstManualEntryKeepsAnEditableWalletWithoutRequiringInitialSetup() {
         var saved: Record? = null
         rule.setContent { FinanceTheme {
-            RecordEditor(null, null, false, {}, { saved = it }, null, null, emptyList(), "", { it })
+            RecordEditor(null, null, false, {}, { value, _ -> saved = value }, null, null, emptyList(), "", { it })
         } }
         rule.onNodeWithTag("amount-input").performTextInput("100")
         rule.onNodeWithTag("record-description").performScrollTo().performTextInput("Compra")
@@ -66,7 +66,7 @@ class RecordEditorNatureTest {
     @Test fun archivedWalletIsNotSuggestedAgain() {
         val wallet = AccountBalance(AccountOption("carteira", "Carteira", 0), true, null, null)
         rule.setContent { FinanceTheme {
-            RecordEditor(null, null, false, {}, {}, null, null, emptyList(), "Carteira", { it }, balances = listOf(wallet))
+            RecordEditor(null, null, false, {}, { _, _ -> }, null, null, emptyList(), "Carteira", { it }, balances = listOf(wallet))
         } }
         rule.openRecordDetails()
         rule.onNodeWithText("Escolher conta").performScrollTo().assertExists()
@@ -76,7 +76,7 @@ class RecordEditorNatureTest {
     @Test fun smartDefaultsDoNotReuseExpenseCategoriesFromLegacyIncome() {
         val old = Record("old-income", 1000, Movement.INCOME, PaymentMethod.PIX, Category.HOME, "Carteira", "Salário", 1_792_800_000_000L)
         rule.setContent { FinanceTheme {
-            RecordEditor(null, null, false, {}, {}, null, null, emptyList(), "Carteira", { it }, initialMovement = Movement.INCOME, history = listOf(old))
+            RecordEditor(null, null, false, {}, { _, _ -> }, null, null, emptyList(), "Carteira", { it }, initialMovement = Movement.INCOME, history = listOf(old))
         } }
         rule.onNodeWithTag("record-description").performScrollTo().performTextInput("Salário")
         rule.onNodeWithText("Outras receitas").performScrollTo().assertExists()
