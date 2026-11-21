@@ -106,6 +106,7 @@ class CommitmentEntryUiTest {
             ui.clickTag("review-${draft.id}")
             val category = rule.onNodeWithContentDescription("Categoria sugerida · editável")
             category.assertTextContains(Category.FOOD.label)
+            rule.openRecordDetails()
             rule.onNodeWithContentDescription("Movimentação").performScrollTo().performClick()
             ui.clickText(Movement.INCOME.label)
             category.performScrollTo().performClick()
