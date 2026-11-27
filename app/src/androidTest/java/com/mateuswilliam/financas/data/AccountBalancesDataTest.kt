@@ -31,6 +31,7 @@ class AccountBalancesDataTest {
             assertEquals(Movement.INCOME, repo.exportRecords().first { it.id == "refund" }.reversalMovement)
             repo.setAccountArchived("a", true)
             repo.addAccount("A")
+            assertTrue(runCatching { repo.addAccount("A", requireActive = true) }.exceptionOrNull() is IllegalArgumentException)
             assertTrue(repo.accounts.first().isEmpty())
             assertEquals(2400L, repo.observeAccountBalances(start + 200).first().single().balanceCents)
             val snapshot = repo.snapshot()
@@ -54,6 +55,26 @@ class AccountBalancesDataTest {
             assertEquals(2100L, repo.observeAccountBalances(start + 200).first().single().balanceCents)
             val afterDeletion = repo.snapshot()
             assertEquals(afterDeletion, BackupSnapshot.decode(BackupSnapshot.encode(afterDeletion)))
+        } finally { db.close() }
+    }
+
+    @Test fun correctingALegacyReferenceUsesItsExactInstant() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val repo = FinanceRepository(db, CapturePreferences(context))
+            val account = "Carteira"
+            val key = AccountNames.key(account)
+            val at = start + 3 * 60 * 60 * 1000L
+            repo.addAccount(account)
+            val original = db.financeDao().insertAccountBalanceEvent(
+                AccountBalanceEventEntity(accountKey = key, balanceCents = 10000, effectiveAt = at,
+                    createdAt = System.currentTimeMillis() + 86_400_000L, reason = "Saldo de outro fuso"),
+            )
+            assertTrue(runCatching { repo.configureAccountBalance(account, 20000, at + 1, "Correção", original) }.isFailure)
+            repo.configureAccountBalance(account, 20000, at, "Correção", original)
+            val events = db.financeDao().allAccountBalanceEvents()
+            assertEquals(listOf(at, at), events.map { it.effectiveAt })
+            assertEquals(20000L, repo.observeAccountBalances(at).first().single().balanceCents)
         } finally { db.close() }
     }
 

@@ -62,21 +62,40 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         AccountLedgerHistory(accounts, records, references)
     }
 
-    suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) = writes.withLock {
+    suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) =
+        configureAccountBalance(name, balanceCents, effectiveAt, reason, correctionOf = null)
+
+    suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String,
+        correctionOf: Long?,
+    ) = writes.withLock {
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
         require(balanceCents in -Money.MAX_CENTS..Money.MAX_CENTS) { "Saldo fora do limite permitido." }
         require(!AccountFunds.isReserve(label) || balanceCents >= 0) { "A reserva não pode ter saldo inicial negativo." }
-        val date = java.time.Instant.ofEpochMilli(effectiveAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-        require(effectiveAt > 0 && effectiveAt == date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()) { "Informe o início da data de referência." }
-        require(!date.isAfter(LocalDate.now())) { "Use uma data de referência até hoje." }
+        if (correctionOf == null) {
+            val zone = ZoneId.systemDefault()
+            val date = java.time.Instant.ofEpochMilli(effectiveAt).atZone(zone).toLocalDate()
+            require(effectiveAt > 0 && effectiveAt == date.atStartOfDay(zone).toInstant().toEpochMilli()) {
+                "Informe o início da data de referência."
+            }
+            require(!date.isAfter(LocalDate.now(zone))) { "Use uma data de referência até hoje." }
+        }
         val cleanReason = reason.trim()
         require(cleanReason.isNotBlank() && cleanReason.length <= 200 && '\u0000' !in cleanReason) { "Informe um motivo com até 200 caracteres." }
         database.withTransaction {
+            val key = AccountNames.key(label)
+            val original = correctionOf?.let { id ->
+                dao.accountBalanceEvent(id).also { event ->
+                    require(event?.accountKey == key && event.effectiveAt == effectiveAt) {
+                        "O saldo original mudou. Abra o lançamento novamente."
+                    }
+                }
+            }
             val oldReferences = if (AccountFunds.isReserve(label)) dao.allAccountBalanceEvents().map { it.toReference() } else null
+            val now = System.currentTimeMillis()
             rememberAccount(label)
-            dao.insertAccountBalanceEvent(AccountBalanceEventEntity(accountKey = AccountNames.key(label), balanceCents = balanceCents,
-                effectiveAt = effectiveAt, createdAt = System.currentTimeMillis(), reason = cleanReason))
+            dao.insertAccountBalanceEvent(AccountBalanceEventEntity(accountKey = key, balanceCents = balanceCents,
+                effectiveAt = effectiveAt, createdAt = maxOf(now, original?.createdAt ?: now), reason = cleanReason))
             if (oldReferences != null) {
                 val records = dao.allRecords().map { it.toRecord() }
                 require(!AccountBalances.worsensReserveDeficit(records, records, oldReferences,
@@ -106,10 +125,17 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         dao.touchAccount(key, time)
     }
 
-    suspend fun addAccount(name: String): String = writes.withLock {
+    suspend fun addAccount(name: String): String = addAccount(name, requireActive = false)
+
+    suspend fun addAccount(name: String, requireActive: Boolean): String = writes.withLock {
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
-        database.withTransaction { rememberAccount(label) }
+        database.withTransaction {
+            require(!requireActive || dao.accountByKey(AccountNames.key(label))?.archived != true) {
+                "Esta conta está arquivada. Reative-a no Resumo."
+            }
+            rememberAccount(label)
+        }
         dao.accountByKey(AccountNames.key(label))!!.label
     }
 
@@ -169,18 +195,21 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val record = if (original != null) Refunds.applyOriginal(record, original) else record
             RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
             if (record.movement == Movement.TRANSFER) {
+                val sourceKey = AccountNames.key(record.bank)
+                val destinationKey = AccountNames.key(record.destination)
                 val unchangedLegacy = previous?.movement == Movement.TRANSFER &&
-                    AccountNames.key(previous.bank) == AccountNames.key(record.bank) && AccountNames.key(previous.destination) == AccountNames.key(record.destination)
-                require(AccountNames.key(record.bank) != AccountNames.key(record.destination)) { "Escolha contas diferentes para a transferência." }
-                if (!unchangedLegacy) require(dao.accountByKey(AccountNames.key(record.bank))?.archived == false &&
-                    dao.accountByKey(AccountNames.key(record.destination))?.archived == false) { "Cadastre as duas contas próprias antes de transferir." }
-                if (AccountFunds.isReserve(record.bank)) {
-                    val reserve = dao.accountByKey(AccountNames.key(record.bank))
-                    require(reserve != null) { "Cadastre a conta Reserva antes de resgatar." }
+                    AccountNames.key(previous.bank) == sourceKey && AccountNames.key(previous.destination) == destinationKey
+                if (!unchangedLegacy) {
+                    require(canTransferWithAccount(sourceKey) && canTransferWithAccount(destinationKey)) {
+                        "Cadastre as duas contas próprias antes de transferir."
+                    }
+                }
+                if (sourceKey == AccountFunds.RESERVE_KEY) {
+                    val reserve = AccountOption(sourceKey, AccountFunds.RESERVE_NAME, 0)
                     val otherRecords = dao.allRecords().filterNot { editing && it.id == record.id }.map { it.toRecord() }
-                    val available = AccountBalances.calculate(listOf(reserve.toOption()), emptySet(),
-                        dao.allAccountBalanceEvents().map { it.toReference() }, otherRecords, record.occurredAt).single().balanceCents
-                    require(available != null) { "Informe o saldo inicial da reserva antes de resgatar." }
+                    val available = checkNotNull(AccountBalances.calculate(listOf(reserve), emptySet(),
+                        dao.allAccountBalanceEvents().map { it.toReference() }, otherRecords, record.occurredAt,
+                        assumeZeroOpening = true).single().balanceCents)
                     require(record.amountCents <= available) { "Saldo insuficiente na reserva na data do resgate." }
                 }
             }
@@ -222,6 +251,11 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             }
             Unit
         }
+    }
+
+    private suspend fun canTransferWithAccount(key: String): Boolean {
+        val account = dao.accountByKey(key)
+        return if (account == null) key == AccountFunds.RESERVE_KEY else !account.archived
     }
 
     private suspend fun validateReserveChange(affected: List<Record>, replacements: List<Record>, removedIds: Set<String>) {

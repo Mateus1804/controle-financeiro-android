@@ -1,12 +1,8 @@
 package com.mateuswilliam.financas
 
-import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.data.AccountLedger
-import com.mateuswilliam.financas.data.CaptureSettings
-import com.mateuswilliam.financas.data.DraftEntity
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flow
@@ -23,24 +19,16 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FinanceStateObservationTest {
-    private enum class Source { LEDGER, PENDING, ACCOUNTS }
-
-    @Test fun refreshRecoversFromLedgerReadFailure() = verifyRefresh(Source.LEDGER)
-    @Test fun refreshRecoversFromPendingReadFailure() = verifyRefresh(Source.PENDING)
-    @Test fun refreshRecoversFromAccountReadFailure() = verifyRefresh(Source.ACCOUNTS)
+    private val snapshot = AccountLedger(42, emptyList(), emptyList(), emptyList(), emptyList())
 
     @Test fun refreshRetriesRepositoryInitialization() = runTest {
         val refreshes = MutableStateFlow(0L)
         var attempts = 0
-        val sources by lazy {
+        val ledger by lazy {
             if (++attempts == 1) error("Falha de abertura simulada")
-            FinanceStateSources(
-                flowOf(AccountLedger(42, emptyList(), emptyList(), emptyList(), emptyList())),
-                flowOf(emptyList()),
-                flowOf(emptyList()),
-            )
+            flowOf(snapshot)
         }
-        val state = observeFinanceState(refreshes, MutableStateFlow(CaptureSettings())) { sources }
+        val state = observeFinanceState(refreshes) { ledger }
             .stateIn(backgroundScope, SharingStarted.Eagerly, FinanceState())
 
         assertEquals(0, attempts)
@@ -56,33 +44,22 @@ class FinanceStateObservationTest {
         assertNull(state.value.loadError)
     }
 
-    private fun verifyRefresh(failedSource: Source) = runTest {
+    @Test fun refreshRecoversFromLedgerReadFailure() = runTest {
         val refreshes = MutableStateFlow(0L)
-        val settings = MutableStateFlow(CaptureSettings())
         val failRead = CompletableDeferred<Unit>()
-        val subscriptions = mutableMapOf<Source, Int>()
-        fun <T> observed(source: Source, value: T) = flow {
-            val attempt = subscriptions.getOrDefault(source, 0) + 1
-            subscriptions[source] = attempt
-            if (source == failedSource && attempt == 1) {
+        var subscriptions = 0
+        val ledger = flow {
+            if (++subscriptions == 1) {
                 failRead.await()
                 error("Falha de leitura simulada")
             }
-            emit(value)
-            awaitCancellation()
+            emit(snapshot)
         }
-        val snapshot = AccountLedger(42, emptyList(), emptyList(), emptyList(), emptyList())
-        val accounts = listOf(AccountOption("carteira", "Carteira", 42))
-        val state = observeFinanceState(refreshes, settings) {
-            FinanceStateSources(
-                observed(Source.LEDGER, snapshot),
-                observed(Source.PENDING, emptyList<DraftEntity>()),
-                observed(Source.ACCOUNTS, accounts),
-            )
-        }.stateIn(backgroundScope, SharingStarted.Eagerly, FinanceState())
+        val state = observeFinanceState(refreshes) { ledger }
+            .stateIn(backgroundScope, SharingStarted.Eagerly, FinanceState())
 
         runCurrent()
-        assertEquals(Source.entries.associateWith { 1 }, subscriptions)
+        assertEquals(1, subscriptions)
         failRead.complete(Unit)
         runCurrent()
         assertFalse(state.value.loaded)
@@ -90,10 +67,9 @@ class FinanceStateObservationTest {
 
         refreshes.value++
         runCurrent()
-        assertEquals(Source.entries.associateWith { 2 }, subscriptions)
+        assertEquals(2, subscriptions)
         assertTrue(state.value.loaded)
         assertNull(state.value.loadError)
         assertEquals(snapshot.asOf, state.value.asOf)
-        assertEquals(accounts, state.value.accounts)
     }
 }

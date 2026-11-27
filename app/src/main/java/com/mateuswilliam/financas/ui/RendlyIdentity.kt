@@ -6,7 +6,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.mateuswilliam.financas.core.*
 
 @Composable
 internal fun DisplayNameDialog(initial: String, dismiss: () -> Unit, save: (String) -> Unit, firstRun: Boolean = false) {
@@ -28,21 +27,4 @@ internal fun DisplayNameDialog(initial: String, dismiss: () -> Unit, save: (Stri
         Row { if (!firstRun) TextButton({ runCatching { save("") }.onSuccess { dismiss() }.onFailure { error = it.message } }) { Text("Apagar nome") }
             TextButton(dismiss) { Text(if (firstRun) "Agora não" else "Cancelar") } }
     })
-}
-
-@Composable
-internal fun RendlyCategories(summary: CentralFinancialSummary, hidden: Boolean) {
-    Column(Modifier.testTag("forecast-categories"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Gastos por categoria", style = MaterialTheme.typography.titleMedium)
-        val grouped = summary.expensesByCategory
-        if (grouped.isEmpty()) Text("As categorias aparecem após cadastrar despesas.")
-        grouped.entries.sortedByDescending { it.value }.forEach { (category, cents) ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(category.label, Modifier.weight(1f)); Amount(cents, hidden, size = 16)
-            }
-            if (!hidden && grouped.values.all { it >= 0 } && summary.projectedExpensesCents > 0 && cents > 0) LinearProgressIndicator(
-                progress = { (cents.toDouble() / summary.projectedExpensesCents).toFloat().coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth())
-        }
-    }
 }

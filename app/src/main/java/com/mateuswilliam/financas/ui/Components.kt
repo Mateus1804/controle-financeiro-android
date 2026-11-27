@@ -4,13 +4,11 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,16 +82,6 @@ fun SectionTitle(title: String, subtitle: String? = null) {
 }
 
 @Composable
-fun EmptyCard(title: String, message: String) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shape = MaterialTheme.shapes.large) {
-        Column(Modifier.fillMaxWidth().padding(FinanceSpacing.card), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
-
-@Composable
 fun IconBadge(@DrawableRes icon: Int, color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary) {
     Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(color.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
         Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
@@ -154,10 +142,13 @@ fun RecordRow(record: Record, hidden: Boolean, onEdit: (() -> Unit)? = null) {
         headlineContent = { Text(privateDisplayText(record.description, hidden), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium) },
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("${privateDisplayText(record.bank, hidden)} · ${shortDate(record.occurredAt)}", style = MaterialTheme.typography.bodySmall)
+                val origin = privateDisplayText(record.bank, hidden)
+                Text(if (record.movement == Movement.TRANSFER)
+                    "$origin → ${privateDisplayText(record.destination, hidden)}" else origin, style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     AppIcon(movementIcon(record.movement), Modifier.size(14.dp))
-                    Text("${record.movement.label} · ${record.category.label}", style = MaterialTheme.typography.labelSmall)
+                    Text(if (record.movement == Movement.TRANSFER) record.movement.label else "${record.movement.label} · ${record.category.label}",
+                        style = MaterialTheme.typography.labelSmall)
                 }
                 if (largeText) CompositionLocalProvider(LocalContentColor provides color) { Amount(record.amountCents, hidden, size = 18) }
             }
@@ -170,11 +161,6 @@ fun RecordRow(record: Record, hidden: Boolean, onEdit: (() -> Unit)? = null) {
         }} else if (onEdit != null) {{ AppIcon(R.drawable.ic_chevron_right) }} else null,
     )
 }
-
-// Superfícies adjacentes compartilham o mesmo fundo sem divisórias ou cartões aninhados.
-fun groupedShape(index: Int, count: Int): RoundedCornerShape = RoundedCornerShape(
-    topStart = if (index == 0) 20.dp else 0.dp, topEnd = if (index == 0) 20.dp else 0.dp,
-    bottomStart = if (index == count - 1) 20.dp else 0.dp, bottomEnd = if (index == count - 1) 20.dp else 0.dp)
 
 @Composable
 internal fun FinanceDisclosure(title: String, tag: String, initiallyExpanded: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
@@ -216,25 +202,6 @@ internal fun ContextualActions(label: String, tag: String, enabled: Boolean, act
                     modifier = Modifier.heightIn(min = FinanceSpacing.touch).then(action.tag?.let { Modifier.testTag(it) } ?: Modifier),
                 )
             }
-        }
-    }
-}
-
-@Composable
-fun CategoryBar(label: String, cents: Long, maximum: Long, hidden: Boolean, onClick: (() -> Unit)? = null) {
-    Surface(modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Amount(cents, hidden, Modifier.widthIn(max = 168.dp), size = 16)
-            }
-            if (!hidden) LinearProgressIndicator(
-                progress = { (cents.toDouble() / maximum.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(6.dp).clearAndSetSemantics {},
-                color = if (label.startsWith("Receita")) LocalFinanceColors.current.income else LocalFinanceColors.current.expense,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            )
         }
     }
 }

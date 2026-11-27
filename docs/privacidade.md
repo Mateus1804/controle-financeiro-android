@@ -1,47 +1,17 @@
 # Privacidade e tratamento dos dados
 
-Versão 0.1.0 · 24/10/2026
+O Rendly registra lançamentos, contas, saldos iniciais e preferências no armazenamento privado do Android. Os nomes das contas funcionam como apelidos. O cadastro pede valor, data e os detalhes necessários para a movimentação.
 
-O Controle Financeiro é um aplicativo de registro financeiro local. Nesta versão, o processamento ocorre no aparelho, sem servidor, cadastro de usuário, anúncios ou serviços de análise de uso.
+Instalações e backups do Rendly v1 podem conter previsões antigas e sugestões geradas por notificações em versões anteriores. Esses dados continuam preservados para compatibilidade. O formulário atual é manual e o app dispensa permissões de captura e envio de notificações.
 
-## Dados utilizados
+## Exibição e proteção
 
-São armazenados os lançamentos confirmados: valor, data, movimentação, meio de pagamento, categoria, descrição, conta de origem e, quando aplicável, destino.
+A opção de ocultar valores mascara montantes e percentuais na interface e nos rótulos acessíveis. A edição de valor exige revelação explícita enquanto essa opção está ativa.
 
-Também são mantidos os nomes das contas cadastradas e sua ordem de uso, a última origem escolhida manualmente, o tema da interface e as escolhas de apresentação inicial e fechamento dos avisos. Esses nomes funcionam como apelidos locais; o cadastro não solicita número de conta nem senha bancária.
+O bloqueio opcional usa a autenticação do aparelho. Biometria, PIN, padrão e senha são tratados pelo Android. O Rendly recebe o resultado da autenticação. A proteção da tela usa `FLAG_SECURE` para impedir capturas e ocultar a imagem nos aplicativos recentes.
 
-O planejamento armazena limites mensais por categoria, previsões recorrentes, vencimentos tratados e estado dos lembretes. As preferências de autenticação e proteção de tela permanecem neste aparelho. Biometria, PIN, padrão e senha do Android são tratados pelo sistema; o aplicativo recebe somente o resultado da autenticação.
+## Backup
 
-Com consentimento e captura ativa, o aplicativo acessa o nome da origem, identificador, horário, título e texto das notificações selecionadas. O Android concede uma autorização ampla; o filtro de origens é aplicado antes da leitura do texto.
+O app mantém o backup automático do Android desativado. O backup manual é criptografado antes de ser entregue ao seletor de arquivos e depende da senha escolhida pelo usuário. O destino pode ser o próprio aparelho ou um provedor de arquivos de sua escolha.
 
-A seleção mostra nomes de aplicativos com ícone de abertura disponíveis no perfil atual do Android. Somente os pacotes selecionados são guardados nas preferências locais.
-
-## Finalidade e retenção
-
-As notificações geram sugestões pendentes de confirmação. Mensagens identificadas como senha, código ou autenticação são descartadas. O lançamento guarda a descrição confirmada pelo usuário, preenchida inicialmente com o nome do banco. Após a confirmação ou o descarte da pendência, o título e o texto originais são apagados da pendência. Identificadores locais e o estado da revisão são mantidos para evitar o reprocessamento do evento. Descrições já salvas permanecem no histórico.
-
-Lançamentos confirmados permanecem armazenados até sua exclusão. A caixa pode conter informações financeiras e pessoais presentes em notificações pendentes; desligar a captura interrompe novas leituras, mas preserva o histórico já salvo. A opção de apagar todos os dados remove registros, pendências, contas, orçamentos, recorrências, vencimentos tratados e preferências e desativa a captura local. Arquivos já exportados permanecem no destino escolhido.
-
-## Compartilhamento e exportação
-
-O aplicativo não envia dados bancários, inventário de aplicativos ou credenciais para serviços externos. A exportação CSV é iniciada pelo usuário para um destino escolhido por ele e contém as previsões de receitas e gastos do ciclo selecionado. Esse arquivo fica sob o controle do destino escolhido.
-
-O backup também depende de uma ação explícita e é entregue já criptografado ao seletor de arquivos. Inclui pendências, que podem conter texto bancário ainda não revisado, além de lançamentos e planejamento. O provedor de arquivos escolhido pode oferecer armazenamento local ou externo. A senha e a segurança desse destino ficam sob responsabilidade do usuário; o aplicativo não guarda uma cópia da senha.
-
-Durante a conferência de uma restauração, os dados são decifrados em memória e inseridos em um banco temporário privado. O aplicativo confere a exclusão dessa base ao cancelar, concluir ou falhar a operação. Se a limpeza ficar pendente, o aplicativo avisa e tenta novamente na próxima abertura ou operação de backup. A exclusão lógica não garante apagamento físico de memória ou armazenamento flash. A restauração preserva as autorizações e a proteção locais, mantendo captura e lembretes pausados para conferência.
-
-## Proteção e limitações
-
-Os dados ficam no armazenamento privado do Android. O banco Room não recebe uma camada adicional de criptografia própria nesta versão. Os backups automáticos de nuvem e transferência de dispositivo estão desativados para evitar cópias não planejadas.
-
-Ocultar totais mascara valores do resumo, histórico, gráficos e planejamento. Ao abrir um formulário de revisão ou edição, os campos continuam visíveis para conferência. Esse controle visual não substitui o bloqueio do aparelho.
-
-O bloqueio opcional utiliza biometria forte ou credencial do aparelho, conforme as APIs disponíveis. A sessão não é salva como autenticação permanente. A proteção da imagem utiliza `FLAG_SECURE`, inclusive nos formulários e calendários nativos; seu comportamento pode variar por versão e fabricante. Esse recurso não criptografa o banco Room.
-
-Os dados locais podem ser perdidos ao desinstalar o aplicativo ou apagar seus dados no Android. A recuperação exige um backup válido e sua senha original. O formato e os limites estão descritos em [Backup e recuperação](backup.md). A proteção e a recuperação em aparelhos reais e as informações exigidas antes da disponibilização de uma versão pública de produção ainda precisam de validação.
-
-## Controle da captura
-
-A captura é opcional. Recusar ou revogar a autorização preserva a possibilidade de lançar manualmente. O acesso às notificações e a permissão para enviar alertas são autorizações distintas do Android. A seleção de bancos pode ser modificada nos ajustes.
-
-Os lembretes de vencimentos têm um controle próprio. Recusar alertas não interrompe uma captura já autorizada nem impede a revisão ou o planejamento dentro do aplicativo. Os alertas de captura e de vencimento não exibem valor, descrição ou conta da transação.
+A restauração confere os dados em um banco temporário privado antes da confirmação. Se a limpeza dessa base ficar pendente, o app exibe um aviso em Ajustes. Para recuperar dados após apagar a instalação, use um backup válido e a senha correspondente. [Backup e recuperação](backup.md)

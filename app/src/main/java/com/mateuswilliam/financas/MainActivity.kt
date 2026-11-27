@@ -22,29 +22,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mateuswilliam.financas.notifications.ReviewNotifications
-import com.mateuswilliam.financas.ui.ForecastApp
 import com.mateuswilliam.financas.ui.FinanceTheme
 import com.mateuswilliam.financas.ui.LockScreen
+import com.mateuswilliam.financas.ui.RendlySheetApp
 import com.mateuswilliam.financas.security.AppLockState
 import com.mateuswilliam.financas.security.AuthenticationAction
 import com.mateuswilliam.financas.core.SessionPolicy
-import com.mateuswilliam.financas.notifications.RecurringReminders
-import com.mateuswilliam.financas.notifications.ForecastReminders
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    private var resumeCount by mutableIntStateOf(0)
-    private var draftFromNotification by mutableStateOf<String?>(null)
-    private var planningFromNotification by mutableStateOf(false)
     private lateinit var session: AppLockState
     private lateinit var financeModel: FinanceViewModel
     private var biometricSignal: CancellationSignal? = null
@@ -59,8 +49,6 @@ class MainActivity : ComponentActivity() {
         financeModel = ViewModelProvider(this)[FinanceViewModel::class.java]
         updateScreenProtection(app.settings.snapshot().secureScreen)
         enableEdgeToEdge()
-        draftFromNotification = intent.getStringExtra(ReviewNotifications.EXTRA_DRAFT_ID)
-        planningFromNotification = intent.getBooleanExtra(RecurringReminders.EXTRA_PLANNING, false)
         setContent {
             val settings by financeModel.preferences.state.collectAsStateWithLifecycle()
             val dark = settings.appearance.usesDarkTheme(isSystemInDarkTheme())
@@ -80,13 +68,8 @@ class MainActivity : ComponentActivity() {
                 if (settings.lockEnabled && !session.authenticated) LockScreen(session.authenticating, session.message) {
                     authenticate(AuthenticationAction.UNLOCK)
                 } else savedUi.SaveableStateProvider("finance") {
-                    ForecastApp(financeModel, ViewModelProvider(this@MainActivity)[ForecastViewModel::class.java], resumeCount,
-                        ui = ViewModelProvider(this@MainActivity)[com.mateuswilliam.financas.ui.ForecastUiStateViewModel::class.java],
-                        incomingDraft = draftFromNotification,
-                        consumeDraft = { draftFromNotification = null; intent.removeExtra(ReviewNotifications.EXTRA_DRAFT_ID) },
-                        onLockChange = { authenticate(if (it) AuthenticationAction.ENABLE else AuthenticationAction.DISABLE) },
-                        incomingPlanning = planningFromNotification,
-                        consumePlanning = { planningFromNotification = false; intent.removeExtra(RecurringReminders.EXTRA_PLANNING) })
+                    RendlySheetApp(financeModel, ViewModelProvider(this@MainActivity)[CycleViewModel::class.java],
+                        onLockChange = { authenticate(if (it) AuthenticationAction.ENABLE else AuthenticationAction.DISABLE) })
                 }
             }
         }
@@ -95,7 +78,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         financeModel.refreshBalances()
-        resumeCount++
         synchronizeSystemBarIcons()
         if (::session.isInitialized) {
             val app = application as FinanceApplication
@@ -103,9 +85,6 @@ class MainActivity : ComponentActivity() {
             if (SessionPolicy.requiresAuthentication(app.settings.snapshot().lockEnabled, session.authenticated,
                     session.backgroundAt, SystemClock.elapsedRealtime(), keyguard.isDeviceLocked)) session.authenticated = false
             session.backgroundAt = null
-            app.background.launch { runCatching {
-                ForecastReminders.notifyToday(app)
-            } }
         }
     }
     override fun onStop() {
@@ -117,13 +96,6 @@ class MainActivity : ComponentActivity() {
         }
         super.onStop()
     }
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        draftFromNotification = intent.getStringExtra(ReviewNotifications.EXTRA_DRAFT_ID)
-        planningFromNotification = intent.getBooleanExtra(RecurringReminders.EXTRA_PLANNING, false)
-    }
-
     private fun updateScreenProtection(enabled: Boolean) {
         if (enabled) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)

@@ -9,19 +9,11 @@ import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.mateuswilliam.financas.core.NotificationInput
 import com.mateuswilliam.financas.core.Record
-import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.core.AccountBalance
 import com.mateuswilliam.financas.core.AccountBalanceReference
-import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.data.AccountLedger
 import com.mateuswilliam.financas.data.StagedRestore
-import com.mateuswilliam.financas.data.CaptureSettings
-import com.mateuswilliam.financas.data.DraftEntity
-import com.mateuswilliam.financas.data.DraftChangedException
-import com.mateuswilliam.financas.notifications.ReviewNotifications
-import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,15 +21,13 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -45,65 +35,37 @@ import kotlinx.coroutines.withContext
 
 data class FinanceState(
     val records: List<Record> = emptyList(),
-    val pending: List<DraftEntity> = emptyList(),
-    val settings: CaptureSettings = CaptureSettings(),
     val loaded: Boolean = false,
-    val accounts: List<AccountOption> = emptyList(),
-    val manualRecords: List<Record> = emptyList(),
     val accountBalances: List<AccountBalance> = emptyList(),
     val balanceReferences: List<AccountBalanceReference> = emptyList(),
     val asOf: Long = System.currentTimeMillis(),
     val loadError: String? = null,
 )
 
-internal class FinanceStateSources(
-    val ledger: Flow<AccountLedger>,
-    val pending: Flow<List<DraftEntity>>,
-    val accounts: Flow<List<AccountOption>>,
-)
-
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun observeFinanceState(
     refreshes: Flow<Long>,
-    settings: StateFlow<CaptureSettings>,
-    loadSources: suspend () -> FinanceStateSources,
+    loadLedger: suspend () -> Flow<AccountLedger>,
 ): Flow<FinanceState> = refreshes.flatMapLatest {
     flow {
-        val sources = loadSources()
-        emitAll(combine(sources.ledger, sources.pending, settings, sources.accounts) { snapshot, drafts, capture, options ->
-            FinanceState(
-                records = snapshot.records,
-                pending = drafts,
-                settings = capture,
-                loaded = true,
-                accounts = options,
-                manualRecords = snapshot.manualRecords,
-                accountBalances = snapshot.balances,
-                balanceReferences = snapshot.references,
-                asOf = snapshot.asOf,
-            )
-        })
+        loadLedger().collect { emit(it) }
+    }.map { snapshot ->
+        FinanceState(records = snapshot.records, loaded = true, accountBalances = snapshot.balances,
+            balanceReferences = snapshot.references, asOf = snapshot.asOf)
     }.catch { exception ->
         if (exception !is Exception || exception is CancellationException) throw exception
-        emit(FinanceState(settings = settings.value, loadError = "Não foi possível carregar os dados financeiros. Tente novamente."))
+        emit(FinanceState(loadError = "Não foi possível carregar os dados financeiros. Tente novamente."))
     }
 }
-
-data class SelectableApp(val packageName: String, val label: String)
 
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as FinanceApplication
     val preferences = app.settings
-    val connected = app.listenerConnected
-    val captureError = app.captureError
     val busy = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
-    val apps = MutableStateFlow<List<SelectableApp>>(emptyList())
-    val loadingApps = MutableStateFlow(false)
     private val refreshRequests = MutableStateFlow(0L)
-    val state = observeFinanceState(refreshRequests, preferences.state) {
-        val repository = loadRepository()
-        FinanceStateSources(repository.observeAccountLedger(clockChanges()), repository.pending, repository.accounts)
+    val state = observeFinanceState(refreshRequests) {
+        loadRepository().observeAccountLedger(clockChanges())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
     val stagedRestore = MutableStateFlow<StagedRestore?>(null)
     private val dataRevision = MutableStateFlow(0L)
@@ -127,25 +89,18 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         awaitClose { app.unregisterReceiver(receiver) }
     }.conflate()
 
-    fun save(record: Record, draftId: String?, editing: Boolean, expectedRevision: Int?, onSaved: () -> Unit) = action {
-        val saved = try { loadRepository().save(record, draftId, editing, expectedRevision) }
-        catch (exception: DraftChangedException) { return@action exception.message.orEmpty() }
-        if (draftId != null) ReviewNotifications.cancel(app, draftId)
+    fun save(record: Record, editing: Boolean, onSaved: () -> Unit) = action {
+        val saved = loadRepository().save(record, draftId = null, editing = editing)
         if (saved) onSaved()
-        if (saved) "Lançamento registrado." else "Este item já foi revisado ou removido."
-    }
-
-    fun dismiss(id: String, onDismissed: () -> Unit = {}) = action {
-        loadRepository().dismiss(id)
-        ReviewNotifications.cancel(app, id)
-        onDismissed()
-        "Notificação ignorada. Nenhum lançamento foi criado."
+        if (saved) "Lançamento salvo." else "Este lançamento já foi removido."
     }
 
     fun delete(id: String) = action { loadRepository().deleteRecord(id); "Lançamento removido." }
     fun refreshBalances() { refreshRequests.update { it + 1 } }
-    fun configureAccountBalance(name: String, cents: Long, effectiveAt: Long, reason: String, onSaved: () -> Unit) = action {
-        loadRepository().configureAccountBalance(name, cents, effectiveAt, reason)
+    fun configureAccountBalance(name: String, cents: Long, effectiveAt: Long, reason: String,
+        correctionOf: Long?, onSaved: () -> Unit,
+    ) = action {
+        loadRepository().configureAccountBalance(name, cents, effectiveAt, reason, correctionOf)
         onSaved()
         "Saldo de referência salvo. Nenhuma receita ou despesa foi criada."
     }
@@ -153,15 +108,6 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         loadRepository().setAccountArchived(key, archived)
         if (archived) "Conta arquivada. Saldo e histórico foram preservados." else "Conta reativada."
     }
-    fun clear() = action {
-        val preferencesCleared = loadRepository().clear()
-        dataRevision.update { it + 1 }
-        ReviewNotifications.cancelAll(app)
-        app.merchantCategories.clear()
-        if (preferencesCleared) "Dados apagados e captura desativada."
-        else "Os dados financeiros foram apagados, mas as preferências não puderam ser limpas. Captura e lembretes permanecem pausados. Confira o armazenamento e tente novamente."
-    }
-
     fun createBackup(password: CharArray, fileName: String) {
         if (busy.value) { password.fill('\u0000'); return }
         if (encryptedBackup != null) {
@@ -232,11 +178,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         try {
             val displayPreferencesSaved = app.backups.restore(staged)
             dataRevision.update { it + 1 }
-            ReviewNotifications.cancelAll(app)
             if (displayPreferencesSaved) {
-                "Dados restaurados. A captura e os lembretes ficaram pausados. As autorizações do Android são específicas deste aparelho."
+                "Dados restaurados."
             } else {
-                "Dados financeiros restaurados. Falha ao salvar as preferências de exibição. A captura e os lembretes ficaram pausados."
+                "Dados financeiros restaurados. Falha ao salvar as preferências de exibição."
             }
         } finally {
             stagedRestore.value = null
@@ -261,40 +206,5 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun loadApps() {
-        if (!preferences.state.value.consented || loadingApps.value) return
-        loadingApps.value = true
-        viewModelScope.launch {
-            try {
-                apps.value = withContext(Dispatchers.IO) {
-                    val manager = app.packageManager
-                    manager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-                        .map { SelectableApp(it.activityInfo.packageName, it.loadLabel(manager).toString().take(80)) }
-                        .distinctBy { it.packageName }.filter { it.packageName != app.packageName }
-                        .sortedBy { it.label.lowercase(java.util.Locale.ROOT) }
-                }
-            } catch (_: Exception) { message.value = "Não foi possível listar os aplicativos disponíveis." }
-            finally { loadingApps.value = false }
-        }
-    }
-
-    fun simulate() {
-        if (!BuildConfig.DEBUG) return
-        action {
-            val repository = loadRepository()
-            val examples = listOf(
-                "Inter · exemplo" to "Pix enviado de R$ 68,50. Restaurante Exemplo.",
-                "PicPay · exemplo" to "Pix recebido de R$ 250,00.",
-                "Nubank · exemplo" to "Compra aprovada no cartão de R$ 119,90. Posto de combustível.",
-            )
-            examples.forEach { (bank, text) ->
-                val key = UUID.randomUUID().toString()
-                repository.capture(NotificationInput("simulacao.local", "simulacao:$key", bank,
-                    "SIMULAÇÃO — dados fictícios", text, System.currentTimeMillis()), simulation = true)
-            }
-            "Três exemplos fictícios foram adicionados à revisão."
-        }
-    }
-
-    suspend fun addAccount(name: String): String = loadRepository().addAccount(name)
+    suspend fun addAccount(name: String): String = loadRepository().addAccount(name, requireActive = true)
 }

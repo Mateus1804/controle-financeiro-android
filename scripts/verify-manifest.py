@@ -8,9 +8,7 @@ tree = ET.parse(manifest).getroot()
 android = "{http://schemas.android.com/apk/res/android}"
 permissions = {node.get(android + "name") for node in tree.findall("uses-permission")}
 allowed = {
-    "android.permission.POST_NOTIFICATIONS",
     "android.permission.USE_BIOMETRIC",
-    "android.permission.RECEIVE_BOOT_COMPLETED",
     "com.mateuswilliam.financas.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
 }
 if permissions - allowed:
@@ -18,10 +16,7 @@ if permissions - allowed:
 application = tree.find("application")
 if application.get(android + "allowBackup") != "false":
     raise SystemExit("O backup automático do Android deve permanecer desativado nesta versão.")
-listener = next(node for node in application.findall("service") if node.get(android + "name", "").endswith("BankNotificationListener"))
-if listener.get(android + "exported") != "false" or listener.get(android + "permission") != "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE":
-    raise SystemExit("O serviço de captura precisa ser privado e protegido pela permissão do sistema.")
-reminders = next(node for node in application.findall("service") if node.get(android + "name", "").endswith("RecurringReminderService"))
-if reminders.get(android + "exported") != "false" or reminders.get(android + "permission") != "android.permission.BIND_JOB_SERVICE":
-    raise SystemExit("O agendador de lembretes precisa ser privado e protegido pela permissão do sistema.")
-print("Manifesto conferido: permissões limitadas, serviços protegidos e backup automático do Android desativado.")
+removed_services = ("BankNotificationListener", "RecurringReminderService")
+if any(node.get(android + "name", "").endswith(removed_services) for node in application.findall("service")):
+    raise SystemExit("O manifesto voltou a incluir serviços de captura ou lembretes.")
+print("Manifesto conferido. Permissões limitadas e backup automático do Android desativado.")

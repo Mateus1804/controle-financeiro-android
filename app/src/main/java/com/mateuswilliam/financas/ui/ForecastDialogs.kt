@@ -16,7 +16,7 @@ internal val financeDateFormat: java.time.format.DateTimeFormatter = java.time.f
 @Composable
 internal fun CycleDayEditor(
     currentDay: Int, busy: Boolean = false, preview: (Int) -> BudgetPeriod,
-    onDismiss: () -> Unit, onSave: (Int) -> Unit, firstConfiguration: Boolean = false,
+    onDismiss: () -> Unit, onSave: (Int) -> Unit, firstConfiguration: Boolean = false, error: String? = null,
 ) {
     var day by rememberSaveable { mutableIntStateOf(currentDay) }
     val next = preview(day)
@@ -27,6 +27,7 @@ internal fun CycleDayEditor(
             Text("${if (firstConfiguration) "Ciclo inicial" else "Primeiro ciclo com a mudança"} · ${next.start.format(financeDateFormat)} a ${next.endExclusive.minusDays(1).format(financeDateFormat)}")
             Text(if (firstConfiguration) "Esta configuração define o ciclo atual. Nos meses mais curtos, o dia é ajustado ao último dia do mês."
                 else "A mudança começa na data da prévia. Ciclos com vínculos e ajustes registrados são preservados.", style = MaterialTheme.typography.bodySmall)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         } },
         confirmButton = { FilledTonalButton({ onSave(day) }, enabled = !busy, modifier = Modifier.testTag("cycle-save")) { Text("Salvar dia do ciclo") } },
         dismissButton = { TextButton(onDismiss, enabled = !busy) { Text("Cancelar") } })
