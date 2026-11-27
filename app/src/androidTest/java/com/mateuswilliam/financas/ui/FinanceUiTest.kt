@@ -59,8 +59,10 @@ class FinanceUiTest {
 
         scrollSummary(hasTestTag("sheet-chart"))
         rule.onNodeWithText(ExpenseLegendText.percentage(10000)).assertExists()
-        scrollSummary(hasText(Category.OTHER.label) and hasClickAction())
-        clickText(Category.OTHER.label)
+        val category = "sheet-category-${Category.OTHER.name}"
+        scrollSummary(hasTestTag(category))
+        rule.onNodeWithTag(category).performScrollTo().assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         waitFor(hasTestTag("records-list"))
         rule.onNodeWithText("Moradia fictícia").assertExists()
         rule.onNodeWithText("Salário fictício").assertDoesNotExist()

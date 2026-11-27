@@ -62,8 +62,11 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         AccountLedgerHistory(accounts, records, references)
     }
 
+    suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) =
+        configureAccountBalance(name, balanceCents, effectiveAt, reason, correctionOf = null)
+
     suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String,
-        correctionOf: Long? = null,
+        correctionOf: Long?,
     ) = writes.withLock {
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
@@ -122,7 +125,9 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         dao.touchAccount(key, time)
     }
 
-    suspend fun addAccount(name: String, requireActive: Boolean = false): String = writes.withLock {
+    suspend fun addAccount(name: String): String = addAccount(name, requireActive = false)
+
+    suspend fun addAccount(name: String, requireActive: Boolean): String = writes.withLock {
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
         database.withTransaction {

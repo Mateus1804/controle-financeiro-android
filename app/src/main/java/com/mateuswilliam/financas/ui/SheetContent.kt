@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.R
@@ -153,7 +154,8 @@ private fun SheetCategoryChart(report: ExpenseReport, hidden: Boolean, onCategor
                 }
             }
             report.groups.forEachIndexed { index, group ->
-                val legendRow = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClickLabel = "Ver lançamentos") {
+                val legendRow = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("sheet-category-${group.key}")
+                    .clickable(onClickLabel = "Ver lançamentos", role = Role.Button) {
                     onCategory(Category.valueOf(group.key))
                 }.padding(vertical = 4.dp)
                 val dot = if (hidden) track else palette[index % palette.size]
