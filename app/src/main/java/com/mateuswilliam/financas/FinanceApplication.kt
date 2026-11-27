@@ -10,21 +10,14 @@ import com.mateuswilliam.financas.data.BackupStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
-import com.mateuswilliam.financas.notifications.RecurringReminders
 
 class FinanceApplication : Application() {
     val settings by lazy { CapturePreferences(this) }
-    val merchantCategories by lazy { com.mateuswilliam.financas.data.MerchantCategoryStore(this) }
     val database by lazy {
         // Reset financeiro solicitado pelo proprietário: esta versão não migra dados anteriores.
         if (discardLegacyDatabase(this, settings)) {
             settings.rememberOrigin("")
-            merchantCategories.clear()
         }
         Room.databaseBuilder(this, FinanceDatabase::class.java, "rendly-v1.db").build()
     }
@@ -33,15 +26,10 @@ class FinanceApplication : Application() {
     val backups by lazy { BackupStore(this) { repository } }
     val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val maintenanceReady by lazy { background.async { backups.removeAbandonedStages() } }
-    val listenerConnected = MutableStateFlow(false)
-    val captureError = MutableStateFlow(false)
 
     override fun onCreate() {
         super.onCreate()
         maintenanceReady
-        background.launch {
-            settings.state.map { it.remindersEnabled }.distinctUntilChanged().collect { RecurringReminders.schedule(this@FinanceApplication) }
-        }
     }
 }
 

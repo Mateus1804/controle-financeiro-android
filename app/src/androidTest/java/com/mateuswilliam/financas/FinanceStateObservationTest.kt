@@ -2,8 +2,6 @@ package com.mateuswilliam.financas
 
 import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.data.AccountLedger
-import com.mateuswilliam.financas.data.CaptureSettings
-import com.mateuswilliam.financas.data.DraftEntity
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -23,10 +21,9 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FinanceStateObservationTest {
-    private enum class Source { LEDGER, PENDING, ACCOUNTS }
+    private enum class Source { LEDGER, ACCOUNTS }
 
     @Test fun refreshRecoversFromLedgerReadFailure() = verifyRefresh(Source.LEDGER)
-    @Test fun refreshRecoversFromPendingReadFailure() = verifyRefresh(Source.PENDING)
     @Test fun refreshRecoversFromAccountReadFailure() = verifyRefresh(Source.ACCOUNTS)
 
     @Test fun refreshRetriesRepositoryInitialization() = runTest {
@@ -37,10 +34,9 @@ class FinanceStateObservationTest {
             FinanceStateSources(
                 flowOf(AccountLedger(42, emptyList(), emptyList(), emptyList(), emptyList())),
                 flowOf(emptyList()),
-                flowOf(emptyList()),
             )
         }
-        val state = observeFinanceState(refreshes, MutableStateFlow(CaptureSettings())) { sources }
+        val state = observeFinanceState(refreshes) { sources }
             .stateIn(backgroundScope, SharingStarted.Eagerly, FinanceState())
 
         assertEquals(0, attempts)
@@ -58,7 +54,6 @@ class FinanceStateObservationTest {
 
     private fun verifyRefresh(failedSource: Source) = runTest {
         val refreshes = MutableStateFlow(0L)
-        val settings = MutableStateFlow(CaptureSettings())
         val failRead = CompletableDeferred<Unit>()
         val subscriptions = mutableMapOf<Source, Int>()
         fun <T> observed(source: Source, value: T) = flow {
@@ -73,10 +68,9 @@ class FinanceStateObservationTest {
         }
         val snapshot = AccountLedger(42, emptyList(), emptyList(), emptyList(), emptyList())
         val accounts = listOf(AccountOption("carteira", "Carteira", 42))
-        val state = observeFinanceState(refreshes, settings) {
+        val state = observeFinanceState(refreshes) {
             FinanceStateSources(
                 observed(Source.LEDGER, snapshot),
-                observed(Source.PENDING, emptyList<DraftEntity>()),
                 observed(Source.ACCOUNTS, accounts),
             )
         }.stateIn(backgroundScope, SharingStarted.Eagerly, FinanceState())

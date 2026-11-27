@@ -16,6 +16,7 @@ object AccountBalances {
         references: List<AccountBalanceReference>,
         records: List<Record>,
         asOf: Long,
+        assumeZeroOpening: Boolean = false,
     ): List<AccountBalance> {
         if (accounts.isEmpty()) return emptyList()
 
@@ -25,16 +26,19 @@ object AccountBalances {
         val balances = HashMap<String, RunningBalance>()
         for (reference in references) {
             if (reference.effectiveAt > asOf || reference.accountKey !in accountKeys) continue
-            val current = balances[reference.accountKey]
-            if (current == null || referenceOrder.compare(reference, current.reference) > 0) {
+            val current = balances[reference.accountKey]?.reference
+            if (current == null || referenceOrder.compare(reference, current) > 0) {
                 balances[reference.accountKey] = RunningBalance(reference)
             }
         }
+        if (assumeZeroOpening) {
+            for (key in accountKeys) balances.getOrPut(key) { RunningBalance(null) }
+        }
 
-        val earliestReference = balances.values.minOfOrNull { it.reference.effectiveAt }
-        if (earliestReference != null) {
+        val earliestOpening = balances.values.minOfOrNull { it.startsAt }
+        if (earliestOpening != null) {
             for (record in records) {
-                if (record.occurredAt !in earliestReference..asOf) continue
+                if (record.occurredAt !in earliestOpening..asOf) continue
                 val source = AccountNames.key(record.bank)
                 if (record.movement == Movement.TRANSFER) {
                     val destination = AccountNames.key(record.destination)
@@ -53,12 +57,13 @@ object AccountBalances {
         }
     }
 
-    private class RunningBalance(val reference: AccountBalanceReference) {
-        var cents = reference.balanceCents
+    private class RunningBalance(val reference: AccountBalanceReference?) {
+        val startsAt = reference?.effectiveAt ?: Long.MIN_VALUE
+        var cents = reference?.balanceCents ?: 0L
             private set
 
         fun add(occurredAt: Long, delta: Long) {
-            if (occurredAt >= reference.effectiveAt) cents = Math.addExact(cents, delta)
+            if (occurredAt >= startsAt) cents = Math.addExact(cents, delta)
         }
     }
 
@@ -66,8 +71,9 @@ object AccountBalances {
         (record.movement == Movement.TRANSFER && AccountFunds.isReserve(record.destination))
 
     /**
-     * Checks the full timeline at each affected instant. An older deficit can be corrected
-     * without requiring unrelated historic balances to be rewritten.
+     * Checks the full timeline from zero until the first explicit opening, then applies each
+     * reference before its same-instant movements. An older deficit can be corrected without
+     * requiring unrelated historic balances to be rewritten.
      */
     fun worsensReserveDeficit(
         before: List<Record>, after: List<Record>,
@@ -85,12 +91,12 @@ object AccountBalances {
         val oldBaselines = baselines(beforeReferences)
         val newBaselines = baselines(afterReferences)
         val instants = (oldChanges.keys + newChanges.keys + oldBaselines.keys + newBaselines.keys).sorted()
-        var old: Long? = null
-        var new: Long? = null
+        var old = 0L
+        var new = 0L
         for (at in instants) {
-            old = (oldBaselines[at] ?: old)?.let { Math.addExact(it, oldChanges[at] ?: 0L) }
-            new = (newBaselines[at] ?: new)?.let { Math.addExact(it, newChanges[at] ?: 0L) }
-            if (new != null && new < 0 && (old == null || new < old)) return true
+            old = Math.addExact(oldBaselines[at] ?: old, oldChanges[at] ?: 0L)
+            new = Math.addExact(newBaselines[at] ?: new, newChanges[at] ?: 0L)
+            if (new < 0 && new < old) return true
         }
         return false
     }

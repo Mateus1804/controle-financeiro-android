@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.R
 import com.mateuswilliam.financas.core.AccountNames
@@ -33,7 +35,9 @@ fun AccountPickerField(label: String, value: String, options: List<AccountOption
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { choosing = true }, modifier = Modifier.weight(1f), shape = MaterialTheme.shapes.small, border = null, colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+            OutlinedButton(onClick = { choosing = true }, modifier = Modifier.weight(1f).semantics { contentDescription = label },
+                shape = MaterialTheme.shapes.small, border = null,
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                 AppIcon(selectedIcon(R.drawable.ic_bank, choosing)); Spacer(Modifier.width(8.dp))
                 Text(privateDisplayText(value.ifBlank { "Escolher conta" }, hidden), Modifier.weight(1f).padding(vertical = 8.dp))
                 AppIcon(selectedIcon(R.drawable.ic_chevron_down, choosing))

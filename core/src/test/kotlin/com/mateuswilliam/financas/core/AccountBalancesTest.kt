@@ -38,6 +38,51 @@ class AccountBalancesTest {
         assertEquals(1060L, balances(listOf(reference()), listOf(refund, incomeRefund))[0].balanceCents)
     }
 
+    @Test fun `accounts with implicit zero count actual entries and transfers conserve the total`() {
+        val unused = AccountOption("c", "C", 0)
+        val rows = listOf(
+            record("income", amount = 1000, movement = Movement.INCOME),
+            record("expense", amount = 150),
+            record("transfer", amount = 300, date = 120, movement = Movement.TRANSFER),
+            record("other-expense", amount = 50, date = 130).copy(bank = "B"),
+            record("refund", amount = 20, date = 145, movement = Movement.REFUND).copy(bank = "B"),
+            record("future", amount = 500, date = 201, movement = Movement.INCOME),
+        )
+
+        val result = AccountBalances.calculate(accounts + unused, emptySet(), emptyList(), rows, 200, assumeZeroOpening = true)
+
+        assertEquals(listOf(550L, 270L, 0L), result.map { it.balanceCents })
+        assertTrue(result.all { it.reference == null })
+        assertEquals(820L, AccountFunds.of(result).wealth.cents)
+    }
+
+    @Test fun `explicit opening replaces earlier rows and financial entries at its cutoff still count`() {
+        val opening = reference(amount = 500, date = 150)
+        val futureOpening = reference(2, "b", 400, 201)
+        val rows = listOf(
+            record("already-included", amount = 999, date = 149, movement = Movement.INCOME),
+            record("at-cutoff", date = 150),
+            record("no-reference", amount = 40, date = 199).copy(bank = "B"),
+        )
+
+        val result = AccountBalances.calculate(accounts, emptySet(), listOf(opening, futureOpening), rows, 200,
+            assumeZeroOpening = true)
+
+        assertEquals(AccountBalance(accounts[0], false, 400L, opening), result[0])
+        assertEquals(AccountBalance(accounts[1], false, -40L, null), result[1])
+    }
+
+    @Test fun `reducing a deposit before an explicit reserve reference can overdraw earlier withdrawals`() {
+        val reserve = AccountFunds.RESERVE_NAME
+        val deposit = record("deposit", amount = 1000, movement = Movement.TRANSFER).copy(destination = reserve)
+        val withdrawal = record("withdrawal", amount = 600, date = 120, movement = Movement.TRANSFER).copy(bank = reserve)
+        val rows = listOf(deposit, withdrawal)
+        val refs = listOf(reference(key = AccountFunds.RESERVE_KEY, amount = 400, date = 150))
+
+        assertTrue(AccountBalances.worsensReserveDeficit(rows, listOf(deposit.copy(amountCents = 599), withdrawal), refs))
+        assertFalse(AccountBalances.worsensReserveDeficit(rows, listOf(deposit.copy(amountCents = 600), withdrawal), refs))
+    }
+
     @Test fun `reads ledger rows once across accounts with different cutoffs`() {
         val a = accounts[0]
         val b = accounts[1]

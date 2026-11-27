@@ -12,6 +12,52 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class ReserveTransfersDataTest {
+    @Test fun firstSuccessfulTransferRegistersTheReserveWithoutCreatingAReference() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val repo = FinanceRepository(db, CapturePreferences(context))
+            val dao = db.financeDao()
+            val reserve = AccountFunds.RESERVE_NAME
+            repo.addAccount("Principal")
+            val deposit = Record("aporte", 1000, Movement.TRANSFER, PaymentMethod.PIX,
+                Category.OTHER, "Principal", "Aporte", 100, reserve)
+            val withdrawal = deposit.copy(id = "resgate", bank = reserve, destination = "Principal", occurredAt = 200)
+
+            assertTrue(runCatching { repo.save(withdrawal, null) }.exceptionOrNull() is IllegalArgumentException)
+            assertFalse(repo.save(deposit, "pendencia-inexistente"))
+            assertNull(dao.accountByKey(AccountFunds.RESERVE_KEY))
+
+            assertTrue(repo.save(deposit, null))
+            assertEquals(reserve, dao.accountByKey(AccountFunds.RESERVE_KEY)?.label)
+            assertTrue(dao.allAccountBalanceEvents().isEmpty())
+            assertTrue(repo.save(withdrawal, null))
+            assertEquals(setOf(deposit, withdrawal), repo.exportRecords().toSet())
+        } finally { db.close() }
+    }
+
+    @Test fun withdrawalAndDepositEditsRespectDatesWithoutAnExplicitReference() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()
+        try {
+            val repo = FinanceRepository(db, CapturePreferences(context))
+            val reserve = AccountFunds.RESERVE_NAME
+            repo.addAccount("Principal")
+            val deposit = Record("aporte", 1000, Movement.TRANSFER, PaymentMethod.PIX,
+                Category.OTHER, "Principal", "Aporte", 100, reserve)
+            val withdrawal = deposit.copy(id = "resgate", amountCents = 700, bank = reserve,
+                destination = "Principal", occurredAt = 200)
+
+            assertTrue(repo.save(deposit, null))
+            assertTrue(runCatching { repo.save(withdrawal.copy(occurredAt = 99), null) }.exceptionOrNull() is IllegalArgumentException)
+            assertTrue(repo.save(withdrawal, null))
+            assertTrue(runCatching { repo.save(deposit.copy(amountCents = 699), null, editing = true) }
+                .exceptionOrNull() is IllegalArgumentException)
+            assertEquals(setOf(deposit, withdrawal), repo.exportRecords().toSet())
+            assertTrue(repo.save(deposit.copy(amountCents = 700), null, editing = true))
+        } finally { db.close() }
+    }
+
     @Test fun withdrawalsRespectBalanceAtTheirDateAndEditingDoesNotCountTheOldWithdrawalTwice() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, FinanceDatabase::class.java).build()

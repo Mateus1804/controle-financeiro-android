@@ -24,8 +24,8 @@ for attempt in 1 2 3; do
      adb exec-out cat "$hierarchy" > qa/phone-preview-hierarchy.xml &&
      grep -F 'package="com.mateuswilliam.financas.teste"' qa/phone-preview-hierarchy.xml >/dev/null &&
      grep -F 'text="Rendly"' qa/phone-preview-hierarchy.xml >/dev/null &&
-     grep -F 'text="Patrimônio total"' qa/phone-preview-hierarchy.xml >/dev/null; then
-    echo 'APK de teste instalado ao lado do original; extrato carregado na primeira abertura.' | tee -a qa/phone-preview-launch.log
+     grep -F 'Patrimônio total' qa/phone-preview-hierarchy.xml >/dev/null; then
+    echo 'APK de teste instalado ao lado do original. Resumo carregado na primeira abertura.' | tee -a qa/phone-preview-launch.log
     exit 0
   fi
   if test -f qa/phone-preview-hierarchy.xml && grep -F 'text="Agora não"' qa/phone-preview-hierarchy.xml >/dev/null; then
@@ -40,5 +40,5 @@ for node in root.iter('node'):
 PYTHON
   fi
 done
-echo 'O extrato do APK de teste não foi carregado.' >&2
+echo 'O resumo do APK de teste não foi carregado.' >&2
 exit 1

@@ -169,18 +169,21 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             val record = if (original != null) Refunds.applyOriginal(record, original) else record
             RecordValidation.error(record)?.let { throw IllegalArgumentException(it) }
             if (record.movement == Movement.TRANSFER) {
+                val sourceKey = AccountNames.key(record.bank)
+                val destinationKey = AccountNames.key(record.destination)
                 val unchangedLegacy = previous?.movement == Movement.TRANSFER &&
-                    AccountNames.key(previous.bank) == AccountNames.key(record.bank) && AccountNames.key(previous.destination) == AccountNames.key(record.destination)
-                require(AccountNames.key(record.bank) != AccountNames.key(record.destination)) { "Escolha contas diferentes para a transferência." }
-                if (!unchangedLegacy) require(dao.accountByKey(AccountNames.key(record.bank))?.archived == false &&
-                    dao.accountByKey(AccountNames.key(record.destination))?.archived == false) { "Cadastre as duas contas próprias antes de transferir." }
-                if (AccountFunds.isReserve(record.bank)) {
-                    val reserve = dao.accountByKey(AccountNames.key(record.bank))
-                    require(reserve != null) { "Cadastre a conta Reserva antes de resgatar." }
+                    AccountNames.key(previous.bank) == sourceKey && AccountNames.key(previous.destination) == destinationKey
+                if (!unchangedLegacy) {
+                    require(canTransferWithAccount(sourceKey) && canTransferWithAccount(destinationKey)) {
+                        "Cadastre as duas contas próprias antes de transferir."
+                    }
+                }
+                if (sourceKey == AccountFunds.RESERVE_KEY) {
+                    val reserve = AccountOption(sourceKey, AccountFunds.RESERVE_NAME, 0)
                     val otherRecords = dao.allRecords().filterNot { editing && it.id == record.id }.map { it.toRecord() }
-                    val available = AccountBalances.calculate(listOf(reserve.toOption()), emptySet(),
-                        dao.allAccountBalanceEvents().map { it.toReference() }, otherRecords, record.occurredAt).single().balanceCents
-                    require(available != null) { "Informe o saldo inicial da reserva antes de resgatar." }
+                    val available = checkNotNull(AccountBalances.calculate(listOf(reserve), emptySet(),
+                        dao.allAccountBalanceEvents().map { it.toReference() }, otherRecords, record.occurredAt,
+                        assumeZeroOpening = true).single().balanceCents)
                     require(record.amountCents <= available) { "Saldo insuficiente na reserva na data do resgate." }
                 }
             }
@@ -222,6 +225,11 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
             }
             Unit
         }
+    }
+
+    private suspend fun canTransferWithAccount(key: String): Boolean {
+        val account = dao.accountByKey(key)
+        return if (account == null) key == AccountFunds.RESERVE_KEY else !account.archived
     }
 
     private suspend fun validateReserveChange(affected: List<Record>, replacements: List<Record>, removedIds: Set<String>) {

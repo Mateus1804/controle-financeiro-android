@@ -5,8 +5,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.mateuswilliam.financas.R
+import com.mateuswilliam.financas.core.BudgetPeriod
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -21,4 +23,12 @@ fun MonthPicker(month: YearMonth, onMonth: (YearMonth) -> Unit) {
             IconButton(onClick = { onMonth(month.plusMonths(1)) }, modifier = Modifier.size(48.dp)) { AppIcon(R.drawable.ic_chevron_right, description = "Próximo mês") }
         }
     }
+}
+
+@Composable
+internal fun FinancialPeriodLabel(period: BudgetPeriod) {
+    val format = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    Text("${period.start.format(format)} a ${period.endExclusive.minusDays(1).format(format)}",
+        Modifier.testTag("financial-period"), style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
