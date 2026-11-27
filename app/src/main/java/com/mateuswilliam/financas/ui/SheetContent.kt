@@ -35,7 +35,7 @@ private fun Long.date(zone: ZoneId): LocalDate = Instant.ofEpochMilli(this).atZo
 
 @Composable
 internal fun SheetOverview(
-    summary: SheetSummary, month: YearMonth, period: BudgetPeriod, zone: ZoneId, hidden: Boolean,
+    summary: SheetSummary, month: YearMonth, period: BudgetPeriod, zone: ZoneId, hidden: Boolean, legacyReserve: Long?,
     onMonth: (YearMonth) -> Unit, onSaveToReserve: () -> Unit, onCategory: (Category) -> Unit,
     onToggleArchive: (String, Boolean) -> Unit,
 ) {
@@ -70,7 +70,19 @@ internal fun SheetOverview(
                         if (summary.savedToReserve > 0) CompactMetric("Guardado no período", summary.savedToReserve, hidden, "sheet-saved")
                         if (summary.withdrawnFromReserve > 0) CompactMetric("Resgatado no período", summary.withdrawnFromReserve, hidden, "sheet-withdrawn")
                     }
+                    if (legacyReserve != null && summary.balances.none {
+                            it.account.key == AccountFunds.RESERVE_KEY && it.reference != null
+                        }) {
+                        FinanceDisclosure("Saldo da reserva na versão anterior", "sheet-legacy-reserve") {
+                            Amount(legacyReserve, hidden, size = 16)
+                            Text("Se esse dinheiro ainda estava na reserva, registre o saldo inicial na data correspondente.",
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     if (summary.balances.isNotEmpty()) FinanceDisclosure("Saldos por conta", "sheet-account-list") {
+                        if (summary.balances.any { it.reference == null }) {
+                            Text("Contas sem saldo inicial partem de zero.", style = MaterialTheme.typography.bodySmall)
+                        }
                         for (row in summary.balances) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 val label = privateDisplayText(row.account.label, hidden)

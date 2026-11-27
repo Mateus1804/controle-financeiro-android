@@ -123,6 +123,7 @@ interface FinanceDao {
     @Query("DELETE FROM forecast_meta") suspend fun clearForecastMeta()
 
     @Query("SELECT * FROM account_balance_events ORDER BY effectiveAt, createdAt, id") suspend fun allAccountBalanceEvents(): List<AccountBalanceEventEntity>
+    @Query("SELECT * FROM account_balance_events WHERE id = :id") suspend fun accountBalanceEvent(id: Long): AccountBalanceEventEntity?
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertAccountBalanceEvent(event: AccountBalanceEventEntity): Long
     @Query("DELETE FROM account_balance_events") suspend fun clearAccountBalanceEvents()
     @Query("UPDATE accounts SET archived = :archived WHERE nameKey = :key") suspend fun setAccountArchived(key: String, archived: Boolean)

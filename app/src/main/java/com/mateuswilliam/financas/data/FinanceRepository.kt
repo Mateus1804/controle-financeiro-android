@@ -62,21 +62,37 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         AccountLedgerHistory(accounts, records, references)
     }
 
-    suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String) = writes.withLock {
+    suspend fun configureAccountBalance(name: String, balanceCents: Long, effectiveAt: Long, reason: String,
+        correctionOf: Long? = null,
+    ) = writes.withLock {
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
         require(balanceCents in -Money.MAX_CENTS..Money.MAX_CENTS) { "Saldo fora do limite permitido." }
         require(!AccountFunds.isReserve(label) || balanceCents >= 0) { "A reserva não pode ter saldo inicial negativo." }
-        val date = java.time.Instant.ofEpochMilli(effectiveAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-        require(effectiveAt > 0 && effectiveAt == date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()) { "Informe o início da data de referência." }
-        require(!date.isAfter(LocalDate.now())) { "Use uma data de referência até hoje." }
+        if (correctionOf == null) {
+            val zone = ZoneId.systemDefault()
+            val date = java.time.Instant.ofEpochMilli(effectiveAt).atZone(zone).toLocalDate()
+            require(effectiveAt > 0 && effectiveAt == date.atStartOfDay(zone).toInstant().toEpochMilli()) {
+                "Informe o início da data de referência."
+            }
+            require(!date.isAfter(LocalDate.now(zone))) { "Use uma data de referência até hoje." }
+        }
         val cleanReason = reason.trim()
         require(cleanReason.isNotBlank() && cleanReason.length <= 200 && '\u0000' !in cleanReason) { "Informe um motivo com até 200 caracteres." }
         database.withTransaction {
+            val key = AccountNames.key(label)
+            val original = correctionOf?.let { id ->
+                dao.accountBalanceEvent(id).also { event ->
+                    require(event?.accountKey == key && event.effectiveAt == effectiveAt) {
+                        "O saldo original mudou. Abra o lançamento novamente."
+                    }
+                }
+            }
             val oldReferences = if (AccountFunds.isReserve(label)) dao.allAccountBalanceEvents().map { it.toReference() } else null
+            val now = System.currentTimeMillis()
             rememberAccount(label)
-            dao.insertAccountBalanceEvent(AccountBalanceEventEntity(accountKey = AccountNames.key(label), balanceCents = balanceCents,
-                effectiveAt = effectiveAt, createdAt = System.currentTimeMillis(), reason = cleanReason))
+            dao.insertAccountBalanceEvent(AccountBalanceEventEntity(accountKey = key, balanceCents = balanceCents,
+                effectiveAt = effectiveAt, createdAt = maxOf(now, original?.createdAt ?: now), reason = cleanReason))
             if (oldReferences != null) {
                 val records = dao.allRecords().map { it.toRecord() }
                 require(!AccountBalances.worsensReserveDeficit(records, records, oldReferences,
@@ -106,10 +122,15 @@ class FinanceRepository(private val database: FinanceDatabase, private val setti
         dao.touchAccount(key, time)
     }
 
-    suspend fun addAccount(name: String): String = writes.withLock {
+    suspend fun addAccount(name: String, requireActive: Boolean = false): String = writes.withLock {
         val label = AccountNames.clean(name)
         require(label.isNotBlank() && label.length <= 80 && '\u0000' !in label) { "Informe um nome de conta com até 80 caracteres." }
-        database.withTransaction { rememberAccount(label) }
+        database.withTransaction {
+            require(!requireActive || dao.accountByKey(AccountNames.key(label))?.archived != true) {
+                "Esta conta está arquivada. Reative-a no Resumo."
+            }
+            rememberAccount(label)
+        }
         dao.accountByKey(AccountNames.key(label))!!.label
     }
 

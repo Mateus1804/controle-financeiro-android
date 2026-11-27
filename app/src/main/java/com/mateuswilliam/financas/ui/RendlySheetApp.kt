@@ -21,6 +21,7 @@ import com.mateuswilliam.financas.core.Category
 import com.mateuswilliam.financas.core.CycleCalendar
 import com.mateuswilliam.financas.core.CycleConfiguration
 import com.mateuswilliam.financas.core.FinancialPeriods
+import com.mateuswilliam.financas.core.ForecastCalculator
 import com.mateuswilliam.financas.core.SheetSummary
 import java.time.Instant
 import java.time.YearMonth
@@ -189,10 +190,15 @@ internal fun RendlySheetApp(finance: FinanceViewModel, cycles: CycleViewModel, o
                         onMonth = { selectedMonth = it.toString() },
                         onEdit = { openEntry(SheetEntryKind.of(it.movement), recordId = it.id) },
                         onBalance = { openEntry(SheetEntryKind.OPENING, balanceId = it.id) })
-                    else -> SheetOverview(totals, month, period, zone, hidden, onMonth = { selectedMonth = it.toString() },
-                        onSaveToReserve = { openEntry(SheetEntryKind.TRANSFER, toReserve = true) },
-                        onCategory = { category = it; accountKey = null; showingRecords = true },
-                        onToggleArchive = finance::setAccountArchived)
+                    else -> {
+                        val olderReserve = calendar?.reserveEvents
+                        val legacyReserve = remember(olderReserve) { olderReserve?.let(ForecastCalculator::reserveBalance) }
+                        SheetOverview(totals, month, period, zone, hidden, legacyReserve,
+                            onMonth = { selectedMonth = it.toString() },
+                            onSaveToReserve = { openEntry(SheetEntryKind.TRANSFER, toReserve = true) },
+                            onCategory = { category = it; accountKey = null; showingRecords = true },
+                            onToggleArchive = finance::setAccountArchived)
+                    }
                 }
             }
         }
@@ -212,7 +218,7 @@ internal fun RendlySheetApp(finance: FinanceViewModel, cycles: CycleViewModel, o
     }
     entryKind?.takeIf { state.loaded && (editRecordId == null || editRecord != null) &&
         (editBalanceId == null || editBalance != null) }?.let { kind ->
-        val options = state.accounts
+        val options = accountRows.filterNot { it.archived }.map { it.account }
         val reserveMissing = accountRows.none { it.account.key == AccountFunds.RESERVE_KEY }
         val accounts = if (reserveMissing) options + AccountOption(AccountFunds.RESERVE_KEY, AccountFunds.RESERVE_NAME, 0) else options
         key(editRecordId, editBalanceId, kind) {
@@ -222,7 +228,7 @@ internal fun RendlySheetApp(finance: FinanceViewModel, cycles: CycleViewModel, o
                 onAddAccount = finance::addAccount,
                 onRecord = { record -> finance.save(record, editRecord != null) { entryKind = null } },
                 onBalance = { label, cents, at, reason ->
-                    finance.configureAccountBalance(label, cents, at, reason) { entryKind = null }
+                    finance.configureAccountBalance(label, cents, at, reason, editBalance?.id) { entryKind = null }
                 },
                 onDelete = finance::delete)
         }

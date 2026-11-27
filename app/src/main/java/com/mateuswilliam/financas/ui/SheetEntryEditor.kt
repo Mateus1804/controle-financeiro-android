@@ -47,13 +47,17 @@ internal fun SheetEntryEditor(
 ) {
     val defaultAccount = accounts.firstOrNull { it.key == AccountNames.key(lastAccount) && it.key != AccountFunds.RESERVE_KEY }
         ?: accounts.firstOrNull { it.key != AccountFunds.RESERVE_KEY }
+    val fallback = "Carteira".takeUnless { wallet ->
+        historicalAccounts.any { it.key == AccountNames.key(wallet) } &&
+            accounts.none { it.key == AccountNames.key(wallet) }
+    }.orEmpty()
     val accountFromReference = reference?.let { ref -> historicalAccounts.firstOrNull { it.key == ref.accountKey }?.label }
     var kind by rememberSaveable { mutableStateOf(initialKind) }
     val newEntry = existing == null && reference == null
     val id = rememberSaveable { existing?.id ?: UUID.randomUUID().toString() }
     var bank by rememberSaveable {
         mutableStateOf(existing?.bank ?: accountFromReference ?: defaultAccount?.label ?:
-            if (initialKind == SheetEntryKind.TRANSFER) "" else "Carteira")
+            if (initialKind == SheetEntryKind.TRANSFER) "" else fallback)
     }
     var destination by rememberSaveable {
         mutableStateOf(existing?.destination.orEmpty().ifBlank { if (toReserve) AccountFunds.RESERVE_NAME else "" })
@@ -117,10 +121,13 @@ internal fun SheetEntryEditor(
             if (newEntry) ChoiceField("Tipo de lançamento", kind, SheetEntryKind.entries.filterNot { it == SheetEntryKind.REFUND }, { it.title }) {
                 if (!busy && it != kind) {
                     kind = it
-                    category = if (it == SheetEntryKind.INCOME) Category.SALARY else Category.OTHER
+                    category = when (it) {
+                        SheetEntryKind.INCOME -> Category.SALARY
+                        else -> Category.OTHER
+                    }
                     if (it != SheetEntryKind.OPENING) negative = false
                     if (it == SheetEntryKind.TRANSFER && accounts.none { option -> option.key == AccountNames.key(bank) }) bank = ""
-                    if (it != SheetEntryKind.TRANSFER && bank.isBlank()) bank = defaultAccount?.label ?: "Carteira"
+                    if (it != SheetEntryKind.TRANSFER && bank.isBlank()) bank = defaultAccount?.label ?: fallback
                 }
             } else Text(kind.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PrivateValueGate(hidden, "Mostrar valor para edição") {
@@ -138,12 +145,12 @@ internal fun SheetEntryEditor(
                 val allowed = (categoriesFor(kind.movement ?: Movement.EXPENSE, existing?.reversalMovement ?: Movement.EXPENSE) + category).distinct()
                 ChoiceField("Categoria", category, allowed, { it.label }) { if (!busy) category = it }
             }
-            OutlinedButton(onClick = {
+            val dateLabel = "Data · ${date.format(financeDateFormat)}"
+            if (reference != null) Text(dateLabel, style = MaterialTheme.typography.bodyMedium)
+            else OutlinedButton(onClick = {
                 keyboard?.hide()
                 showFinanceDatePicker(context, calendarTheme, date) { dateText = it.toString() }
-            }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("sheet-entry-date")) {
-                Text("Data · ${date.format(financeDateFormat)}")
-            }
+            }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("sheet-entry-date")) { Text(dateLabel) }
             PrivateValueGate(hidden && privateDisplayText(description, true) != description, "Mostrar descrição para edição") {
                 OutlinedTextField(description, { description = it.take(200) },
                     label = { Text(if (opening || transfer) "Descrição opcional" else "Descrição") }, singleLine = true,
@@ -168,11 +175,12 @@ internal fun SheetEntryEditor(
                 if (cents != null && error == null) {
                     keyboard?.hide()
                     val startOfDay = date.atStartOfDay(zone).toInstant().toEpochMilli()
-                    if (opening) onBalance(accountText, if (negative) -cents else cents, startOfDay, memo)
+                    if (opening) onBalance(accountText, if (negative) -cents else cents, reference?.effectiveAt ?: startOfDay, memo)
                     else {
+                        val now = Instant.now().atZone(zone)
                         val at = when {
                             originalTime?.toLocalDate() == date -> originalTime.toInstant().toEpochMilli()
-                            date == today -> System.currentTimeMillis()
+                            date == now.toLocalDate() -> now.toInstant().toEpochMilli()
                             else -> startOfDay
                         }
                         onRecord(candidate(at))

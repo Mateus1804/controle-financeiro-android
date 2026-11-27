@@ -10,7 +10,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mateuswilliam.financas.core.Record
-import com.mateuswilliam.financas.core.AccountOption
 import com.mateuswilliam.financas.core.AccountBalance
 import com.mateuswilliam.financas.core.AccountBalanceReference
 import com.mateuswilliam.financas.data.AccountLedger
@@ -25,11 +24,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -38,35 +36,22 @@ import kotlinx.coroutines.withContext
 data class FinanceState(
     val records: List<Record> = emptyList(),
     val loaded: Boolean = false,
-    val accounts: List<AccountOption> = emptyList(),
     val accountBalances: List<AccountBalance> = emptyList(),
     val balanceReferences: List<AccountBalanceReference> = emptyList(),
     val asOf: Long = System.currentTimeMillis(),
     val loadError: String? = null,
 )
 
-internal class FinanceStateSources(
-    val ledger: Flow<AccountLedger>,
-    val accounts: Flow<List<AccountOption>>,
-)
-
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun observeFinanceState(
     refreshes: Flow<Long>,
-    loadSources: suspend () -> FinanceStateSources,
+    loadLedger: suspend () -> Flow<AccountLedger>,
 ): Flow<FinanceState> = refreshes.flatMapLatest {
     flow {
-        val sources = loadSources()
-        emitAll(combine(sources.ledger, sources.accounts) { snapshot, options ->
-            FinanceState(
-                records = snapshot.records,
-                loaded = true,
-                accounts = options,
-                accountBalances = snapshot.balances,
-                balanceReferences = snapshot.references,
-                asOf = snapshot.asOf,
-            )
-        })
+        loadLedger().collect { emit(it) }
+    }.map { snapshot ->
+        FinanceState(records = snapshot.records, loaded = true, accountBalances = snapshot.balances,
+            balanceReferences = snapshot.references, asOf = snapshot.asOf)
     }.catch { exception ->
         if (exception !is Exception || exception is CancellationException) throw exception
         emit(FinanceState(loadError = "Não foi possível carregar os dados financeiros. Tente novamente."))
@@ -80,8 +65,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val message = MutableStateFlow<String?>(null)
     private val refreshRequests = MutableStateFlow(0L)
     val state = observeFinanceState(refreshRequests) {
-        val repository = loadRepository()
-        FinanceStateSources(repository.observeAccountLedger(clockChanges()), repository.accounts)
+        loadRepository().observeAccountLedger(clockChanges())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinanceState())
     val stagedRestore = MutableStateFlow<StagedRestore?>(null)
     private val dataRevision = MutableStateFlow(0L)
@@ -113,8 +97,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun delete(id: String) = action { loadRepository().deleteRecord(id); "Lançamento removido." }
     fun refreshBalances() { refreshRequests.update { it + 1 } }
-    fun configureAccountBalance(name: String, cents: Long, effectiveAt: Long, reason: String, onSaved: () -> Unit) = action {
-        loadRepository().configureAccountBalance(name, cents, effectiveAt, reason)
+    fun configureAccountBalance(name: String, cents: Long, effectiveAt: Long, reason: String,
+        correctionOf: Long?, onSaved: () -> Unit,
+    ) = action {
+        loadRepository().configureAccountBalance(name, cents, effectiveAt, reason, correctionOf)
         onSaved()
         "Saldo de referência salvo. Nenhuma receita ou despesa foi criada."
     }
@@ -220,5 +206,5 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    suspend fun addAccount(name: String): String = loadRepository().addAccount(name)
+    suspend fun addAccount(name: String): String = loadRepository().addAccount(name, requireActive = true)
 }

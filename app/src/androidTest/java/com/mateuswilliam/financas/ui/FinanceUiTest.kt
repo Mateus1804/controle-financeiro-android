@@ -4,7 +4,6 @@ import android.os.ParcelFileDescriptor
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.test.espresso.Espresso
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mateuswilliam.financas.FinanceApplication
 import com.mateuswilliam.financas.MainActivity
@@ -46,6 +45,7 @@ class FinanceUiTest {
         amount("100000")
         rule.onNodeWithContentDescription("Destino").performScrollTo().performClick()
         clickText(AccountFunds.RESERVE_NAME)
+        waitFor(hasContentDescription("Destino") and hasText(AccountFunds.RESERVE_NAME))
         save()
         waitRecords(3)
 
@@ -148,6 +148,17 @@ class FinanceUiTest {
         rule.onNodeWithText("Despesa fictícia de ••••").assertExists()
     }
 
+    @Test fun anArchivedWalletIsNeverSuggestedForANewEntry() {
+        runBlocking {
+            app.repository.addAccount("Carteira")
+            app.repository.setAccountArchived(AccountNames.key("Carteira"), true)
+        }
+        assertMetric("sheet-wealth", 0)
+        scrollSummary(hasTestTag("sheet-account-list"))
+        openEntry(SheetEntryKind.EXPENSE)
+        rule.onNodeWithContentDescription("Conta").assertTextContains("Escolher conta")
+    }
+
     @Test fun editorRemainsUsableOnANarrowScreenAtDoubleFontScale() {
         val previousSize = Regex("Override size: ([0-9]+x[0-9]+)").find(shell("wm size"))?.groupValues?.get(1) ?: "reset"
         val previousFont = shell("settings get system font_scale").trim().takeIf { it.toFloatOrNull() != null } ?: "1.0"
@@ -210,8 +221,8 @@ class FinanceUiTest {
         rule.onNodeWithTag("sheet-description").performScrollTo().performTextReplacement(value)
 
     private fun save(expectClosed: Boolean = true) {
-        Espresso.closeSoftKeyboard()
-        rule.onNodeWithTag("sheet-entry-save").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
+        rule.onNodeWithTag("sheet-entry-save").performScrollTo().assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.OnClick) { assertTrue(it()) }
         if (expectClosed) rule.waitUntil(10000) { rule.onAllNodesWithTag("sheet-entry-save").fetchSemanticsNodes().isEmpty() }
     }
 
